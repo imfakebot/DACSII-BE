@@ -1,0 +1,108 @@
+@startuml
+' Class Diagram (Gold Standard) - Rich Model with Composition/Aggregation
+
+title Hệ thống Đặt sân bóng đá - Sơ đồ Lớp 
+
+skinparam classAttributeIconSize 0
+
+' --- Định nghĩa các Lớp với đầy đủ chi tiết ---
+
+class User {
+  ' Thuộc tính
+  + id: string
+  + fullName: string
+  + email: string
+  + role: RoleEnum
+  + status: UserStatusEnum
+  + isEmailVerified: boolean
+  + isPhoneVerified: boolean
+  + createdAt: Date
+  --
+  ' Phương thức
+  + changePassword(newPass: string): void
+  + updateProfile(profileDto): void
+  + suspend(): void
+  + activate(): void
+}
+
+class Field {
+  ' Thuộc tính
+  + id: string
+  + name: string
+  + address: string
+  + status: FieldStatusEnum
+  --
+  ' Phương thức
+  + open(): void
+  + closeForMaintenance(): void
+}
+
+class FieldType {
+  ' Thuộc tính
+  + id: string
+  + name: string
+  + pricePerHour: number
+  --
+  ' Phương thức
+  + updatePrice(newPrice: number): void
+}
+
+class Booking {
+  ' Thuộc tính
+  + id: string
+  + startTime: Date
+  + endTime: Date
+  + totalPrice: number
+  + status: BookingStatusEnum
+  + createdAt: Date
+  --
+  ' Phương thức
+  + confirm(): void
+  + cancel(): void
+}
+
+class Review {
+  ' Thuộc tính
+  + id: string
+  + rating: int
+  + comment: string
+  + createdAt: Date
+  --
+  ' Phương thức
+  + editComment(newComment: string): void
+}
+
+class Payment {
+  ' Thuộc tính
+  + id: string
+  + amount: number
+  + status: PaymentStatusEnum
+  + paymentMethod: string
+  + transactionCode: string
+  + createdAt: Date
+  + completedAt: Date
+  --
+  ' Phương thức
+  + markAsSuccess(transCode: string): void
+  + markAsFailed(): void
+  + initiateRefund(): void
+}
+
+
+' --- Định nghĩa các Mối quan hệ Chi tiết ---
+
+' Composition (*--): User "sở hữu" Booking và Review. Nếu User bị xóa, chúng cũng bị xóa.
+User "1" *-- "0..*" Booking : books
+User "1" *-- "0..*" Review : writes
+
+' Composition (*--): Field "sở hữu" Booking và Review của nó.
+Field "1" *-- "0..*" Booking : is booked for
+Field "1" *-- "0..*" Review : is reviewed for
+
+' Aggregation (o--): FieldType là một "tập hợp" các Field.
+FieldType "1" o-- "0..*" Field : has
+
+' Composition (*--): Booking "sở hữu" Payment của nó.
+Booking "1" *-- "1" Payment : has
+
+@enduml
