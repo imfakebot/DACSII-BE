@@ -1,4 +1,4 @@
-@startuml
+@startuml Soccer Field Booking System - Class Diagram
 ' Class Diagram (Gold Standard) - Rich Model with Composition/Aggregation
 
 title Hệ thống Đặt sân bóng đá - Sơ đồ Lớp 
