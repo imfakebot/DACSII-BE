@@ -1,4 +1,4 @@
-@startuml Booking 
+@startuml Create Booking 
 ' Sơ đồ Tuần tự Hoàn Chỉnh - Usecase "Đặt Sân"
 
 title Sơ đồ Tuần tự - Usecase "Đặt Sân"
@@ -82,7 +82,7 @@ group Luồng Hệ thống Xác nhận Thanh toán (Webhook/Callback)
     DB --> BService: bookingToConfirm
     deactivate DB
 
-    ' --- SỬA LỖI Ở ĐÂY ---
+
     ' Hành động gọi phương thức của Rich Domain Object là một xử lý nội bộ của Service
     BService -> BService: bookingToConfirm.confirm()
     note right of BService: Gọi phương thức của Rich Domain Object\nđể đóng gói và thực thi logic nghiệp vụ

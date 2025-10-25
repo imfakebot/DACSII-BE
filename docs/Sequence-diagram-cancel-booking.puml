@@ -1,0 +1,71 @@
+@startuml Cancel Booking
+' Sơ đồ Tuần tự - Usecase "Hủy Lịch Đặt Sân" (Thành viên thực hiện)
+
+
+title Sơ đồ Tuần tự - Usecase "Hủy Lịch Đặt Sân"
+
+' --- Cấu hình & Định nghĩa các Thành phần ---
+autonumber "<b>[0]"
+
+actor ":Thành viên" as Member
+participant ":BookingController" as BController
+participant ":BookingService" as BService
+participant ":NotificationService" as NotiService
+participant ":Database" as DB
+
+skinparam sequenceActorBorderColor #5E81AC
+skinparam sequenceParticipantBorderColor #5E81AC
+skinparam sequenceLifeLineBorderColor #BF616A
+
+' --- Bắt đầu luồng nghiệp vụ ---
+
+Member -> BController: Yêu cầu hủy sân (PATCH /bookings/{id}/cancel)
+activate BController
+note left: Người dùng cung cấp ID của lịch đặt\nvà token xác thực (chứa userId)
+
+BController -> BService: cancelBooking(bookingId, userId)
+activate BService
+note right of BService: Bắt đầu xử lý logic nghiệp vụ hủy sân
+
+BService -> DB: Tìm Booking theo bookingId
+activate DB
+DB --> BService: bookingEntity
+deactivate DB
+
+' alt/else là cấu trúc để thể hiện các luồng rẽ nhánh (thành công hoặc thất bại)
+alt Luồng thành công (Kiểm tra hợp lệ)
+
+    ' Logic kiểm tra được thực thi bên trong Service
+    BService -> BService: validateCancellation(booking, userId)
+    note right of BService: **Kiểm tra nghiệp vụ:**\n1. Lịch đặt này có thuộc về user không?\n2. Trạng thái lịch có phải là 'CONFIRMED' không?\n3. Còn trong thời gian cho phép hủy không?
+
+    ' Gọi phương thức của đối tượng nghiệp vụ "thông minh"
+    BService -> BService: bookingEntity.cancel()
+    note right of BService: Gọi phương thức của Rich Domain Object\nđể thay đổi trạng thái thành 'CANCELLED'
+
+    BService -> DB: Cập nhật Booking (status="CANCELLED")
+    activate DB
+    DB --> BService
+    deactivate DB
+    note right of BService: (Optional) Có thể gọi FieldService\nđể cập nhật lại trạng thái sân là 'Còn trống'
+
+    BService -> NotiService: sendCancellationConfirmation(bookingEntity)
+    activate NotiService
+    note right of NotiService: Gửi email/SMS thông báo hủy thành công
+    NotiService --> BService
+    deactivate NotiService
+
+    BService --> BController: { success: true, message: "Hủy lịch thành công" }
+
+else Luồng thất bại (Không hợp lệ)
+
+    BService --> BController: Lỗi (Ví dụ: "Không thể hủy lịch đã quá hạn")
+    note right of BService: Ném ra một Exception (ví dụ: ForbiddenException,\nBadRequestException)
+
+end
+
+deactivate BService
+BController --> Member: 200 OK (hoặc mã lỗi 4xx)
+deactivate BController
+
+@enduml
