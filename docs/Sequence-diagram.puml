@@ -1,6 +1,5 @@
 @startuml Booking 
 ' Sơ đồ Tuần tự Hoàn Chỉnh - Usecase "Đặt Sân"
-' Phiên bản ĐÃ SỬA LỖI, có cấu trúc và chú thích chi tiết
 
 title Sơ đồ Tuần tự - Usecase "Đặt Sân"
 
