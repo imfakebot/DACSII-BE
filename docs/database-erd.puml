@@ -20,9 +20,14 @@ package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
       + **id** (PK) : VARCHAR
       --
       fullName : VARCHAR
+      dateOfBirth : DATE
+      gender : VARCHAR
       phoneNumber : VARCHAR
       avatarUrl : TEXT
+      bio : TEXT
       createdAt : DATETIME
+      --
+      # //addressId// (FK) : VARCHAR
     }
 
     entity "Roles" as ROL {
@@ -40,6 +45,9 @@ package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
       status : VARCHAR
       isVerified : BOOLEAN
       lastLogin : DATETIME
+      twoFactorEnabled : BOOLEAN
+      twoFactorSecret : VARCHAR
+      twoFactorRecoveryCodes : TEXT
       --
       # //userProfileId// (FK) : VARCHAR
       # //roleId// (FK) : INT
@@ -213,7 +221,7 @@ package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
 ' --- ĐỊNH NGHĨA CÁC ĐƯỜNG NỐI (MỐI QUAN HỆ) - PHIÊN BẢN NHẤT QUÁN ---
 
 ' Khối 1
-UP ||--o{ AC : has
+AC ||--|| UP : has
 ROL ||--o{ AC : defines
 
 ' Khối 2
@@ -221,6 +229,7 @@ C ||--o{ D
 D ||--o{ W
 W ||--o{ ADDR
 ADDR ||--|| F
+UP }o--|| ADDR : "resides at"
 FT ||--o{ F : categorizes
 F ||--o{ FI : has
 F }|..|{ FU
