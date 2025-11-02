@@ -1,4 +1,4 @@
-@startuml
+@startuml ERD
 ' ERD CHI TIẾT NHẤT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (ĐÃ SỬA LỖI CÚ PHÁP LẦN 3)
 
 title Sơ đồ Quan hệ Thực thể - Hệ thống Đặt sân bóng đá
@@ -60,17 +60,16 @@ package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
     entity "Cities" as C {
       + **id** (PK) : INT
       --
-      name: VARCHAR
-    }
-    entity "Districts" as D {
-      + **id** (PK) : INT
-      --
-      name: VARCHAR
+      name : VARCHAR
+      type : VARCHAR
     }
     entity "Wards" as W {
       + **id** (PK) : INT
       --
-      name: VARCHAR
+      name : VARCHAR
+      type : VARCHAR
+      --
+      # //cityId// (FK) : INT
     }
 
     entity "Addresses" as ADDR {
@@ -79,7 +78,6 @@ package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
       street : VARCHAR
       --
       # //wardId// (FK) : INT
-      # //districtId// (FK) : INT
       # //cityId// (FK) : INT
     }
 
@@ -225,8 +223,7 @@ AC ||--|| UP : has
 ROL ||--o{ AC : defines
 
 ' Khối 2
-C ||--o{ D
-D ||--o{ W
+C ||--o{ W
 W ||--o{ ADDR
 ADDR ||--|| F
 UP }o--|| ADDR : "resides at"
