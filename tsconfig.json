@@ -1,25 +1,32 @@
 {
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  }
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2017",
+        "sourceMap": true,
+        "outDir": "./dist",
+        /* Tùy chọn để tăng cường tính chặt chẽ */
+        "strict": true, // Bật tất cả các chế độ kiểm tra nghiêm ngặt
+        "noImplicitAny": true, // Báo lỗi nếu có biến hoặc tham số không được định kiểu rõ ràng
+        "strictNullChecks": true, // Xử lý `null` và `undefined` một cách nghiêm ngặt hơn
+        "esModuleInterop": true, // Giúp import các thư viện CommonJS dễ dàng hơn (ví dụ: `import express from 'express'`)
+        "forceConsistentCasingInFileNames": true, // Đảm bảo việc import file đúng với kiểu chữ hoa/thường của tên file
+        /* Tùy chọn nâng cao (hữu ích cho NestJS/Express) */
+        "experimentalDecorators": true, // Bắt buộc cho các framework dùng Decorator như NestJS
+        "emitDecoratorMetadata": true, // Bắt buộc cho các framework dùng Decorator như NestJS
+        /* Tùy chọn về Module */
+        "moduleResolution": "node", // Cách TypeScript tìm kiếm module, nên để là 'node'
+        "baseUrl": "./", // Thư mục gốc để giải quyết các đường dẫn import tuyệt đối
+        "paths": { // (Tùy chọn) Định nghĩa các đường dẫn import ngắn gọn
+            "@/*": [
+                "src/*"
+            ]
+        }
+    },
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
 }
