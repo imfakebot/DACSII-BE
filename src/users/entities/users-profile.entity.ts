@@ -1,18 +1,19 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-
+import { BeforeInsert, Column, CreateDateColumn, Entity, OneToOne, PrimaryColumn } from "typeorm";
+import { Account } from "./account.entity";
+import { v4 as uuidv4 } from 'uuid';
 @Entity({ name: 'UsersProfile' })
 export class UserProfile {
-    @PrimaryGeneratedColumn()
+    @PrimaryColumn('varchar')
     id?: string;
 
     @Column()
-    fullname?: string;
+    fullName?: string;
 
     @Column()
-    dateofbirth?: Date;
+    dateOfBirth?: Date;
 
     @Column({ unique: true })
-    phonenumber?: string;
+    phoneNumber?: string;
 
     @Column()
     avatarURL?: string;
@@ -20,6 +21,16 @@ export class UserProfile {
     @Column()
     bio?: string;
 
-    @Column()
+    @CreateDateColumn()
     createdAt?: Date;
+
+    @OneToOne(() => Account, (account) => account.userProfileID)
+    account?: Account;
+
+    @BeforeInsert()
+    generateId() {
+        if (!this.id)
+            this.id = uuidv4();
+    }
+
 }

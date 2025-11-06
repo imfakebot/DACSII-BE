@@ -55,6 +55,8 @@ CREATE TABLE roles
     status VARCHAR
         (20) NOT NULL DEFAULT 'active' COMMENT 'e.g., active, inactive, banned',
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    verification_code VARCHAR(255) NULL,
+    verification_code_expires_at DATETIME NULL,
     last_login TIMESTAMP NULL,
     two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     two_factor_secret VARCHAR
