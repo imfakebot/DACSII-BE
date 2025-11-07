@@ -50,6 +50,8 @@ package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
       twoFactorEnabled : BOOLEAN
       twoFactorSecret : VARCHAR
       twoFactorRecoveryCodes : TEXT
+      createdAt : DATETIME
+      updatedAt : DATETIME
       --
       # //userProfileId// (FK) : VARCHAR
       # //roleId// (FK) : INT

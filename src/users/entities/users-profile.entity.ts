@@ -1,19 +1,23 @@
-import { BeforeInsert, Column, CreateDateColumn, Entity, OneToOne, PrimaryColumn } from "typeorm";
+import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn } from "typeorm";
 import { Account } from "./account.entity";
 import { v4 as uuidv4 } from 'uuid';
-@Entity({ name: 'UsersProfile' })
+import { Address } from "./address.entity";
+@Entity({ name: 'user_profiles' })
 export class UserProfile {
     @PrimaryColumn('varchar')
     id?: string;
 
-    @Column()
-    fullName?: string;
+    @Column({ type: 'varchar', length: 255 })
+    full_name?: string;
 
-    @Column()
-    dateOfBirth?: Date;
+    @Column({ type: 'date', nullable: true })
+    date_of_birth?: Date;
+
+    @Column({ type: 'varchar' })
+    gender?: string;
 
     @Column({ unique: true })
-    phoneNumber?: string;
+    phone_number?: string;
 
     @Column()
     avatarURL?: string;
@@ -22,10 +26,21 @@ export class UserProfile {
     bio?: string;
 
     @CreateDateColumn()
-    createdAt?: Date;
+    created_at?: Date;
 
-    @OneToOne(() => Account, (account) => account.userProfileID)
+    @Column()
+    updated_at?: Date;
+
+
+    @OneToOne(() => Account, (account) => account.userProfile)
     account?: Account;
+
+    @Column({ name: 'address_id', type: 'varchar', length: 36, nullable: true })
+    address_id?: string;
+
+    @OneToOne(() => Address)
+    @JoinColumn({ name: 'address_id' })
+    address?: Address;
 
     @BeforeInsert()
     generateId() {

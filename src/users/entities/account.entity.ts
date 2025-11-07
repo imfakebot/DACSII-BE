@@ -3,7 +3,7 @@ import { Role } from "./role.entity";
 import { UserProfile } from "./users-profile.entity";
 import { v4 as uuidv4 } from 'uuid';
 
-@Entity({ name: 'Account' })
+@Entity({ name: 'accounts' })
 export class Account {
     @PrimaryColumn('varchar')
     id?: string;
@@ -12,7 +12,7 @@ export class Account {
     email?: string;
 
     @Column({ type: 'varchar', length: 255 })
-    passwordHash?: string;
+    password_hash?: string;
 
     @Column({ type: 'varchar', length: 255 })
     provider?: string;
@@ -21,36 +21,36 @@ export class Account {
     status?: string;
 
     @Column({ type: 'boolean', default: false })
-    isVerified?: boolean;
+    is_verified?: boolean;
 
     @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-    lastLogin?: Date;
+    last_login?: Date;
 
     @Column({ type: 'boolean', default: false })
-    twoFactorEnabled?: boolean;
+    two_factor_enabled?: boolean;
 
     @Column({ type: 'varchar', nullable: true })
-    twoFactorSecret?: string;
+    two_factor_secret?: string;
 
     @Column({ type: 'text', nullable: true })
-    twoFactorRecoveryCodes?: string;
+    two_factor_recovery_codes?: string;
 
     @Column({ type: 'varchar', length: 255, nullable: true })
-    verificationCode?: string;
+    verification_code?: string;
 
     @Column({ type: 'timestamp', nullable: true })
-    verificationCodeExpiresAt?: Date;
+    verification_code_expires_at?: Date;
 
     @Column({ type: 'varchar', length: 255, unique: true })
-    userProfileID?: string;
+    user_profile_id?: string;
 
 
     @ManyToOne(() => Role, (role) => role.accounts, { eager: true })
-    @JoinColumn({ name: 'roleID' })
+    @JoinColumn({ name: 'role_id' })
     role?: Role;
 
     @OneToOne(() => UserProfile, (userProfile) => userProfile.account, { eager: true })
-    @JoinColumn({ name: 'userProfileID' })
+    @JoinColumn({ name: 'user_profile_id' })
     userProfile?: UserProfile;
 
     @BeforeInsert()

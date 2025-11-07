@@ -12,7 +12,7 @@ export class AuthService {
         private readonly mailerService: MailerService
     ) { }
     async initateRegistration(registerDto: RegisterUserDto) {
-        const { email, fullName, password } = registerDto;
+        const { email, full_name, password, phoneNumber, gender, street, ward_id, city_id } = registerDto;
 
         if (!email) {
             throw new ConflictException('Email is required');
@@ -22,12 +22,12 @@ export class AuthService {
             throw new ConflictException('Password is required');
         }
 
-        if (!fullName) {
+        if (!full_name) {
             throw new ConflictException('Full name is required');
         }
 
         const existingAccount = await this.userService.findAccountByEmail(email);
-        if (existingAccount && existingAccount.isVerified) {
+        if (existingAccount && existingAccount.is_verified) {
             throw new ConflictException('Email already in use');
         }
 
@@ -37,17 +37,23 @@ export class AuthService {
 
         if (existingAccount) {
             await this.userService.updateUnverifiedAccount(existingAccount.id as string, {
-                passwordHash,
-                verificationCode,
-                verificationCodeExpiresAt: expiresAt,
+                password_hash: passwordHash,
+                verification_code: verificationCode,
+                verification_code_expires_at: expiresAt,
             });
         } else {
             await this.userService.createUnverifiedUser({
-                email,
+                email: email,
                 passwordHash,
-                fullName,
-                verificationCode,
-                expiresAt
+                fullName: full_name,
+                bio: null,
+                gender: gender || null,
+                phoneNumber: phoneNumber as string,
+                verificationCode: verificationCode,
+                expiresAt,
+                street: street,
+                ward_id: ward_id,
+                city_id: city_id,
             });
         }
 
@@ -62,11 +68,11 @@ export class AuthService {
 
     async completeRegistration(email: string, code: string) {
         const account = await this.userService.findAccountByEmail(email);
-        if (!account || account.isVerified) {
+        if (!account || account.is_verified) {
             throw new ConflictException('Invalid verification attempt');
         }
 
-        if (account.verificationCode !== code || (account.verificationCodeExpiresAt && account.verificationCodeExpiresAt < new Date())) {
+        if (account.verification_code !== code || (account.verification_code_expires_at && account.verification_code_expires_at < new Date())) {
             throw new ConflictException('Invalid or expired verification code');
         }
 

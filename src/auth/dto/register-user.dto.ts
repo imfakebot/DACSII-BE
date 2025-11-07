@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
 
 export class RegisterUserDto {
     @IsNotEmpty({ message: 'Email is required' })
@@ -12,9 +12,26 @@ export class RegisterUserDto {
 
     @IsNotEmpty({ message: 'Full name is required' })
     @IsString()
-    fullName?: string;
+    full_name?: string;
 
     @IsNotEmpty({ message: 'Phone number is required' })
     @IsString()
     phoneNumber?: string;
+
+    @IsOptional()
+    @IsString()
+    @IsIn(['male', 'female', 'other'], { message: 'Gender must be one of male, female, or other' })
+    gender?: string;
+
+    @IsOptional()
+    @IsString()
+    street?: string;
+
+    @IsOptional()
+    @IsNumber()
+    ward_id?: number;
+
+    @IsOptional()
+    @IsNumber()
+    city_id?: number;
 }

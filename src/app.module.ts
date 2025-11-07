@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/database.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { LocationModule } from './locations/locations.module';
 import { FieldsModule } from './fields/fields.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -16,7 +17,25 @@ import { FeedbacksModule } from './feedbacks/feedbacks.module';
 @Module({
   imports: [ConfigModule.forRoot({
     isGlobal: true
-  }), DatabaseModule, AuthModule, UsersModule, LocationModule, FieldsModule, BookingsModule, PricingModule, PaymentsModule, VouchersModule, ReviewsModule, NotificationsModule, FeedbacksModule],
+  }),
+  MailerModule.forRootAsync({
+    imports: [ConfigModule],
+    useFactory: (configService: ConfigService) => ({
+      transport: {
+        host: configService.get<string>('MAIL_HOST'),
+        secure: false,
+        auth: {
+          user: configService.get<string>('MAIL_USER'),
+          pass: configService.get<string>('MAIL_PASS'),
+        },
+      },
+      defaults: {
+        from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`,
+      },
+    }),
+    inject: [ConfigService],
+  }),
+    DatabaseModule, AuthModule, UsersModule, LocationModule, FieldsModule, BookingsModule, PricingModule, PaymentsModule, VouchersModule, ReviewsModule, NotificationsModule, FeedbacksModule],
   controllers: [],
   providers: [],
 })
