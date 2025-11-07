@@ -52,7 +52,7 @@ export class UsersService {
                 phone_number: data.phoneNumber,
                 gender: data.gender,
                 bio: data.bio,
-                address_id: addressId,
+                address: addressId ? { id: addressId } : undefined,
             });
             await transactionalEntityManager.save(newProfile);
 

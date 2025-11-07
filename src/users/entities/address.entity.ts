@@ -23,5 +23,5 @@ export class Address {
 
     @OneToOne(() => UserProfile, userProfile => userProfile.address)
     @JoinColumn({ name: 'id' }) // Assuming address_id in UserProfile references Address.id
-    userProfile: UserProfile;
+    userProfile: UserProfile | undefined;
 }

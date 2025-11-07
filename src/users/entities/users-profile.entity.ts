@@ -1,7 +1,8 @@
-import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn } from "typeorm";
+import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn, UpdateDateColumn } from "typeorm";
 import { Account } from "./account.entity";
 import { v4 as uuidv4 } from 'uuid';
 import { Address } from "./address.entity";
+
 @Entity({ name: 'user_profiles' })
 export class UserProfile {
     @PrimaryColumn('varchar')
@@ -13,22 +14,23 @@ export class UserProfile {
     @Column({ type: 'date', nullable: true })
     date_of_birth?: Date;
 
-    @Column({ type: 'varchar' })
-    gender?: string;
+    // SỬA ĐỔI 1: Thêm "nullable: true" để cho phép cột này nhận giá trị NULL
+    @Column({ type: 'varchar', nullable: true })
+    gender?: string | null;
 
     @Column({ unique: true })
     phone_number?: string;
 
-    @Column()
-    avatarURL?: string;
+    @Column({ nullable: true })
+    avatar_URL?: string;
 
-    @Column()
-    bio?: string;
+    @Column({ type: 'text', nullable: true })
+    bio?: string | null;
 
     @CreateDateColumn()
     created_at?: Date;
 
-    @Column()
+    @UpdateDateColumn()
     updated_at?: Date;
 
 
@@ -47,5 +49,4 @@ export class UserProfile {
         if (!this.id)
             this.id = uuidv4();
     }
-
 }
