@@ -13,6 +13,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { FeedbacksModule } from './feedbacks/feedbacks.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -35,7 +36,7 @@ import { FeedbacksModule } from './feedbacks/feedbacks.module';
     }),
     inject: [ConfigService],
   }),
-    DatabaseModule, AuthModule, UsersModule, LocationModule, FieldsModule, BookingsModule, PricingModule, PaymentsModule, VouchersModule, ReviewsModule, NotificationsModule, FeedbacksModule],
+  DatabaseModule, AuthModule, UsersModule, LocationModule, FieldsModule, BookingsModule, PricingModule, PaymentsModule, VouchersModule, ReviewsModule, NotificationsModule, FeedbacksModule, HealthModule],
   controllers: [],
   providers: [],
 })
