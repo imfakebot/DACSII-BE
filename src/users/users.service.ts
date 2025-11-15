@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
-
 import { Account } from './entities/account.entity';
 import { Role } from './entities/role.entity';
 import { UserProfile } from './entities/users-profile.entity';
 import { Address } from '../locations/entities/address.entity';
+import { Ward } from '../locations/entities/ward.entity'
+import { City } from '../locations/entities/city.entity';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -66,41 +67,45 @@ export class UsersService {
     }
 
     /**
-    * Tạo một người dùng mới với tài khoản chưa được xác thực.
-    * Phương thức này thực hiện trong một transaction để đảm bảo tính toàn vẹn dữ liệu
-    * giữa việc tạo địa chỉ (nếu có), hồ sơ người dùng và tài khoản.
-    * @param data Dữ liệu cần thiết để tạo người dùng, bao gồm thông tin cá nhân và mã xác thực.
+    * Tạo một tài khoản người dùng mới nhưng chưa được xác thực.
+    * Quá trình này bao gồm việc tạo hồ sơ người dùng (UserProfile), địa chỉ (Address, nếu có),
+    * và tài khoản (Account) trong một giao dịch cơ sở dữ liệu duy nhất để đảm bảo tính toàn vẹn dữ liệu.
+    * Tài khoản mới sẽ có vai trò 'User' mặc định và một mã xác thực.
+    * @param data Dữ liệu cần thiết để tạo người dùng, bao gồm thông tin tài khoản, hồ sơ và địa chỉ tùy chọn.
     * @returns Promise giải quyết thành đối tượng `Account` vừa được tạo.
-    * @throws {Error} Nếu vai trò 'user' mặc định không được tìm thấy.
+    * @throws {Error} Nếu vai trò 'User' mặc định không được tìm thấy trong cơ sở dữ liệu.
     */
     async createUnverifiedUser(data: CreateUnverifiedUserDto): Promise<Account> {
         return this.accountRepository.manager.transaction(async (transactionalEntityManager) => {
-            let addressId: string | undefined = undefined;
+            let savedProfile: UserProfile;
 
-            // Chỉ tạo địa chỉ nếu có đủ thông tin
-            if (data.street && data.ward_id && data.city_id) {
-                const newAddress = transactionalEntityManager.create(Address, {
-                    street: data.street,
-                    ward_id: data.ward_id,
-                    city_id: data.city_id,
-                });
-                const savedAddress = await transactionalEntityManager.save(newAddress);
-                addressId = savedAddress.id;
-            }
-
+            // Bắt đầu bằng việc tạo Profile
             const newProfile = transactionalEntityManager.create(UserProfile, {
                 full_name: data.fullName,
                 phone_number: data.phoneNumber,
                 gender: data.gender,
                 bio: data.bio,
-                // TypeORM có thể nhận một object chỉ có id để tạo mối quan hệ
-                address: addressId ? { id: addressId } : undefined,
             });
-            await transactionalEntityManager.save(newProfile);
+            savedProfile = await transactionalEntityManager.save(newProfile);
+
+            // Chỉ tạo và liên kết địa chỉ nếu có đủ thông tin
+            if (data.street && data.ward_id && data.city_id) {
+                // SỬA ĐỔI QUAN TRỌNG: Gán mối quan hệ đúng cách
+                const newAddress = transactionalEntityManager.create(Address, {
+                    street: data.street,
+                    // Gán đối tượng tham chiếu thay vì ID trực tiếp
+                    ward: { id: data.ward_id } as Ward,
+                    city: { id: data.city_id } as City,
+                });
+                const savedAddress = await transactionalEntityManager.save(newAddress);
+
+                // Sau khi có địa chỉ, cập nhật lại profile để liên kết
+                savedProfile.address = savedAddress;
+                savedProfile = await transactionalEntityManager.save(savedProfile);
+            }
 
             const defaultRole = await transactionalEntityManager.findOneBy(Role, { name: 'User' });
             if (!defaultRole) {
-                // Trong môi trường thực tế, nên dùng một loại exception cụ thể hơn, ví dụ InternalServerErrorException của NestJS
                 throw new Error('Default role "User" not found. Please seed the database.');
             }
 
@@ -109,7 +114,7 @@ export class UsersService {
                 password_hash: data.passwordHash,
                 verification_code: data.verificationCode,
                 verification_code_expires_at: data.expiresAt,
-                userProfile: newProfile,
+                userProfile: savedProfile, // Liên kết với profile đã được cập nhật
                 role: defaultRole,
             });
             return transactionalEntityManager.save(newAccount);

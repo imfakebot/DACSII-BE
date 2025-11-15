@@ -1,4 +1,4 @@
-import {  Entity,  PrimaryGeneratedColumn,  Column,  ManyToOne,  JoinColumn,  OneToMany,  OneToOne, CreateDateColumn, UpdateDateColumn} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, OneToOne } from 'typeorm';
 import { City } from './city.entity';
 import { Ward } from './ward.entity';
 import { Fields } from '../../fields/entities/field.entity';
@@ -12,7 +12,6 @@ export class Address {
   @Column({ type: 'varchar', length: 255 })
   street!: string;
 
-  // --- MỐI QUAN HỆ ---
 
   /**
    * Một Địa chỉ (Address) thuộc về một Thành phố (City).
@@ -24,8 +23,6 @@ export class Address {
   @JoinColumn({ name: 'cityId' })
   city!: City;
 
-  @Column({ type: 'int' })
-  cityId!: number;
 
   /**
    * Một Địa chỉ (Address) thuộc về một Phường/Xã (Ward).
@@ -33,11 +30,9 @@ export class Address {
    * ERD: Wards --o{ Addresses
    */
   @ManyToOne(() => Ward, (ward) => ward.addresses)
-  @JoinColumn({ name: 'wardId' })
+  @JoinColumn({ name: 'ward_Id' })
   ward!: Ward;
 
-  @Column({ type: 'int' })
-  wardId!: number;
 
   /**
    * Một Địa chỉ (Address) có thể có nhiều Sân bóng (Field).
@@ -54,16 +49,8 @@ export class Address {
    */
   @OneToOne(
     () => UserProfile,
-    (userProfile) => userProfile.address ,
+    (userProfile) => userProfile.address,
     { nullable: true, onDelete: 'SET NULL' },
   )
   userProfile!: UserProfile;
-
-  // --- CÁC CỘT MẶC ĐỊNH ---
-
-  @CreateDateColumn()
-  createdAt!: Date;
-
-  @UpdateDateColumn()
-  updatedAt!: Date;
 }

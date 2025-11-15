@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Req,
-  UseGuards,
-  HttpCode,
-  HttpStatus,
-  Res,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards, HttpCode, HttpStatus, Res, InternalServerErrorException } from '@nestjs/common';
 import { Request } from 'express';
 import { Response } from 'express';
 import { AuthService } from './auth.service';

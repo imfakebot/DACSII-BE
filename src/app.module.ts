@@ -53,4 +53,4 @@ import { LocationModule } from './locations/locations.module';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }
