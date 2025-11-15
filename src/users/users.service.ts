@@ -197,4 +197,12 @@ export class UsersService {
             relations: ['address'],
         });
     }
+
+    async findAccountById(id: string) {
+        return this.accountRepository.findOne({ where: { id } });
+    }
+
+    async updateAccount(id: string, data: Partial<Account>) {
+        await this.accountRepository.update(id, data);
+    }
 }

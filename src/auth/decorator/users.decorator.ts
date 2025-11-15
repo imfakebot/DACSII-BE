@@ -1,3 +1,4 @@
+import { UserProfile } from '@/users/entities/users-profile.entity';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 /**
@@ -5,6 +6,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  * Dữ liệu này được trả về từ `LocalStrategy` và được sử dụng trong `AuthController.login`.
  */
 export interface AuthenticatedUser {
+    userProfile: UserProfile;
     id: string;
     email: string;
     user_profile_id: string;

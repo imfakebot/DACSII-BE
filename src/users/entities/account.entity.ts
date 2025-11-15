@@ -44,6 +44,9 @@ export class Account {
     @Column({ type: 'varchar', length: 255, unique: true })
     user_profile_id!: string;
 
+    @Column({ type: "varchar", default: null })
+    hashed_refresh_token!: string | null;
+
 
     @ManyToOne(() => Role, (role) => role.accounts, { eager: true })
     @JoinColumn({ name: 'role_id' })

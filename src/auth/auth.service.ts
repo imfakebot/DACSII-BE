@@ -1,12 +1,21 @@
 import { UsersService } from '@/users/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { ConflictException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { AuthenticatedUser } from './decorator/users.decorator';
+import { ConfigService } from '@nestjs/config';
+import * as bcrypt from 'bcrypt';
+import { Account } from '@/users/entities/account.entity';
+import {StringValue} from 'ms'
 
+
+interface JwtPayload {
+  email: string,
+  sub: string,
+  role: string
+}
 /**
  * AuthService chịu trách nhiệm xử lý logic liên quan đến xác thực người dùng,
  * bao gồm đăng ký, xác thực email, đăng nhập và tạo token JWT.
@@ -22,6 +31,7 @@ export class AuthService {
     private userService: UsersService,
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
+    private configService: ConfigService,
   ) { }
 
   /**
@@ -138,15 +148,50 @@ export class AuthService {
    * @param user Đối tượng người dùng đã được xác thực từ `validateUser`.
    * @returns Một đối tượng chứa access_token.
    */
-  login(user: AuthenticatedUser) {
-    const payload = {
+  async login(user: AuthenticatedUser | Account) {
+    const payload: JwtPayload = {
       email: user.email,
-      sub: user.user_profile_id,
-      role: user.role.id,
-      is_profile_complete: user.is_profile_complete,
+      sub: user.id,
+      role: String(user.role.id),
     };
+
+    const accessTokenSecret = this.configService.get<string>('JWT_ACCESS_SECRET');
+    const accessTokenExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRATION_TIME');
+    const refreshTokenSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME');
+
+    if (!accessTokenSecret || !accessTokenExpiresIn || !refreshTokenSecret || !refreshTokenExpiresIn) {
+      throw new InternalServerErrorException('Lỗi cấu hình JWT, vui lòng kiểm tra file .env');
+    }
+
+    const accessTokenOptions: JwtSignOptions = {
+      secret: accessTokenSecret,
+      expiresIn: accessTokenExpiresIn as StringValue,
+    };
+
+    const refreshTokenOptions: JwtSignOptions = {
+      secret: refreshTokenSecret,
+      expiresIn: refreshTokenExpiresIn as StringValue,
+    }
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, accessTokenOptions),
+
+      this.jwtService.signAsync(payload, refreshTokenOptions)
+    ])
+
+
+    await this.updateRefreshTokenHash(user.id, refreshToken);
+
     return {
-      access_token: this.jwtService.sign(payload),
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role.name,
+        is_profile_complete: user.userProfile?.is_profile_complete || false
+      }
     };
   }
 
@@ -179,5 +224,63 @@ export class AuthService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password_hash, ...accountDetails } = newUserAccount;
     return accountDetails;
+  }
+
+  /**
+   * Làm mới access token bằng cách sử dụng refresh token
+   * @param userId ID của người dùng từ payload của refresh token.
+   * @param refreshToken Chuỗi refresh token được gửi từ client.
+   * @returns Một cặp accessToken và refreshToken mới.
+   * @throws {ForbiddenException} Nếu refresh token không hợp lệ hoặc không khớp.
+   */
+  async refreshTokens(userID: string, refreshToken: string) {
+    const account = await this.userService.findAccountById(userID);
+
+    if (!account || !account.hashed_refresh_token) {
+      throw new ForbiddenException('Access Denied');
+    }
+
+    const tokensMatch = await bcrypt.compare(
+      refreshToken,
+      account.hashed_refresh_token
+    );
+
+    if (!tokensMatch) {
+      throw new ForbiddenException('Access Denied');
+    }
+
+    // Chuyển đổi Account thành AuthenticatedUser
+    const authenticatedUser: AuthenticatedUser = {
+      id: account.id,
+      email: account.email,
+      user_profile_id: account.user_profile_id,
+      role: account.role as AuthenticatedUser['role'], // Explicitly cast to the expected type
+      userProfile: account.userProfile, // Đảm bảo userProfile được tải
+      is_profile_complete: account.userProfile?.is_profile_complete || false, // Đảm bảo có giá trị
+    };
+    return this.login(authenticatedUser);
+  }
+
+  async logout(accountID: string) {
+    await this.userService.updateAccount(accountID, { // Fix: hashed_refresh_token should be undefined to set to NULL
+      hashed_refresh_token: null,
+    });
+
+    return { message: "Đăng xuất thành công" }
+  }
+
+  /**
+   * Hàm helper private để hash và cập nhật refresh token trong DB.
+   * @param accountId ID của tài khoản (kiểu chuỗi UUID).
+   * @param refreshToken Chuỗi refresh token cần hash và lưu.
+   */
+  private async updateRefreshTokenHash(
+    accountId: string,
+    refreshToken: string,
+  ) {
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await this.userService.updateAccount(accountId, {
+      hashed_refresh_token: hashedRefreshToken,
+    });
   }
 }
