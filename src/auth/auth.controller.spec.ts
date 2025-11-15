@@ -40,21 +40,43 @@ describe('AuthController', () => {
 
   describe('initiateRegistaration', () => {
     it('should call authService.initateRegistration with the correct DTO', async () => {
-      const registerDto: RegisterUserDto = { email: 'test@example.com', password: 'password123', full_name: 'Test User' };
-      mockAuthService.initateRegistration.mockResolvedValue({ message: 'Success' });
+      const registerDto: RegisterUserDto = {
+        email: 'test@example.com',
+        password: 'password123',
+        full_name: 'Test User',
+        phoneNumber: '098765432'
+      };
+      mockAuthService.initateRegistration.mockResolvedValue({
+        message: 'Success',
+      });
 
-      const result = await controller.initiateRegistaration(registerDto);
+      const result = await controller.initiateRegistration(registerDto);
 
-      expect(mockAuthService.initateRegistration).toHaveBeenCalledWith(registerDto);
+      expect(mockAuthService.initateRegistration).toHaveBeenCalledWith(
+        registerDto,
+      );
       expect(result).toEqual({ message: 'Success' });
     });
   });
 
   describe('login', () => {
     it('should call authService.login with the user object', () => {
-      const user = { email: 'test@example.com', user_profile_id: 'profile-id', role_id: 'role-id' };
+      const user = {
+        id: 'some-id',
+        email: 'test@example.com',
+        user_profile_id: 'profile-id',
+        role: {
+          id: 'role-id',
+          name: 'user',
+        },
+        // Add other properties from AuthenticatedUser if necessary for the test
+        // For example, if 'id' is required, add id: 'some-id'
+      };
       // LoginUserDto không được sử dụng trực tiếp trong logic nhưng vẫn cần cho validation và swagger
-      const loginDto: LoginUserDto = { email: 'test@example.com', password: 'password' };
+      const loginDto: LoginUserDto = {
+        email: 'test@example.com',
+        password: 'password',
+      };
       const token = { access_token: 'jwt-token' };
       mockAuthService.login.mockReturnValue(token);
 
@@ -72,7 +94,9 @@ describe('AuthController', () => {
         email: 'test@example.com',
         verificationCode: '123456',
       };
-      mockAuthService.completeRegistration.mockResolvedValue({ message: 'Verified' });
+      mockAuthService.completeRegistration.mockResolvedValue({
+        message: 'Verified',
+      });
 
       const result = await controller.completeRegistration(verifyDto);
 

@@ -1,5 +1,5 @@
 @startuml ERD
-' ERD CHI TIẾT NHẤT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (ĐÃ SỬA LỖI CÚ PHÁP LẦN 3)
+' ERD CHI TIẾT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (ĐÃ CẬP NHẬT)
 
 title Sơ đồ Quan hệ Thực thể - Hệ thống Đặt sân bóng đá
 
@@ -17,111 +17,99 @@ skinparam tableAttributeFontSize 12
 ' ========================================
 package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
     entity "UserProfiles" as UP {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      fullName : VARCHAR
-      dateOfBirth : DATE
-      gender : VARCHAR
-      phoneNumber : VARCHAR
-      avatarUrl : TEXT
+      full_name : VARCHAR(100)
+      date_of_birth : DATE
+      gender : ENUM
+      phone_number : VARCHAR(15)
+      avatar_url : TEXT
       bio : TEXT
-      createdAt : DATETIME
+      is_profile_completed : BOOLEAN
+      created_at : TIMESTAMP
+      updated_at : TIMESTAMP
       --
-      # //addressId// (FK) : VARCHAR
+      # //address_id// (FK) : VARCHAR(36)
     }
 
     entity "Roles" as ROL {
       + **id** (PK) : INT
       --
-      name : VARCHAR
+      name : VARCHAR(50)
     }
 
     entity "Accounts" as AC {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      email : VARCHAR
-      passwordHash : VARCHAR
-      provider : VARCHAR
-      status : VARCHAR
-      isVerified : BOOLEAN
-      verificationCode : VARCHAR
-      verificationCodeExpiresAt : DATETIME
-      lastLogin : DATETIME
-      twoFactorEnabled : BOOLEAN
-      twoFactorSecret : VARCHAR
-      twoFactorRecoveryCodes : TEXT
-      createdAt : DATETIME
-      updatedAt : DATETIME
+      email : VARCHAR(255)
+      password_hash : VARCHAR(255)
+      provider : VARCHAR(50)
+      status : VARCHAR(20)
+      is_verified : BOOLEAN
       --
-      # //userProfileId// (FK) : VARCHAR
-      # //roleId// (FK) : INT
+      # //user_profile_id// (FK) : VARCHAR(36)
+      # //role_id// (FK) : INT
     }
 }
 
 ' ========================================
 package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
-    ' --- SỬA LỖI Ở ĐÂY: Tách các thuộc tính ra nhiều dòng ---
     entity "Cities" as C {
       + **id** (PK) : INT
       --
-      name : VARCHAR
-      type : VARCHAR
+      name : VARCHAR(100)
     }
     entity "Wards" as W {
       + **id** (PK) : INT
       --
-      name : VARCHAR
-      type : VARCHAR
+      name : VARCHAR(100)
       --
-      # //cityId// (FK) : INT
+      # //city_id// (FK) : INT
     }
 
     entity "Addresses" as ADDR {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      street : VARCHAR
+      street : VARCHAR(255)
       --
-      # //wardId// (FK) : INT
-      # //cityId// (FK) : INT
+      # //ward_id// (FK) : INT
     }
 
     entity "Utilities" as UT {
       + **id** (PK) : INT
       --
-      name : VARCHAR
-      iconUrl : TEXT
+      name : VARCHAR(100)
     }
 
     entity "FieldTypes" as FT {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      name : VARCHAR
-      description : TEXT
+      name : VARCHAR(50)
     }
 
     entity "Fields" as F {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      name : VARCHAR
-      description : TEXT
-      status : VARCHAR
+      name : VARCHAR(150)
+      status : BOOLEAN
       --
-      # //fieldTypeId// (FK) : VARCHAR
-      # //addressId// (FK) : VARCHAR
+      # //field_type_id// (FK) : VARCHAR(36)
+      # //address_id// (FK) : VARCHAR(36)
+      # //owner_id// (FK) : VARCHAR(36)
     }
 
     entity "FieldImages" as FI {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      imageUrl : TEXT
-      isCover : BOOLEAN
+      image_url : TEXT
+      is_cover : BOOLEAN
       --
-      # //fieldId// (FK) : VARCHAR
+      # //field_id// (FK) : VARCHAR(36)
     }
 
     entity "Field_Utilities" as FU {
-      + **//fieldId//** (PFK) : VARCHAR
-      + **//utilityId//** (PFK) : INT
+      + **//field_id//** (PFK) : VARCHAR(36)
+      + **//utility_id//** (PFK) : INT
     }
 }
 
@@ -130,129 +118,119 @@ package "3. KHỐI QUẢN LÝ ĐẶT SÂN & GIÁ CẢ" {
     entity "TimeSlots" as TS {
       + **id** (PK) : INT
       --
-      startTime : TIME
-      endTime : TIME
+      start_time : TIME
+      end_time : TIME
       price : DECIMAL
-      isPeakHour : BOOLEAN
       --
-      # //fieldTypeId// (FK) : VARCHAR
+      # //field_type_id// (FK) : VARCHAR(36)
     }
 
     entity "Bookings" as B {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      bookingDate : DATE
-      totalPrice : DECIMAL
-      status : VARCHAR
-      createdAt : DATETIME
+      booking_date : DATE
+      total_price : DECIMAL
+      status : ENUM
       --
-      # //userProfileId// (FK) : VARCHAR
-      # //fieldId// (FK) : VARCHAR
-      # //timeSlotId// (FK) : INT
+      # //user_profile_id// (FK) : VARCHAR(36)
+      # //field_id// (FK) : VARCHAR(36)
+      # //time_slot_id// (FK) : INT
     }
 }
 
 ' ========================================
 package "4. KHỐI QUẢN LÝ THANH TOÁN & KHUYẾN MÃI" {
     entity "Vouchers" as V {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      code : VARCHAR
-      discountAmount : DECIMAL
-      discountPercentage : INT
-      validTo : DATETIME
+      code : VARCHAR(50)
+      ...
     }
 
     entity "Payments" as P {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
       amount : DECIMAL
-      finalAmount : DECIMAL
-      status : VARCHAR
-      paymentMethod : VARCHAR
+      status : ENUM
       --
-      # //bookingId// (FK) : VARCHAR
-      # //voucherId// (FK) : VARCHAR
+      # //booking_id// (FK) : VARCHAR(36)
+      # //voucher_id// (FK) : VARCHAR(36)
     }
 }
 
 ' ========================================
 package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
     entity "Reviews" as REV {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
       rating : INT
       comment : TEXT
       --
-      # //userProfileId// (FK) : VARCHAR
-      # //fieldId// (FK) : VARCHAR
+      # //booking_id// (FK) : VARCHAR(36)
     }
     
     entity "Notifications" as NOTI {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      title : VARCHAR
-      content : TEXT
-      isRead : BOOLEAN
+      title : VARCHAR(255)
+      is_read : BOOLEAN
       --
-      # //recipientId// (FK) : VARCHAR
+      # //recipient_id// (FK) : VARCHAR(36)
     }
 
     entity "Feedbacks" as FB {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
-      title : VARCHAR
-      category : VARCHAR
-      status : VARCHAR
+      title : VARCHAR(255)
       --
-      # //submitterId// (FK) : VARCHAR
-      # //assigneeId// (FK) : VARCHAR
+      # //submitter_id// (FK) : VARCHAR(36)
+      # //assignee_id// (FK) : VARCHAR(36)
     }
     
     entity "FeedbackResponses" as FBR {
-      + **id** (PK) : VARCHAR
+      + **id** (PK) : VARCHAR(36)
       --
       content : TEXT
       --
-      # //feedbackId// (FK) : VARCHAR
-      # //responderId// (FK) : VARCHAR
+      # //feedback_id// (FK) : VARCHAR(36)
+      # //responder_id// (FK) : VARCHAR(36)
     }
 }
 
 
-' --- ĐỊNH NGHĨA CÁC ĐƯỜNG NỐI (MỐI QUAN HỆ) - PHIÊN BẢN NHẤT QUÁN ---
+' --- ĐỊNH NGHĨA CÁC MỐI QUAN HỆ ĐÃ CẬP NHẬT ---
 
 ' Khối 1
-AC ||--|| UP : has
-ROL ||--o{ AC : defines
+AC ||--|| UP : "has"
+ROL ||--o{ AC : "defines"
 
 ' Khối 2
-C ||--o{ W
-W ||--o{ ADDR
-ADDR ||--|| F
-UP }o--|| ADDR : "resides at"
-FT ||--o{ F : categorizes
-F ||--o{ FI : has
-F }|..|{ FU
+C  ||--o{ W
+W  ||--o{ ADDR
+F }o--|| ADDR : "located at"
+UP }o..|| ADDR : "resides at"
+FT ||--o{ F : "categorizes"
+F  ||--o{ FI : "has"
+F  }|..|{ FU
 UT }|..|{ FU
+UP }o--|| F : "owns"
 
 ' Khối 3
-FT ||--o{ TS : has pricing for
-UP }o--|| B : makes
-F  }o--|| B : is for
-TS }o--|| B : at
+FT ||--o{ TS : "has pricing for"
+UP }o--|| B : "makes"
+F  }o--|| B : "is for"
+TS }o--|| B : "at"
 
 ' Khối 4
-B ||--|| P : requires
-V }o--|| P : applies
+B  ||--o{ P : "has" ' Một booking có thể có nhiều payment (đặt cọc, thanh toán đủ)
+V  }o--o{ P : "applies" ' Một voucher có thể áp dụng cho nhiều payment
 
 ' Khối 5
-UP }o--|| REV : writes
-F  }o--|| REV : receives
-UP ||--o{ NOTI : receives
-UP ||--o{ FB : submits
+B ||--|| REV : "has" ' Một booking chỉ có một review
+UP ||--o{ NOTI : "receives"
+UP ||--o{ FB : "submits"
 UP }o--o{ FB : "assigned to"
-FB ||--o{ FBR : has
-UP ||--o{ FBR : responds
+FB ||--o{ FBR : "has"
+UP ||--o{ FBR : "responds"
 
 @enduml

@@ -66,10 +66,14 @@ describe('AuthService', () => {
       mockUsersService.findAccountByEmail.mockResolvedValue(null);
       mockUsersService.hashPassword.mockResolvedValue('hashed_password');
 
-      await service.initateRegistration(registerDto);
+      await service.initiateRegistration(registerDto);
 
-      expect(mockUsersService.findAccountByEmail).toHaveBeenCalledWith(registerDto.email);
-      expect(mockUsersService.hashPassword).toHaveBeenCalledWith(registerDto.password);
+      expect(mockUsersService.findAccountByEmail).toHaveBeenCalledWith(
+        registerDto.email,
+      );
+      expect(mockUsersService.hashPassword).toHaveBeenCalledWith(
+        registerDto.password,
+      );
       expect(mockUsersService.createUnverifiedUser).toHaveBeenCalled();
       expect(mockMailerService.sendMail).toHaveBeenCalled();
     });
@@ -79,7 +83,7 @@ describe('AuthService', () => {
       mockUsersService.findAccountByEmail.mockResolvedValue(existingAccount);
       mockUsersService.hashPassword.mockResolvedValue('new_hashed_password');
 
-      await service.initateRegistration(registerDto);
+      await service.initiateRegistration(registerDto);
 
       expect(mockUsersService.updateUnverifiedAccount).toHaveBeenCalled();
       expect(mockUsersService.createUnverifiedUser).not.toHaveBeenCalled();
@@ -90,7 +94,9 @@ describe('AuthService', () => {
       const existingAccount = { is_verified: true };
       mockUsersService.findAccountByEmail.mockResolvedValue(existingAccount);
 
-      await expect(service.initateRegistration(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.initiateRegistration(registerDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -104,10 +110,15 @@ describe('AuthService', () => {
       };
       mockUsersService.findAccountByEmail.mockResolvedValue(account);
 
-      const result = await service.completeRegistration('test@example.com', '123456');
+      const result = await service.completeRegistration(
+        'test@example.com',
+        '123456',
+      );
 
       expect(mockUsersService.verifyAccount).toHaveBeenCalledWith(account.id);
-      expect(result).toEqual({ message: 'Tài khoản của bạn đã được xác thực thành công.' });
+      expect(result).toEqual({
+        message: 'Tài khoản của bạn đã được xác thực thành công.',
+      });
     });
 
     it('should throw ConflictException for invalid or expired code', async () => {
@@ -119,57 +130,99 @@ describe('AuthService', () => {
       };
       mockUsersService.findAccountByEmail.mockResolvedValue(account);
 
-      await expect(service.completeRegistration('test@example.com', 'wrong-code')).rejects.toThrow(ConflictException);
-      await expect(service.completeRegistration('test@example.com', '123456')).rejects.toThrow(ConflictException);
+      await expect(
+        service.completeRegistration('test@example.com', 'wrong-code'),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.completeRegistration('test@example.com', '123456'),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw ConflictException if account is not found or already verified', async () => {
       mockUsersService.findAccountByEmail.mockResolvedValue(null);
-      await expect(service.completeRegistration('test@example.com', '123456')).rejects.toThrow(ConflictException);
+      await expect(
+        service.completeRegistration('test@example.com', '123456'),
+      ).rejects.toThrow(ConflictException);
 
-      mockUsersService.findAccountByEmail.mockResolvedValue({ is_verified: true });
-      await expect(service.completeRegistration('test@example.com', '123456')).rejects.toThrow(ConflictException);
+      mockUsersService.findAccountByEmail.mockResolvedValue({
+        is_verified: true,
+      });
+      await expect(
+        service.completeRegistration('test@example.com', '123456'),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('validateUser', () => {
     it('should return user data if validation is successful', async () => {
-      const account = { id: 'uuid', email: 'test@example.com', password_hash: 'hashed', is_verified: true };
+      const account = {
+        id: 'uuid',
+        email: 'test@example.com',
+        password_hash: 'hashed',
+        is_verified: true,
+      };
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password_hash, ...result } = account;
 
       mockUsersService.findAccountByEmail.mockResolvedValue(account);
       mockUsersService.comparePassword.mockResolvedValue(true);
 
-      expect(await service.validateUser('test@example.com', 'password')).toEqual(result);
+      expect(
+        await service.validateUser('test@example.com', 'password'),
+      ).toEqual(result);
     });
 
     it('should return null if account is not found or not verified', async () => {
       mockUsersService.findAccountByEmail.mockResolvedValue(null);
-      expect(await service.validateUser('test@example.com', 'password')).toBeNull();
+      expect(
+        await service.validateUser('test@example.com', 'password'),
+      ).toBeNull();
 
-      mockUsersService.findAccountByEmail.mockResolvedValue({ is_verified: false });
-      expect(await service.validateUser('test@example.com', 'password')).toBeNull();
+      mockUsersService.findAccountByEmail.mockResolvedValue({
+        is_verified: false,
+      });
+      expect(
+        await service.validateUser('test@example.com', 'password'),
+      ).toBeNull();
     });
 
     it('should return null if password does not match', async () => {
-      const account = { id: 'uuid', email: 'test@example.com', password_hash: 'hashed', is_verified: true };
+      const account = {
+        id: 'uuid',
+        email: 'test@example.com',
+        password_hash: 'hashed',
+        is_verified: true,
+      };
       mockUsersService.findAccountByEmail.mockResolvedValue(account);
       mockUsersService.comparePassword.mockResolvedValue(false);
 
-      expect(await service.validateUser('test@example.com', 'wrong-password')).toBeNull();
+      expect(
+        await service.validateUser('test@example.com', 'wrong-password'),
+      ).toBeNull();
     });
   });
 
   describe('login', () => {
     it('should return an access token', () => {
-      const user = { email: 'test@example.com', user_profile_id: 'profile-id', role_id: 'role-id' };
+      const user = {
+        email: 'test@example.com',
+        id: 'some-id',
+        user_profile_id: 'profile-id',
+        role: {
+          id: 'role-id',
+          name: 'user',
+        },
+      };
       const token = 'jwt-token';
       mockJwtService.sign.mockReturnValue(token);
 
       const result = service.login(user);
 
-      expect(mockJwtService.sign).toHaveBeenCalledWith({ email: user.email, sub: user.user_profile_id, role: user.role_id });
+      expect(mockJwtService.sign).toHaveBeenCalledWith({
+        email: user.email,
+        sub: user.user_profile_id,
+        role: user.role.id,
+      });
       expect(result).toEqual({ access_token: token });
     });
   });
