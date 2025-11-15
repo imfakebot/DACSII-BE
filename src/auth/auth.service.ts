@@ -8,7 +8,7 @@ import { AuthenticatedUser } from './decorator/users.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { Account } from '@/users/entities/account.entity';
-import {StringValue} from 'ms'
+import { StringValue } from 'ms'
 
 
 interface JwtPayload {
@@ -227,38 +227,20 @@ export class AuthService {
   }
 
   /**
-   * Làm mới access token bằng cách sử dụng refresh token
-   * @param userId ID của người dùng từ payload của refresh token.
-   * @param refreshToken Chuỗi refresh token được gửi từ client.
-   * @returns Một cặp accessToken và refreshToken mới.
-   * @throws {ForbiddenException} Nếu refresh token không hợp lệ hoặc không khớp.
+   * Xác thực người dùng và tạo ra một access token mới.
+   * Logic kiểm tra refresh token đã được JwtRefreshGuard xử lý.
+   * @param userId ID người dùng lấy từ payload của refresh token đã được xác thực.
+   * @returns Một đối tượng chứa accessToken mới.
    */
-  async refreshTokens(userID: string, refreshToken: string) {
+  async refreshTokens(userID: string) {
     const account = await this.userService.findAccountById(userID);
-
-    if (!account || !account.hashed_refresh_token) {
-      throw new ForbiddenException('Access Denied');
+    if (!account) {
+      throw new ForbiddenException('Tài khoản không tồn tại');
     }
 
-    const tokensMatch = await bcrypt.compare(
-      refreshToken,
-      account.hashed_refresh_token
-    );
+    const accessToken = await this.createAccessToken(account);
 
-    if (!tokensMatch) {
-      throw new ForbiddenException('Access Denied');
-    }
-
-    // Chuyển đổi Account thành AuthenticatedUser
-    const authenticatedUser: AuthenticatedUser = {
-      id: account.id,
-      email: account.email,
-      user_profile_id: account.user_profile_id,
-      role: account.role as AuthenticatedUser['role'], // Explicitly cast to the expected type
-      userProfile: account.userProfile, // Đảm bảo userProfile được tải
-      is_profile_complete: account.userProfile?.is_profile_complete || false, // Đảm bảo có giá trị
-    };
-    return this.login(authenticatedUser);
+    return { accessToken };
   }
 
   async logout(accountID: string) {
@@ -281,6 +263,32 @@ export class AuthService {
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     await this.userService.updateAccount(accountId, {
       hashed_refresh_token: hashedRefreshToken,
+    });
+  }
+
+  /**
+   * HÀM MỚI (hoặc tách ra từ hàm login): Chỉ tạo Access Token.
+   * Rất hữu ích cho việc làm mới token mà không cần tạo lại mọi thứ.
+   * @param user Đối tượng người dùng hoặc payload đã được xác thực.
+   * @returns Một chuỗi access token mới.
+   */
+  async createAccessToken(user: AuthenticatedUser) {
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: String(user.role.id),
+    }
+
+    const accessTokenSecret = this.configService.get<string>('JWT_ACCESS_SECRET');
+    const accessTokenExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRATION_TIME');
+
+    if (!accessTokenSecret || !accessTokenExpiresIn) {
+      throw new InternalServerErrorException('Lỗi cấu hình Access Token');
+    }
+
+    return this.jwtService.signAsync(payload, {
+      secret: accessTokenSecret,
+      expiresIn: accessTokenExpiresIn as StringValue,
     });
   }
 }

@@ -7,8 +7,11 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -18,6 +21,8 @@ import { LocalAuthGuard } from './guards/local-auth-guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
+
 
 /**
  * Interface để định nghĩa cấu trúc của một Request đã được xác thực,
@@ -28,18 +33,19 @@ interface AuthenticatedRequest extends Request {
     sub: string;
     email: string;
     role: string;
-    refreshToken?: string; // Thuộc tính này chỉ tồn tại trong luồng refresh token.
   };
 }
 
 /**
- * @ontroller AuthController
+ * @controller AuthController
  * @description Xử lý các yêu cầu liên quan đến xác thực người dùng,
  * bao gồm đăng ký, đăng nhập, đăng xuất, xác thực qua Google và làm mới token.
  */
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -104,25 +110,41 @@ export class AuthController {
    */
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  googleAuthRedirect(@User() user: AuthenticatedUser) {
-    // Guard đã xử lý và trả về user, giờ chỉ cần tạo token.
-    return this.authService.login(user);
+  async googleAuthRedirect(@User() user: AuthenticatedUser, @Res({ passthrough: true }) res: Response) {
+    const loginData = await this.authService.login(user);
+
+    const frontendURL = this.configService.get<string>('FRONTEND_URL');
+    if (!frontendURL) {
+      throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL')
+    }
+
+    res.cookie('refresh_token', loginData.refreshToken, {
+      httpOnly: true,// Bắt buộc: Chống XSS
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      path: '/',
+    });
+
+    return {
+      accessToken: loginData.accessToken,
+      refreshToken: loginData.refreshToken,
+    }
   }
 
   /**
-   * @route POST /auth/refresh
-   * Sử dụng refresh token để lấy một cặp access/refresh token mới.
+   * Luồng hoạt động:
+   * 1. Frontend gọi POST /auth/refresh (không cần body).
+   * 2. Trình duyệt tự động đính kèm cookie 'refresh_token'.
+   * 3. JwtRefreshGuard chặn request, đọc cookie, và xác thực token.
+   * 4. Nếu hợp lệ, Guard gắn payload (chứa userId) vào req.user.
+   * 5. Hàm này được thực thi, gọi service để tạo access token mới.
    */
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refreshTokens(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
-    const refreshToken = req.user.refreshToken;
-
-    // Dấu '!' (non-null assertion) ở đây là an toàn vì JwtRefreshGuard
-    // đảm bảo rằng refreshToken sẽ luôn tồn tại trong request này.
-    return this.authService.refreshTokens(userId, refreshToken!);
+    return this.authService.refreshTokens(userId);
   }
 
   /**

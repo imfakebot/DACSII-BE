@@ -6,12 +6,12 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  * Dữ liệu này được trả về từ `LocalStrategy` và được sử dụng trong `AuthController.login`.
  */
 export interface AuthenticatedUser {
-    userProfile: UserProfile;
+    userProfile?: UserProfile;
     id: string;
     email: string;
-    user_profile_id: string;
-    role: { id: string; name: string };
-    is_profile_complete: boolean;
+    user_profile_id?: string;
+    role: { id: string; name?: string };
+    is_profile_complete?: boolean;
 }
 
 export const User = createParamDecorator(
