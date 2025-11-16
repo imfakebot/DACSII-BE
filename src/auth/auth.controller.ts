@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, UseGuards, HttpCode, HttpStatus, Res, InternalServerErrorException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
@@ -30,6 +31,7 @@ interface AuthenticatedRequest extends Request {
  * @description Xử lý các yêu cầu liên quan đến xác thực người dùng,
  * bao gồm đăng ký, đăng nhập, đăng xuất, xác thực qua Google và làm mới token.
  */
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService,
@@ -43,6 +45,10 @@ export class AuthController {
    * @returns {Promise<{ message: string }>} - Thông báo về việc đã gửi email xác thực.
    */
   @Post('register/initiate')
+  @ApiOperation({ summary: 'Bắt đầu quá trình đăng ký' })
+  @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
+  @ApiResponse({ status: 409, description: 'Email đã được sử dụng.' })
+  @ApiBody({ type: RegisterUserDto })
   @HttpCode(HttpStatus.OK)
   initiateRegistration(@Body() registerDto: RegisterUserDto) {
     return this.authService.initiateRegistration(registerDto);
@@ -55,6 +61,9 @@ export class AuthController {
    * @returns {Promise<User>} - Thông tin người dùng sau khi đăng ký thành công.
    */
   @Post('register/complete')
+  @ApiOperation({ summary: 'Hoàn thành đăng ký bằng mã xác thực' })
+  @ApiResponse({ status: 200, description: 'Xác thực thành công.' })
+  @ApiResponse({ status: 409, description: 'Mã không hợp lệ hoặc đã hết hạn.' })
   @HttpCode(HttpStatus.OK)
   completeRegistration(@Body() verifyEmailDto: VerifyEmailDto) {
     return this.authService.completeRegistration(
@@ -73,6 +82,10 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng nhập người dùng' })
+  @ApiBody({ type: LoginUserDto })
+  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access và refresh token.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Sai email hoặc mật khẩu.' })
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   login(@User() user: AuthenticatedUser, @Body() _userDto?: LoginUserDto) {
     return this.authService.login(user);
@@ -86,6 +99,8 @@ export class AuthController {
    */
   @Get('google')
   @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Bắt đầu đăng nhập với Google' })
+  @ApiResponse({ status: 302, description: 'Chuyển hướng đến trang đăng nhập của Google.' })
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async googleAuth(@Req() _req: Request) {
     // Guard sẽ tự động chuyển hướng, không cần code trong hàm này.
@@ -99,6 +114,9 @@ export class AuthController {
    */
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
+  @ApiOperation({ summary: 'Callback xử lý sau khi đăng nhập Google thành công' })
+  @ApiResponse({ status: 200, description: 'Xác thực thành công. Trả về một script để gửi token cho cửa sổ cha và đóng popup.' })
+  @ApiResponse({ status: 500, description: 'Lỗi cấu hình phía server (ví dụ: thiếu FRONTEND_URL).' })
   async googleAuthRedirect(@User() user: AuthenticatedUser, @Res({ passthrough: true }) res: Response) {
     const loginData = await this.authService.login(user);
 
@@ -139,6 +157,10 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Làm mới access token bằng refresh token' })
+  @ApiCookieAuth('refresh_token') // Mô tả rằng endpoint này yêu cầu cookie 'refresh_token'
+  @ApiResponse({ status: 200, description: 'Trả về access token mới.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Refresh token không hợp lệ hoặc đã hết hạn.' })
   refreshTokens(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     return this.authService.refreshTokens(userId);
@@ -151,6 +173,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng xuất người dùng' })
+  @ApiBearerAuth() // Mô tả rằng endpoint này yêu cầu JWT Access Token
+  @ApiResponse({ status: 200, description: 'Đăng xuất thành công.' })
   logout(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
     return this.authService.logout(userId);
