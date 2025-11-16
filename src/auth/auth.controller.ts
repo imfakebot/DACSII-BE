@@ -104,20 +104,28 @@ export class AuthController {
 
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
     if (!frontendURL) {
-      throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL')
+      throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL');
     }
 
     res.cookie('refresh_token', loginData.refreshToken, {
-      httpOnly: true,// Bắt buộc: Chống XSS
+      httpOnly: true,
       sameSite: 'strict',
-      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      path: '/',
-    });
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      path: '/', // Add a comma here
+    })
 
-    return {
-      accessToken: loginData.accessToken,
-      refreshToken: loginData.refreshToken,
-    }
+    const script =
+      `
+    <script>
+      window.opener.postMessage(${JSON.stringify({
+        accessToken: loginData.accessToken,
+        user: loginData.user
+      })},'${frontendURL}');
+      window.close();
+    </script>
+    `;
+
+    res.send(script);
   }
 
   /**
