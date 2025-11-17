@@ -35,7 +35,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Kiểm tra ngay khi khởi tạo để đảm bảo biến môi trường cần thiết đã được cung cấp.
     if (!secret) {
-      throw new Error('JWT_ACCESS_SECRET is not defined in environment variables.');
+      throw new Error(
+        'JWT_ACCESS_SECRET is not defined in environment variables.',
+      );
     }
 
     super({

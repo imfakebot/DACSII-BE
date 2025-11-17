@@ -22,12 +22,12 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
  * @property {boolean} [is_profile_complete] - Cờ báo hiệu hồ sơ người dùng đã hoàn chỉnh hay chưa.
  */
 export interface AuthenticatedUser {
-    userProfile?: UserProfile;
-    id: string;
-    email: string;
-    user_profile_id?: string;
-    role: { id: string; name?: string; };
-    is_profile_complete?: boolean;
+  userProfile?: UserProfile;
+  id: string;
+  email: string;
+  user_profile_id?: string;
+  role: { id: string; name?: string };
+  is_profile_complete?: boolean;
 }
 
 /**
@@ -51,8 +51,10 @@ export interface AuthenticatedUser {
  * ```
  */
 export const User = createParamDecorator(
-    (data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
-        const request = ctx.switchToHttp().getRequest<{ user: AuthenticatedUser }>();
-        return request.user;
-    },
+  (data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
+    const request = ctx
+      .switchToHttp()
+      .getRequest<{ user: AuthenticatedUser }>();
+    return request.user;
+  },
 );

@@ -10,13 +10,12 @@
  * @requires GOOGLE_CLIENT_SECRET - Client Secret được cung cấp bởi Google Cloud Console.
  * @requires GOOGLE_CALLBACK_URL - URL callback mà Google sẽ chuyển hướng về sau khi xác thực thành công.
  */
-import { registerAs } from "@nestjs/config";
-
+import { registerAs } from '@nestjs/config';
 
 export default registerAs('googleOAuth', () => {
-    return {
-        clientID: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: process.env.GOOGLE_CALLBACK_URL
-    };
-})
+  return {
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL,
+  };
+});

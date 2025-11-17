@@ -4,7 +4,15 @@
  * Lớp này định nghĩa cấu trúc dữ liệu và các quy tắc xác thực cho thông tin đầu vào khi người dùng đăng ký.
  */
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterUserDto {
   @ApiProperty({

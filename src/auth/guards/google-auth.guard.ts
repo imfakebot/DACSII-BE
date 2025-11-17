@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import { AuthGuard } from '@nestjs/passport'
+import { Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 /**
  * @guard GoogleAuthGuard
@@ -11,11 +11,11 @@ import { AuthGuard } from '@nestjs/passport'
  *   và gọi hàm `validate` trong `GoogleStrategy` để xác thực hoặc tạo người dùng.
  *
  * @example
- * 
+ *
  * @Get('google')
  * @UseGuards(GoogleAuthGuard)
  * googleAuth() { // Passport sẽ tự động chuyển hướng }
  * ```
  */
 @Injectable()
-export class GoogleAuthGuard extends AuthGuard('google') { }
+export class GoogleAuthGuard extends AuthGuard('google') {}

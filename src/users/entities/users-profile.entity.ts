@@ -1,4 +1,13 @@
-import { BeforeInsert, Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Account } from './account.entity';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,7 +76,7 @@ export class UserProfile {
    * Cờ cho biết người dùng đã hoàn thành việc cập nhật hồ sơ lần đầu hay chưa.
    */
   @Column({ type: 'boolean', default: false })
-  is_profile_complete!: boolean
+  is_profile_complete!: boolean;
 
   /**
    * Dấu thời gian khi hồ sơ được tạo.

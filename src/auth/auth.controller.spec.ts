@@ -44,7 +44,7 @@ describe('AuthController', () => {
         email: 'test@example.com',
         password: 'password123',
         full_name: 'Test User',
-        phoneNumber: '098765432'
+        phoneNumber: '098765432',
       };
       mockAuthService.initateRegistration.mockResolvedValue({
         message: 'Success',

@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { City } from './city.entity';
 import { Ward } from './ward.entity';
 import { Fields } from '../../fields/entities/field.entity';
@@ -11,7 +18,6 @@ export class Address {
   @Column({ type: 'varchar', length: 255 })
   street!: string;
 
-
   /**
    * Một Địa chỉ (Address) thuộc về một Thành phố (City).
    * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một thành phố).
@@ -22,7 +28,6 @@ export class Address {
   @JoinColumn({ name: 'cityId' })
   city!: City;
 
-
   /**
    * Một Địa chỉ (Address) thuộc về một Phường/Xã (Ward).
    * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một phường/xã).
@@ -32,7 +37,6 @@ export class Address {
   @JoinColumn({ name: 'ward_Id' })
   ward!: Ward;
 
-
   /**
    * Một Địa chỉ (Address) có thể có nhiều Sân bóng (Field).
    * Quan hệ: One-to-Many (Một địa chỉ có thể là vị trí của nhiều sân).
@@ -40,7 +44,4 @@ export class Address {
    */
   @OneToMany(() => Fields, (field) => field.address)
   fields!: Fields[];
-
-
-
 }

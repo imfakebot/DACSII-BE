@@ -1,6 +1,13 @@
 import { UsersService } from '@/users/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
-import { Injectable, ForbiddenException, ConflictException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  ConflictException,
+  InternalServerErrorException,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { randomBytes } from 'crypto';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
@@ -8,20 +15,21 @@ import { AuthenticatedUser } from './decorator/users.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { Account, AuthProvider } from '@/users/entities/account.entity';
-import { StringValue } from 'ms'
+import { StringValue } from 'ms';
 import { Gender } from '@/users/entities/users-profile.entity';
 
-
 interface JwtPayload {
-  email: string,
-  sub: string,
-  role: string
+  email: string;
+  sub: string;
+  role: string;
 }
 
 /**
  * @class AuthService
  * @description Chịu trách nhiệm xử lý tất cả logic nghiệp vụ liên quan đến xác thực,
  * bao gồm đăng ký, đăng nhập, quản lý token (JWT), OAuth, và quy trình quên mật khẩu.
+ * bao gồm đăng ký, đăng nhập (cả đăng nhập hai bước), quản lý token (JWT),
+ * OAuth, và quy trình quên mật khẩu.
  */
 @Injectable()
 export class AuthService {
@@ -37,7 +45,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * Tạo một tài khoản chưa được xác thực và gửi mã xác thực qua email.
@@ -47,13 +55,7 @@ export class AuthService {
    * @throws {ConflictException} Nếu email đã được sử dụng bởi một tài khoản đã được xác thực.
    */
   async initiateRegistration(registerDto: RegisterUserDto) {
-    const {
-      email,
-      full_name,
-      password,
-      phone_number,
-      gender
-    } = registerDto;
+    const { email, full_name, password, phone_number, gender } = registerDto;
     const existingAccount = await this.userService.findAccountByEmail(email);
     if (existingAccount && existingAccount.is_verified) {
       throw new ConflictException('Email này đã được sử dụng.');
@@ -158,13 +160,26 @@ export class AuthService {
       role: String(user.role.id),
     };
 
-    const accessTokenSecret = this.configService.get<string>('JWT_ACCESS_SECRET');
-    const accessTokenExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRATION_TIME');
-    const refreshTokenSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
-    const refreshTokenExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRATION_TIME');
+    const accessTokenSecret =
+      this.configService.get<string>('JWT_ACCESS_SECRET');
+    const accessTokenExpiresIn = this.configService.get<string>(
+      'JWT_ACCESS_EXPIRATION_TIME',
+    );
+    const refreshTokenSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET');
+    const refreshTokenExpiresIn = this.configService.get<string>(
+      'JWT_REFRESH_EXPIRATION_TIME',
+    );
 
-    if (!accessTokenSecret || !accessTokenExpiresIn || !refreshTokenSecret || !refreshTokenExpiresIn) {
-      throw new InternalServerErrorException('Lỗi cấu hình JWT, vui lòng kiểm tra file .env');
+    if (
+      !accessTokenSecret ||
+      !accessTokenExpiresIn ||
+      !refreshTokenSecret ||
+      !refreshTokenExpiresIn
+    ) {
+      throw new InternalServerErrorException(
+        'Lỗi cấu hình JWT, vui lòng kiểm tra file .env',
+      );
     }
 
     const accessTokenOptions: JwtSignOptions = {
@@ -175,16 +190,18 @@ export class AuthService {
     const refreshTokenOptions: JwtSignOptions = {
       secret: refreshTokenSecret,
       expiresIn: refreshTokenExpiresIn as StringValue,
-    }
+    };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, accessTokenOptions),
 
-      this.jwtService.signAsync(payload, refreshTokenOptions)
-    ])
+      this.jwtService.signAsync(payload, refreshTokenOptions),
+    ]);
 
-
-    await this.updateRefreshTokenHash(user.id, refreshToken);
+    await Promise.all([
+      this.updateRefreshTokenHash(user.id, refreshToken),
+      this.userService.updateLastLogin(user.id),
+    ]);
 
     return {
       accessToken,
@@ -193,8 +210,8 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role.name,
-        is_profile_complete: user.userProfile?.is_profile_complete || false
-      }
+        is_profile_complete: user.userProfile?.is_profile_complete || false,
+      },
     };
   }
 
@@ -205,9 +222,15 @@ export class AuthService {
    * @param provider Tên của nhà cung cấp (e.g., 'google').
    * @returns Thông tin người dùng đã được xác thực trong hệ thống.
    */
-  async validateOAuthLogin(payload: { email: string, firstName?: string, lastName?: string }, provider: AuthProvider) {
+  async validateOAuthLogin(
+    payload: { email: string; firstName?: string; lastName?: string },
+    provider: AuthProvider,
+  ) {
     // Tải trước userProfile và role để tránh truy vấn thừa
-    const account = await this.userService.findAccountByEmail(payload.email, ['userProfile', 'role']);
+    const account = await this.userService.findAccountByEmail(payload.email, [
+      'userProfile',
+      'role',
+    ]);
 
     // Nếu tài khoản đã tồn tại
     if (account) {
@@ -253,11 +276,12 @@ export class AuthService {
    * @returns Một thông báo xác nhận đăng xuất thành công.
    */
   async logout(accountID: string) {
-    await this.userService.updateAccount(accountID, { // Fix: hashed_refresh_token should be undefined to set to NULL
+    await this.userService.updateAccount(accountID, {
+      // Fix: hashed_refresh_token should be undefined to set to NULL
       hashed_refresh_token: null,
     });
 
-    return { message: "Đăng xuất thành công" }
+    return { message: 'Đăng xuất thành công' };
   }
 
   /**
@@ -286,10 +310,13 @@ export class AuthService {
       email: user.email,
       sub: user.id,
       role: String(user.role.id),
-    }
+    };
 
-    const accessTokenSecret = this.configService.get<string>('JWT_ACCESS_SECRET');
-    const accessTokenExpiresIn = this.configService.get<string>('JWT_ACCESS_EXPIRATION_TIME');
+    const accessTokenSecret =
+      this.configService.get<string>('JWT_ACCESS_SECRET');
+    const accessTokenExpiresIn = this.configService.get<string>(
+      'JWT_ACCESS_EXPIRATION_TIME',
+    );
 
     if (!accessTokenSecret || !accessTokenExpiresIn) {
       throw new InternalServerErrorException('Lỗi cấu hình Access Token');
@@ -310,7 +337,10 @@ export class AuthService {
   async forgotPassword(email: string): Promise<{ message: string }> {
     const account = await this.userService.findAccountByEmail(email);
     if (!account || !account.is_verified) {
-      return { message: 'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.' };
+      return {
+        message:
+          'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.',
+      };
     }
 
     // 1. Tạo token
@@ -342,7 +372,10 @@ export class AuthService {
       `,
     });
 
-    return { message: 'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.' };
+    return {
+      message:
+        'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.',
+    };
   }
 
   /**
@@ -355,12 +388,16 @@ export class AuthService {
    * @returns Một đối tượng chứa thông báo xác nhận mật khẩu đã được cập nhật thành công.
    * @throws {BadRequestException} Nếu token không hợp lệ hoặc đã hết hạn.
    */
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     // 1. Hash token nhận được từ client để so sánh với CSDL
     const hashedToken = await bcrypt.hash(token, 10);
 
     // 2. Tìm tài khoản dựa trên token đã hash và còn hạn
-    const account = await this.userService.findAccountByValidResetToken(hashedToken);
+    const account =
+      await this.userService.findAccountByValidResetToken(hashedToken);
 
     if (!account) {
       throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn.');
@@ -377,5 +414,75 @@ export class AuthService {
     });
 
     return { message: 'Mật khẩu đã được cập nhật thành công.' };
+  }
+
+  /**
+   * Bắt đầu quá trình đăng nhập hai bước (2FA).
+   * Xác thực email và mật khẩu, sau đó gửi mã OTP qua email nếu thông tin đăng nhập hợp lệ.
+   * @param email Email của người dùng.
+   * @param pass Mật khẩu của người dùng.
+   * @returns Một thông báo xác nhận đã gửi mã OTP.
+   * @throws {UnauthorizedException} Nếu email hoặc mật khẩu không chính xác.
+   */
+  async loginInitiate(email: string, pass: string) {
+    // 1. Dùng lại validateUser để kiểm tra mật khẩu
+    const account = await this.validateUser(email, pass);
+    if (!account) {
+      throw new UnauthorizedException('Sai email hoặc mật khẩu.');
+    }
+
+    // 2. Tạo và lưu mã OTP (tái sử dụng logic của register)
+    const verificationCode = randomBytes(3).toString('hex').toUpperCase();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Mã OTP có hạn 10 phút
+
+    await this.userService.updateAccount(account.id, {
+      verification_code: verificationCode,
+      verification_code_expires_at: expiresAt,
+    });
+
+    // 3. Gửi email
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Mã Xác thực Đăng nhập',
+      text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
+    });
+
+    return {
+      message:
+        'Mật khẩu chính xác. Một mã xác thực đã được gửi đến email của bạn.',
+    };
+  }
+
+  /**
+   * Hoàn tất quá trình đăng nhập hai bước bằng mã OTP.
+   * Xác thực mã OTP, sau đó tạo và trả về token truy cập và token làm mới nếu mã hợp lệ.
+   * @param email Email của người dùng.
+   * @param code Mã OTP người dùng cung cấp.
+   * @returns Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin người dùng.
+   * @throws {UnauthorizedException} Nếu tài khoản không tồn tại, mã OTP không hợp lệ hoặc đã hết hạn.
+   */
+  async loginComplete(email: string, code: string) {
+    const account = await this.userService.findAccountByEmail(email, [
+      'userProfile',
+      'role',
+    ]);
+    if (!account) {
+      throw new UnauthorizedException('Sai email hoặc mật khẩu.');
+    }
+
+    if (
+      !account.verification_code ||
+      account.verification_code_expires_at < new Date() ||
+      account.verification_code !== code
+    ) {
+      throw new UnauthorizedException('Sai mã xác thực hoặc đã hết hạn.');
+    }
+
+    await this.userService.updateAccount(account.id, {
+      verification_code: undefined,
+      verification_code_expires_at: undefined,
+    });
+
+    return this.login(account);
   }
 }

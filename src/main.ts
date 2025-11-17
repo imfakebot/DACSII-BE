@@ -4,7 +4,6 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 
-
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(
@@ -29,11 +28,15 @@ async function bootstrap() {
       description: 'Nhập JWT Access Token',
       in: 'header',
     })
-    .addCookieAuth('refresh_token', {
-      type: 'http',
-      in: 'Header', // Mặc dù là cookie, Swagger UI sẽ gửi qua header
-      scheme: 'Bearer',
-    }, 'cookie_auth')
+    .addCookieAuth(
+      'refresh_token',
+      {
+        type: 'http',
+        in: 'Header', // Mặc dù là cookie, Swagger UI sẽ gửi qua header
+        scheme: 'Bearer',
+      },
+      'cookie_auth',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -42,7 +45,7 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
-  })
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

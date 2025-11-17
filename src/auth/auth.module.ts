@@ -15,8 +15,6 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
-
-
 @Module({
   imports: [
     UsersModule,
@@ -34,7 +32,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     LocalAuthGuard,
     JwtRefreshGuard,
     JwtRefreshStrategy,
-    JwtAuthGuard
+    JwtAuthGuard,
   ],
 })
-export class AuthModule { }
+export class AuthModule {}
