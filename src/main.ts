@@ -21,11 +21,28 @@ async function bootstrap() {
     .setTitle('API document')
     .setDescription('API')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      name: 'JWT',
+      description: 'Nhập JWT Access Token',
+      in: 'header',
+    })
+    .addCookieAuth('refresh_token', {
+      type: 'http',
+      in: 'Header', // Mặc dù là cookie, Swagger UI sẽ gửi qua header
+      scheme: 'Bearer',
+    }, 'cookie_auth')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-doc', app, document);
+
+  app.enableCors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  })
 
   await app.listen(process.env.PORT ?? 3000);
 }

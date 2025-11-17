@@ -1,14 +1,15 @@
 import { UsersService } from '@/users/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
-import { Injectable, ForbiddenException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, ForbiddenException, ConflictException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { randomBytes } from 'crypto';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { AuthenticatedUser } from './decorator/users.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { Account } from '@/users/entities/account.entity';
+import { Account, AuthProvider } from '@/users/entities/account.entity';
 import { StringValue } from 'ms'
+import { Gender } from '@/users/entities/users-profile.entity';
 
 
 interface JwtPayload {
@@ -16,16 +17,20 @@ interface JwtPayload {
   sub: string,
   role: string
 }
+
 /**
- * AuthService chịu trách nhiệm xử lý logic liên quan đến xác thực người dùng,
- * bao gồm đăng ký, xác thực email, đăng nhập và tạo token JWT.
+ * @class AuthService
+ * @description Chịu trách nhiệm xử lý tất cả logic nghiệp vụ liên quan đến xác thực,
+ * bao gồm đăng ký, đăng nhập, quản lý token (JWT), OAuth, và quy trình quên mật khẩu.
  */
 @Injectable()
 export class AuthService {
   /**
+   * @constructor
    * @param userService Service để tương tác với dữ liệu người dùng.
    * @param mailerService Service để gửi email.
    * @param jwtService Service để tạo và quản lý JWT.
+   * @param configService Service để truy cập các biến môi trường cấu hình.
    */
   constructor(
     private userService: UsersService,
@@ -35,20 +40,19 @@ export class AuthService {
   ) { }
 
   /**
-   * Bắt đầu quá trình đăng ký.
    * Tạo một tài khoản chưa được xác thực và gửi mã xác thực qua email.
+   * Nếu email đã tồn tại nhưng chưa xác thực, nó sẽ cập nhật mã xác thực mới.
    * @param registerDto DTO chứa thông tin đăng ký của người dùng.
    * @returns Một thông báo xác nhận đã gửi email.
-   * @throws {ConflictException} Nếu email đã được sử dụng hoặc thiếu thông tin.
+   * @throws {ConflictException} Nếu email đã được sử dụng bởi một tài khoản đã được xác thực.
    */
   async initiateRegistration(registerDto: RegisterUserDto) {
     const {
       email,
       full_name,
       password,
-      phoneNumber,
-      gender,
-      street, ward_id, city_id,
+      phone_number,
+      gender
     } = registerDto;
     const existingAccount = await this.userService.findAccountByEmail(email);
     if (existingAccount && existingAccount.is_verified) {
@@ -71,13 +75,10 @@ export class AuthService {
         passwordHash,
         fullName: full_name,
         bio: null,
-        gender: gender || null,
-        phoneNumber: phoneNumber,
+        gender: (gender as Gender) || null,
+        phoneNumber: phone_number,
         verificationCode: verificationCode,
         expiresAt,
-        street: street,
-        ward_id: ward_id,
-        city_id: city_id,
       });
     }
 
@@ -119,10 +120,10 @@ export class AuthService {
 
   /**
    * Kiểm tra thông tin đăng nhập của người dùng.
-   * Phương thức này được gọi tự động bởi LocalStrategy.
-   * @param email Email người dùng
-   * @param pass Mật khẩu người dùng
-   * @returns Thông tin người dùng nếu hợp lệ, ngược lại trả về null.
+   * Phương thức này được gọi bởi `LocalStrategy` để xác thực email và mật khẩu.
+   * @param email Email người dùng cung cấp.
+   * @param pass Mật khẩu người dùng cung cấp.
+   * @returns Đối tượng người dùng (không bao gồm hash mật khẩu) nếu xác thực thành công, ngược lại trả về `null`.
    */
   async validateUser(email: string, pass: string) {
     const account = await this.userService.findAccountByEmail(email);
@@ -144,9 +145,11 @@ export class AuthService {
 
   /**
    * Tạo và ký một JWT cho người dùng đã được xác thực.
-   * Phương thức này được gọi sau khi `validateUser` thành công.
-   * @param user Đối tượng người dùng đã được xác thực từ `validateUser`.
-   * @returns Một đối tượng chứa access_token.
+   * Phương thức này được gọi sau khi `validateUser` hoặc `validateOAuthLogin` thành công.
+   * Nó tạo ra cả access token và refresh token, sau đó lưu bản hash của refresh token vào CSDL.
+   * @param user Đối tượng người dùng đã được xác thực.
+   * @returns Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin cơ bản của người dùng.
+   * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình JWT.
    */
   async login(user: AuthenticatedUser | Account) {
     const payload: JwtPayload = {
@@ -200,9 +203,9 @@ export class AuthService {
    * Nếu người dùng chưa tồn tại, một tài khoản mới sẽ được tạo.
    * @param payload Thông tin người dùng từ provider OAuth.
    * @param provider Tên của nhà cung cấp (e.g., 'google').
-   * @returns Thông tin người dùng đã được xác thực.
+   * @returns Thông tin người dùng đã được xác thực trong hệ thống.
    */
-  async validateOAuthLogin(payload: { email: string, firstName?: string, lastName?: string }, provider: string) {
+  async validateOAuthLogin(payload: { email: string, firstName?: string, lastName?: string }, provider: AuthProvider) {
     // Tải trước userProfile và role để tránh truy vấn thừa
     const account = await this.userService.findAccountByEmail(payload.email, ['userProfile', 'role']);
 
@@ -230,7 +233,8 @@ export class AuthService {
    * Xác thực người dùng và tạo ra một access token mới.
    * Logic kiểm tra refresh token đã được JwtRefreshGuard xử lý.
    * @param userId ID người dùng lấy từ payload của refresh token đã được xác thực.
-   * @returns Một đối tượng chứa accessToken mới.
+   * @returns Một đối tượng chứa `accessToken` mới.
+   * @throws {ForbiddenException} Nếu tài khoản không tồn tại.
    */
   async refreshTokens(userID: string) {
     const account = await this.userService.findAccountById(userID);
@@ -243,6 +247,11 @@ export class AuthService {
     return { accessToken };
   }
 
+  /**
+   * Đăng xuất người dùng bằng cách vô hiệu hóa refresh token.
+   * @param accountID ID của tài khoản cần đăng xuất.
+   * @returns Một thông báo xác nhận đăng xuất thành công.
+   */
   async logout(accountID: string) {
     await this.userService.updateAccount(accountID, { // Fix: hashed_refresh_token should be undefined to set to NULL
       hashed_refresh_token: null,
@@ -267,9 +276,9 @@ export class AuthService {
   }
 
   /**
-   * HÀM MỚI (hoặc tách ra từ hàm login): Chỉ tạo Access Token.
-   * Rất hữu ích cho việc làm mới token mà không cần tạo lại mọi thứ.
+   * Tạo một access token mới cho người dùng.
    * @param user Đối tượng người dùng hoặc payload đã được xác thực.
+   * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình Access Token.
    * @returns Một chuỗi access token mới.
    */
   async createAccessToken(user: AuthenticatedUser) {
@@ -290,5 +299,83 @@ export class AuthService {
       secret: accessTokenSecret,
       expiresIn: accessTokenExpiresIn as StringValue,
     });
+  }
+
+  /**
+   * Xử lý yêu cầu quên mật khẩu.
+   * Tạo một token đặt lại mật khẩu, lưu bản hash vào CSDL và gửi email chứa token cho người dùng.
+   * @param email Email của người dùng yêu cầu đặt lại mật khẩu.
+   * @returns Một thông báo chung để tránh tiết lộ email nào đã được đăng ký (time-safe response).
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const account = await this.userService.findAccountByEmail(email);
+    if (!account || !account.is_verified) {
+      return { message: 'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.' };
+    }
+
+    // 1. Tạo token
+    const resetToken = randomBytes(32).toString('hex');
+    const hashedToken = await bcrypt.hash(resetToken, 10); // Lưu bản hash để bảo mật
+
+    // 2. Đặt thời gian hết hạn (ví dụ: 15 phút)
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+
+    // 3. Lưu token và thời gian hết hạn vào CSDL
+    await this.userService.updateAccount(account.id, {
+      password_reset_token: hashedToken,
+      password_reset_expires: expires,
+    });
+
+    // 4. Tạo URL và gửi email
+    const frontendURL = this.configService.get<string>('FRONTEND_URL');
+    const resetUrl = `${frontendURL}/reset-password?token=${resetToken}`;
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Yêu cầu Đặt lại Mật khẩu',
+      // Dùng template engine (như Handlebars) cho email chuyên nghiệp hơn
+      html: `
+        <p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng nhấp vào liên kết dưới đây để tiếp tục:</p>
+        <a href="${resetUrl}">Đặt lại Mật khẩu</a>
+        <p>Liên kết này sẽ hết hạn sau 15 phút.</p>
+        <p>Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.</p>
+      `,
+    });
+
+    return { message: 'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.' };
+  }
+
+  /**
+   * Xử lý việc đặt lại mật khẩu bằng token đã được gửi qua email.
+   * Phương thức này tìm kiếm một tài khoản dựa trên token đặt lại mật khẩu,
+   * xác minh token chưa hết hạn, sau đó cập nhật mật khẩu của người dùng và
+   * vô hiệu hóa token đã sử dụng.
+   * @param token Token đặt lại mật khẩu mà người dùng cung cấp (bản gốc, chưa hash).
+   * @param newPassword Mật khẩu mới mà người dùng muốn đặt.
+   * @returns Một đối tượng chứa thông báo xác nhận mật khẩu đã được cập nhật thành công.
+   * @throws {BadRequestException} Nếu token không hợp lệ hoặc đã hết hạn.
+   */
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    // 1. Hash token nhận được từ client để so sánh với CSDL
+    const hashedToken = await bcrypt.hash(token, 10);
+
+    // 2. Tìm tài khoản dựa trên token đã hash và còn hạn
+    const account = await this.userService.findAccountByValidResetToken(hashedToken);
+
+    if (!account) {
+      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn.');
+    }
+
+    // 3. Hash mật khẩu mới và cập nhật
+    const newPasswordHash = await this.userService.hashPassword(newPassword);
+
+    await this.userService.updateAccount(account.id, {
+      password_hash: newPasswordHash,
+      // Vô hiệu hóa token sau khi sử dụng
+      password_reset_token: null,
+      password_reset_expires: null,
+    });
+
+    return { message: 'Mật khẩu đã được cập nhật thành công.' };
   }
 }

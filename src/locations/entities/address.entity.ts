@@ -1,8 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany, OneToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { City } from './city.entity';
 import { Ward } from './ward.entity';
 import { Fields } from '../../fields/entities/field.entity';
-import { UserProfile } from '../../users/entities/users-profile.entity';
 
 @Entity({ name: 'addresses' })
 export class Address {
@@ -42,15 +41,6 @@ export class Address {
   @OneToMany(() => Fields, (field) => field.address)
   fields!: Fields[];
 
-  /**
-   * Một Địa chỉ (Address) là nơi ở của một Hồ sơ người dùng (UserProfile).
-   * Quan hệ: One-to-One (Mỗi địa chỉ nhà riêng chỉ gắn với một người dùng).
-   * ERD: UP }o--|| ADDR : "resides at"
-   */
-  @OneToOne(
-    () => UserProfile,
-    (userProfile) => userProfile.address,
-    { nullable: true, onDelete: 'SET NULL' },
-  )
-  userProfile!: UserProfile;
+
+
 }

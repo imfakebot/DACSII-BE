@@ -1,13 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
-import { Account } from './entities/account.entity';
+import { Account, AuthProvider } from './entities/account.entity';
 import { Role } from './entities/role.entity';
-import { UserProfile } from './entities/users-profile.entity';
-import { Address } from '../locations/entities/address.entity';
-import { Ward } from '../locations/entities/ward.entity'
-import { City } from '../locations/entities/city.entity';
+import { Gender, UserProfile } from './entities/users-profile.entity';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -20,12 +19,8 @@ type CreateUnverifiedUserDto = {
     verificationCode: string;
     expiresAt: Date;
     bio: string | null;
-    gender: string | null;
+    gender: Gender | null;
     phoneNumber: string;
-    // Các trường địa chỉ là tùy chọn
-    street?: string;
-    ward_id?: number;
-    city_id?: number;
 };
 
 /**
@@ -34,7 +29,7 @@ type CreateUnverifiedUserDto = {
 type CreateOAuthUserPayload = {
     email: string;
     fullName: string;
-    provider: string;
+    provider: AuthProvider;
 };
 
 
@@ -54,7 +49,6 @@ export class UsersService {
         @InjectRepository(Account) private accountRepository: Repository<Account>,
         @InjectRepository(Role) private roleRepository: Repository<Role>,
         @InjectRepository(UserProfile) private userProfileRepository: Repository<UserProfile>,
-        @InjectRepository(Address) private addressRepository: Repository<Address>,
     ) { }
 
     /**
@@ -77,36 +71,18 @@ export class UsersService {
     */
     async createUnverifiedUser(data: CreateUnverifiedUserDto): Promise<Account> {
         return this.accountRepository.manager.transaction(async (transactionalEntityManager) => {
-            let savedProfile: UserProfile;
-
-            // Bắt đầu bằng việc tạo Profile
             const newProfile = transactionalEntityManager.create(UserProfile, {
                 full_name: data.fullName,
                 phone_number: data.phoneNumber,
                 gender: data.gender,
-                bio: data.bio,
+                bio: data.bio
             });
-            savedProfile = await transactionalEntityManager.save(newProfile);
 
-            // Chỉ tạo và liên kết địa chỉ nếu có đủ thông tin
-            if (data.street && data.ward_id && data.city_id) {
-                // SỬA ĐỔI QUAN TRỌNG: Gán mối quan hệ đúng cách
-                const newAddress = transactionalEntityManager.create(Address, {
-                    street: data.street,
-                    // Gán đối tượng tham chiếu thay vì ID trực tiếp
-                    ward: { id: data.ward_id } as Ward,
-                    city: { id: data.city_id } as City,
-                });
-                const savedAddress = await transactionalEntityManager.save(newAddress);
-
-                // Sau khi có địa chỉ, cập nhật lại profile để liên kết
-                savedProfile.address = savedAddress;
-                savedProfile = await transactionalEntityManager.save(savedProfile);
-            }
+            await transactionalEntityManager.save(newProfile);
 
             const defaultRole = await transactionalEntityManager.findOneBy(Role, { name: 'User' });
             if (!defaultRole) {
-                throw new Error('Default role "User" not found. Please seed the database.');
+                throw new Error('Default role "User" not found. Please seed the database.')
             }
 
             const newAccount = transactionalEntityManager.create(Account, {
@@ -114,13 +90,13 @@ export class UsersService {
                 password_hash: data.passwordHash,
                 verification_code: data.verificationCode,
                 verification_code_expires_at: data.expiresAt,
-                userProfile: savedProfile, // Liên kết với profile đã được cập nhật
-                role: defaultRole,
-            });
-            return transactionalEntityManager.save(newAccount);
-        });
-    }
+                userProfile: newProfile,
+                role: defaultRole
+            })
 
+            return transactionalEntityManager.save(newAccount);
+        })
+    }
     /**
     * Tạo một tài khoản mới cho người dùng đăng nhập qua OAuth.
     * Tài khoản này sẽ được đánh dấu là đã xác thực ngay lập tức và không có mật khẩu.
@@ -209,5 +185,57 @@ export class UsersService {
 
     async updateAccount(id: string, data: Partial<Account>) {
         await this.accountRepository.update(id, data);
+    }
+
+    /**
+   * SỬA ĐỔI: Cập nhật các thông tin hồ sơ cơ bản của người dùng (không bao gồm địa chỉ)
+   * và đánh dấu hồ sơ là đã hoàn thành.
+   * @param accountId ID của tài khoản người dùng (lấy từ token).
+   * @param data Dữ liệu hồ sơ cần cập nhật từ DTO.
+   * @returns Một thông báo thành công.
+   */
+    async updateProfile(accountId: string, data: UpdateUserProfileDto): Promise<{ message: string }> {
+        // 1. Tìm tài khoản và userProfile liên quan
+        const account = await this.accountRepository.findOne({
+            where: { id: accountId },
+            relations: ['userProfile'], // Chỉ cần join userProfile
+        });
+
+        if (!account || !account.userProfile) {
+            throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+        }
+
+        const userProfile = account.userProfile;
+
+        // 2. Cập nhật các trường thông tin của UserProfile
+        // DTO của bạn cũng không cần các trường street, ward_id, city_id.
+        // Ép kiểu `data.gender` thành `Gender` vì DTO nhận `string` nhưng entity cần `Gender` enum.
+        this.userProfileRepository.merge(userProfile, { ...data, gender: data.gender as Gender });
+
+        // 3. Quan trọng: Đánh dấu hồ sơ đã hoàn thành
+        userProfile.is_profile_complete = true;
+
+        // 4. Lưu lại các thay đổi vào UserProfile
+        await this.userProfileRepository.save(userProfile);
+
+        return { message: 'Cập nhật hồ sơ thành công.' };
+    }
+
+    async findAccountByHashedResetToken(token: string): Promise<string> {
+        const hashedToken = await bcrypt.hash(token, 10);
+        return hashedToken;
+    }
+
+    /**
+  * Tìm tài khoản bằng token đặt lại mật khẩu còn hiệu lực.
+  * @param token Token thuần nhận được từ client.
+  */
+    async findAccountByValidResetToken(token: string): Promise<Account | null> {
+        return this.accountRepository.findOne({
+            where: {
+                password_reset_token: token, // So sánh token thuần
+                password_reset_expires: MoreThan(new Date()), // Đảm bảo chưa hết hạn
+            },
+        });
     }
 }

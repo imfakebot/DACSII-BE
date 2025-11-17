@@ -1,28 +1,29 @@
 import { Body, Controller, Get, Post, Req, UseGuards, HttpCode, HttpStatus, Res, InternalServerErrorException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiCookieAuth } from '@nestjs/swagger';
-import { Request } from 'express';
-import { Response } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiCookieAuth } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { LoginUserDto } from './dto/login-user.dto';
+
 import { AuthenticatedUser, User } from './decorator/users.decorator';
 import { LocalAuthGuard } from './guards/local-auth-guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 
 /**
  * Interface để định nghĩa cấu trúc của một Request đã được xác thực,
  * đảm bảo `req.user` có kiểu dữ liệu chặt chẽ.
  */
-interface AuthenticatedRequest extends Request {
+export interface AuthenticatedRequest extends Request {
   user: {
     sub: string;
     email: string;
-    role: string;
+    role: { id: string; name?: string; };
   };
 }
 
@@ -35,6 +36,10 @@ interface AuthenticatedRequest extends Request {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService,
+    /**
+     * @param {AuthService} authService - Service xử lý logic nghiệp vụ xác thực.
+     * @param {ConfigService} configService - Service để truy cập các biến môi trường.
+     */
     private readonly configService: ConfigService,
   ) { }
 
@@ -47,7 +52,8 @@ export class AuthController {
   @Post('register/initiate')
   @ApiOperation({ summary: 'Bắt đầu quá trình đăng ký' })
   @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
-  @ApiResponse({ status: 409, description: 'Email đã được sử dụng.' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ (Validation Error).' })
+  @ApiResponse({ status: 409, description: 'Email đã được sử dụng bởi một tài khoản đã xác thực.' })
   @ApiBody({ type: RegisterUserDto })
   @HttpCode(HttpStatus.OK)
   initiateRegistration(@Body() registerDto: RegisterUserDto) {
@@ -63,6 +69,7 @@ export class AuthController {
   @Post('register/complete')
   @ApiOperation({ summary: 'Hoàn thành đăng ký bằng mã xác thực' })
   @ApiResponse({ status: 200, description: 'Xác thực thành công.' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ (Validation Error).' })
   @ApiResponse({ status: 409, description: 'Mã không hợp lệ hoặc đã hết hạn.' })
   @HttpCode(HttpStatus.OK)
   completeRegistration(@Body() verifyEmailDto: VerifyEmailDto) {
@@ -74,21 +81,37 @@ export class AuthController {
 
   /**
    * @route POST /auth/login
-   * @description Xác thực và đăng nhập người dùng. Yêu cầu `LocalAuthGuard` để xác thực credentials.
+   * @description Xác thực và đăng nhập người dùng bằng email và mật khẩu.
+   * `LocalAuthGuard` sẽ xử lý việc xác thực thông tin đăng nhập.
+   * Nếu thành công, trả về access token và thiết lập refresh token trong một httpOnly cookie.
    * @param {AuthenticatedUser} user - Đối tượng người dùng đã được xác thực bởi Guard.
-   * @param {LoginUserDto} _userDto - DTO chứa thông tin đăng nhập (chỉ dùng cho validation của Guard).
-   * @returns {Promise<{ accessToken: string; refreshToken: string }>} - Cặp access token và refresh token.
+   * @param {Response} res - Đối tượng response của Express để thiết lập cookie.
+   * @returns {Promise<{ accessToken: string; user: object }>} - Access token và thông tin cơ bản của người dùng.
    */
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Đăng nhập người dùng' })
-  @ApiBody({ type: LoginUserDto })
-  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access và refresh token.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Sai email hoặc mật khẩu.' })
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  login(@User() user: AuthenticatedUser, @Body() _userDto?: LoginUserDto) {
-    return this.authService.login(user);
+  @ApiOperation({ summary: 'Đăng nhập bằng email và mật khẩu' })
+  @ApiBody({
+    schema: { properties: { email: { type: 'string', example: 'user@example.com' }, password: { type: 'string', example: 'password123' } } }
+  })
+  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access token và thông tin người dùng.' })
+  @ApiResponse({ status: 401, description: 'Thông tin đăng nhập không chính xác.' })
+  async login(@User() user: AuthenticatedUser, @Res({ passthrough: true }) res: Response) {
+    const loginData = await this.authService.login(user);
+
+    res.cookie('refresh_token', loginData.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 ngày
+      path: '/',
+    });
+
+    return {
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    };
   }
 
   /**
@@ -110,6 +133,7 @@ export class AuthController {
    * @route GET /auth/google/callback
    * @description Callback URL cho luồng xác thực Google. `GoogleAuthGuard` xử lý và trả về thông tin người dùng.
    * @param {AuthenticatedUser} user - Thông tin người dùng lấy được từ Google.
+   * @param {Response} res - Đối tượng response của Express để gửi script về cho client.
    * @returns {Promise<{ accessToken: string; refreshToken: string }>} - Cặp access token và refresh token.
    */
   @Get('google/callback')
@@ -127,10 +151,11 @@ export class AuthController {
 
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
       sameSite: 'strict',
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      path: '/', // Add a comma here
-    })
+      path: '/',
+    });
 
     const script =
       `
@@ -147,12 +172,14 @@ export class AuthController {
   }
 
   /**
+   * @route POST /auth/refresh
+   * @description Làm mới access token bằng cách sử dụng refresh token được lưu trong cookie.
    * Luồng hoạt động:
    * 1. Frontend gọi POST /auth/refresh (không cần body).
    * 2. Trình duyệt tự động đính kèm cookie 'refresh_token'.
    * 3. JwtRefreshGuard chặn request, đọc cookie, và xác thực token.
    * 4. Nếu hợp lệ, Guard gắn payload (chứa userId) vào req.user.
-   * 5. Hàm này được thực thi, gọi service để tạo access token mới.
+   * 5. Controller được thực thi, gọi service để tạo access token mới.
    */
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
@@ -168,16 +195,53 @@ export class AuthController {
 
   /**
    * @route POST /auth/logout
-   * Đăng xuất người dùng bằng cách vô hiệu hóa refresh token.
+   * @description Đăng xuất người dùng. Vô hiệu hóa refresh token trong CSDL và xóa cookie phía client.
+   * @param {AuthenticatedRequest} req - Request đã được xác thực bởi `JwtAuthGuard`.
+   * @param {Response} res - Đối tượng response của Express để xóa cookie.
+   * @returns {Promise<{ message: string }>} - Thông báo đăng xuất thành công.
    */
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất người dùng' })
-  @ApiBearerAuth() // Mô tả rằng endpoint này yêu cầu JWT Access Token
+  @ApiCookieAuth() // Cho Swagger biết endpoint này cần xác thực (JWT)
   @ApiResponse({ status: 200, description: 'Đăng xuất thành công.' })
-  logout(@Req() req: AuthenticatedRequest) {
+  @ApiResponse({ status: 401, description: 'Unauthorized - Access token không hợp lệ.' })
+  async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
     const userId = req.user.sub;
-    return this.authService.logout(userId);
+    await this.authService.logout(userId);
+    res.clearCookie('refresh_token', { path: '/' });
+    return { message: 'Đăng xuất thành công' };
+  }
+  /**
+   * @route POST /auth/forgot-password
+   * @description Bắt đầu quá trình quên mật khẩu. Gửi email chứa link đặt lại mật khẩu cho người dùng.
+   * @param {ForgotPasswordDto} forgotPasswordDto - DTO chứa email của người dùng.
+   * @returns {Promise<{ message: string }>} - Một thông báo chung để bảo mật.
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gửi yêu cầu đặt lại mật khẩu' })
+  @ApiResponse({ status: 200, description: 'Luôn trả về thông báo thành công để tránh dò email.' })
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto.email);
+  }
+
+  /**
+   * @route POST /auth/reset-password
+   * @description Đặt lại mật khẩu bằng token đã nhận được qua email.
+   * @param {ResetPasswordDto} resetPasswordDto - DTO chứa token và mật khẩu mới.
+   * @returns {Promise<{ message: string }>} - Thông báo cập nhật mật khẩu thành công.
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đặt lại mật khẩu với token' })
+  @ApiResponse({ status: 200, description: 'Mật khẩu đã được cập nhật thành công.' })
+  @ApiResponse({ status: 400, description: 'Token không hợp lệ hoặc đã hết hạn.' })
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.newPassword,
+    );
   }
 }
