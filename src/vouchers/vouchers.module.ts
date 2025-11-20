@@ -3,8 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Voucher } from './entities/voucher.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([Voucher])
-    ]
+  imports: [TypeOrmModule.forFeature([Voucher])],
 })
-export class VouchersModule { }
+export class VouchersModule {}

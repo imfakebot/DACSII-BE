@@ -31,8 +31,6 @@ export class Ward {
   @JoinColumn({ name: 'city_id' })
   city?: City;
 
-
-
   /**
    * Một Phường/Xã (Ward) có nhiều Địa chỉ (Address).
    * Quan hệ: One-to-Many (Một phường xã có nhiều địa chỉ).

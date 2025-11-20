@@ -24,7 +24,7 @@ export class RolesGuard implements CanActivate {
    * @param {Reflector} reflector - Một helper class của NestJS để truy xuất metadata
    * được đính kèm vào các class hoặc handler (ví dụ: các vai trò được định nghĩa bởi `@Roles`).
    */
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   /**
    * @method canActivate

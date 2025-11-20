@@ -27,11 +27,14 @@ export class FieldsService {
    * @param {ConfigService} configService - Service để truy cập các biến môi trường.
    */
   constructor(
-    @InjectRepository(Field) private readonly fieldRepository: Repository<Field>,
-    @InjectRepository(Address) private readonly addressRepository: Repository<Address>,
-    @InjectRepository(FieldImage) private readonly fieldImageRepository: Repository<FieldImage>,
+    @InjectRepository(Field)
+    private readonly fieldRepository: Repository<Field>,
+    @InjectRepository(Address)
+    private readonly addressRepository: Repository<Address>,
+    @InjectRepository(FieldImage)
+    private readonly fieldImageRepository: Repository<FieldImage>,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method create
@@ -41,26 +44,33 @@ export class FieldsService {
    * @param {UserProfile} ownerProfile - Hồ sơ người dùng của chủ sân (admin).
    * @returns {Promise<Field>} - Thực thể Field vừa được tạo.
    */
-  async create(createFieldDto: CreateFieldDto, ownerProfile: UserProfile): Promise<Field> { // Sửa tên hàm
-    const { street, wardId, cityId, fieldTypeId, ...fieldData } = createFieldDto;
+  async create(
+    createFieldDto: CreateFieldDto,
+    ownerProfile: UserProfile,
+  ): Promise<Field> {
+    // Sửa tên hàm
+    const { street, wardId, cityId, fieldTypeId, ...fieldData } =
+      createFieldDto;
 
     // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu.
-    return this.fieldRepository.manager.transaction(async (transactionalEntityManager) => {
-      const address = transactionalEntityManager.create(Address, {
-        street,
-        ward: { id: wardId },
-        city: { id: cityId },
-      });
-      const savedAddress = await transactionalEntityManager.save(address);
+    return this.fieldRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        const address = transactionalEntityManager.create(Address, {
+          street,
+          ward: { id: wardId },
+          city: { id: cityId },
+        });
+        const savedAddress = await transactionalEntityManager.save(address);
 
-      const newField = transactionalEntityManager.create(Field, {
-        ...fieldData,
-        address: savedAddress,
-        fieldType: { id: fieldTypeId } as unknown as FieldType,
-        owner: ownerProfile,
-      });
-      return transactionalEntityManager.save(newField);
-    });
+        const newField = transactionalEntityManager.create(Field, {
+          ...fieldData,
+          address: savedAddress,
+          fieldType: { id: fieldTypeId } as unknown as FieldType,
+          owner: ownerProfile,
+        });
+        return transactionalEntityManager.save(newField);
+      },
+    );
   }
 
   /**
@@ -70,7 +80,13 @@ export class FieldsService {
    */
   async findAll(): Promise<Field[]> {
     return this.fieldRepository.find({
-      relations: ['address', 'address.ward', 'address.city', 'fieldType', 'owner'],
+      relations: [
+        'address',
+        'address.ward',
+        'address.city',
+        'fieldType',
+        'owner',
+      ],
     });
   }
 
@@ -84,8 +100,16 @@ export class FieldsService {
   async findOne(id: string): Promise<Field> {
     return this.fieldRepository.findOneOrFail({
       where: { id: id },
-      relations: ['address', 'address.ward', 'address.city', 'fieldType', 'owner', 'images', 'utilities'],
-    })
+      relations: [
+        'address',
+        'address.ward',
+        'address.city',
+        'fieldType',
+        'owner',
+        'images',
+        'utilities',
+      ],
+    });
   }
 
   /**
@@ -98,37 +122,43 @@ export class FieldsService {
    * @throws {NotFoundException} - Nếu sân bóng không tồn tại.
    */
   async update(id: string, updateFieldDto: UpdateFieldDto): Promise<Field> {
-    const { street, wardId, cityId, fieldTypeId, ...fieldData } = updateFieldDto;
+    const { street, wardId, cityId, fieldTypeId, ...fieldData } =
+      updateFieldDto;
 
     // Tải sân bóng và địa chỉ hiện tại của nó
-    const field = await this.fieldRepository.findOne({ where: { id }, relations: ['address'] });
+    const field = await this.fieldRepository.findOne({
+      where: { id },
+      relations: ['address'],
+    });
 
     if (!field) {
       throw new NotFoundException(`Sân bóng với ID ${id} không tồn tại`);
     }
 
     // Sử dụng transaction để đảm bảo an toàn
-    return this.fieldRepository.manager.transaction(async (transactionalEntityManager) => {
-      // 1. Cập nhật các thông tin cơ bản của sân bóng
-      transactionalEntityManager.merge(Field, field, fieldData);
+    return this.fieldRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        // 1. Cập nhật các thông tin cơ bản của sân bóng
+        transactionalEntityManager.merge(Field, field, fieldData);
 
-      // 2. Cập nhật loại sân nếu được cung cấp
-      if (fieldTypeId) {
-        field.fieldType = { id: fieldTypeId } as unknown as FieldType;
-      }
+        // 2. Cập nhật loại sân nếu được cung cấp
+        if (fieldTypeId) {
+          field.fieldType = { id: fieldTypeId } as unknown as FieldType;
+        }
 
-      // 3. Cập nhật địa chỉ nếu được cung cấp
-      if (field.address && (street || wardId || cityId)) {
-        const addressToUpdate = field.address;
-        if (street) addressToUpdate.street = street;
-        if (wardId) addressToUpdate.ward = { id: wardId } as Ward;
-        if (cityId) addressToUpdate.city = { id: cityId } as City;
-        await transactionalEntityManager.save(addressToUpdate);
-      }
+        // 3. Cập nhật địa chỉ nếu được cung cấp
+        if (field.address && (street || wardId || cityId)) {
+          const addressToUpdate = field.address;
+          if (street) addressToUpdate.street = street;
+          if (wardId) addressToUpdate.ward = { id: wardId } as Ward;
+          if (cityId) addressToUpdate.city = { id: cityId } as City;
+          await transactionalEntityManager.save(addressToUpdate);
+        }
 
-      // Lưu lại toàn bộ thực thể Field đã được cập nhật
-      return transactionalEntityManager.save(field);
-    });
+        // Lưu lại toàn bộ thực thể Field đã được cập nhật
+        return transactionalEntityManager.save(field);
+      },
+    );
   }
 
   /**
@@ -166,7 +196,10 @@ export class FieldsService {
    * @returns {Promise<FieldImage[]>} - Danh sách các thực thể FieldImage đã được tạo và lưu.
    * @throws {NotFoundException} - Nếu không tìm thấy sân bóng với ID đã cho.
    */
-  async addImagesToField(fieldID: string, files: Array<Express.Multer.File>): Promise<FieldImage[]> {
+  async addImagesToField(
+    fieldID: string,
+    files: Array<Express.Multer.File>,
+  ): Promise<FieldImage[]> {
     // 1. Kiểm tra xem sân bóng có tồn tại không
     const field = await this.fieldRepository.findOneBy({ id: fieldID });
     if (!field) {
@@ -177,7 +210,7 @@ export class FieldsService {
     const baseUrl = this.configService.get<string>('BASE_URL'); // Ví dụ: BASE_URL=http://localhost:3000
 
     // 2. Lặp qua từng file và tạo bản ghi trong CSDL
-    const imagePromises = files.map(file => {
+    const imagePromises = files.map((file) => {
       const imageUrl = `${baseUrl}/uploads/${file.filename}`;
 
       const newImage = this.fieldImageRepository.create({

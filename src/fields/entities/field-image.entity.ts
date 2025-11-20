@@ -1,5 +1,5 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
-import { Field } from "./field.entity";
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Field } from './field.entity';
 
 /**
  * @entity FieldImage
@@ -8,33 +8,31 @@ import { Field } from "./field.entity";
  */
 @Entity({ name: 'field_images' })
 export class FieldImage {
-    /**
-     * @property {string} id - ID duy nhất của hình ảnh (UUID).
-     */
-    @Column({ type: "varchar", length: 36, primary: true })
-    id!: string;
+  /**
+   * @property {string} id - ID duy nhất của hình ảnh (UUID).
+   */
+  @Column({ type: 'varchar', length: 36, primary: true })
+  id!: string;
 
-    /**
-     * @property {string} image_url - URL dẫn đến tệp hình ảnh.
-     */
-    @Column({ type: "text" })
-    image_url!: string;
+  /**
+   * @property {string} image_url - URL dẫn đến tệp hình ảnh.
+   */
+  @Column({ type: 'text' })
+  image_url!: string;
 
-    /**
-     * @property {boolean} isCover - Cờ cho biết đây có phải là ảnh bìa (ảnh đại diện) của sân bóng hay không.
-     * Mặc định là `false`.
-     */
-    @Column({ name: 'is_cover', type: 'boolean', default: false })
-    isCover!: boolean;
+  /**
+   * @property {boolean} isCover - Cờ cho biết đây có phải là ảnh bìa (ảnh đại diện) của sân bóng hay không.
+   * Mặc định là `false`.
+   */
+  @Column({ name: 'is_cover', type: 'boolean', default: false })
+  isCover!: boolean;
 
-    /**
-     * @description Mối quan hệ Nhiều-Một với thực thể Field.
-     * Mỗi hình ảnh thuộc về một sân bóng duy nhất.
-     * `onDelete: 'CASCADE'` đảm bảo rằng khi một sân bóng bị xóa, tất cả các hình ảnh liên quan cũng sẽ bị xóa.
-     */
-    @ManyToOne(() => Field, (field) => field.images, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'field_id' })
-    field!: Field;
-
-
+  /**
+   * @description Mối quan hệ Nhiều-Một với thực thể Field.
+   * Mỗi hình ảnh thuộc về một sân bóng duy nhất.
+   * `onDelete: 'CASCADE'` đảm bảo rằng khi một sân bóng bị xóa, tất cả các hình ảnh liên quan cũng sẽ bị xóa.
+   */
+  @ManyToOne(() => Field, (field) => field.images, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'field_id' })
+  field!: Field;
 }
