@@ -3,13 +3,15 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  JoinColumn,
+  OneToMany,
   OneToOne,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Account } from './account.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { Booking } from '@/bookings/entities/booking.entity';
+import { Field } from '@/fields/entities/field.entity';
 
 /**
  * Enum định nghĩa các giá trị hợp lệ cho giới tính.
@@ -94,8 +96,14 @@ export class UserProfile {
    * Mối quan hệ một-một ngược lại với thực thể Account.
    */
   @OneToOne(() => Account, (account) => account.userProfile)
-  @JoinColumn({ name: 'account_id' }) // Tường minh hóa cột khóa ngoại
   account!: Account;
+
+  @OneToMany(() => Booking, (booking) => booking.userProfile)
+  bookings!: Booking[];
+
+  @OneToMany(() => Field, (field) => field.owner)
+  ownerFields!: Field[];
+
 
   /**
    * Hook tự động tạo ID trước khi lưu vào cơ sở dữ liệu.

@@ -1,5 +1,5 @@
 @startuml ERD
-' ERD CHI TIẾT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (ĐÃ CẬP NHẬT)
+' ERD CHI TIẾT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (DỰA TRÊN MYSQL DUMP)
 
 title Sơ đồ Quan hệ Thực thể - Hệ thống Đặt sân bóng đá
 
@@ -17,7 +17,7 @@ skinparam tableAttributeFontSize 12
 ' ========================================
 package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
     entity "UserProfiles" as UP {
-      + **id** (PK) : VARCHAR(36)
+      + **id** (PK) : VARCHAR(36) 'UUID của hồ sơ người dùng
       --
       full_name : VARCHAR(100)
       date_of_birth : DATE
@@ -25,72 +25,96 @@ package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
       phone_number : VARCHAR(15)
       avatar_url : TEXT
       bio : TEXT
-      is_profile_completed : BOOLEAN
+      is_profile_complete : BOOLEAN
       created_at : TIMESTAMP
       updated_at : TIMESTAMP
-      --
-      # //address_id// (FK) : VARCHAR(36)
+      .. Indexes ..
+      UNIQUE(phone_number)
     }
 
     entity "Roles" as ROL {
-      + **id** (PK) : INT
+      + **id** (PK) : INT (AUTO_INCREMENT)
       --
-      name : VARCHAR(50)
+      name : VARCHAR(50) 'Tên vai trò (e.g., admin, user, field_owner)
+      .. Indexes ..
+      UNIQUE(name)
     }
 
     entity "Accounts" as AC {
-      + **id** (PK) : VARCHAR(36)
+      + **id** (PK) : VARCHAR(36) 'UUID của tài khoản
       --
       email : VARCHAR(255)
       password_hash : VARCHAR(255)
       provider : VARCHAR(50)
       status : VARCHAR(20)
       is_verified : BOOLEAN
+      last_login : TIMESTAMP
+      two_factor_enabled : BOOLEAN
+      two_factor_secret : VARCHAR(255)
+      two_factor_recovery_codes : TEXT
+      verification_code : VARCHAR(100)
+      verification_code_expires_at : DATETIME
+      hashed_refresh_token : VARCHAR(255)
+      password_reset_token : VARCHAR(255)
+      password_reset_expires : DATETIME
+      created_at : TIMESTAMP
+      updated_at : TIMESTAMP
       --
       # //user_profile_id// (FK) : VARCHAR(36)
       # //role_id// (FK) : INT
     }
+    ' ghi chú: UNIQUE(email), UNIQUE(user_profile_id)
+    ' Indexes: idx_accounts_status, idx_accounts_provider
+
 }
 
 ' ========================================
 package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
     entity "Cities" as C {
-      + **id** (PK) : INT
+      + **id** (PK) : INT 'Mã tỉnh/thành phố
       --
       name : VARCHAR(100)
+      type : VARCHAR(50)
     }
     entity "Wards" as W {
-      + **id** (PK) : INT
+      + **id** (PK) : INT (AUTO_INCREMENT) 'Mã phường/xã
       --
       name : VARCHAR(100)
+      type : VARCHAR(50)
       --
       # //city_id// (FK) : INT
     }
 
     entity "Addresses" as ADDR {
-      + **id** (PK) : VARCHAR(36)
+      + **id** (PK) : VARCHAR(36) 'UUID
       --
       street : VARCHAR(255)
       --
       # //ward_id// (FK) : INT
+      # //cityId// (FK) : INT
     }
 
     entity "Utilities" as UT {
-      + **id** (PK) : INT
+      + **id** (PK) : INT (AUTO_INCREMENT)
       --
       name : VARCHAR(100)
+      icon_url : TEXT
     }
 
     entity "FieldTypes" as FT {
       + **id** (PK) : VARCHAR(36)
       --
       name : VARCHAR(50)
+      description : TEXT
+      .. Indexes ..
+      UNIQUE(name)
     }
 
     entity "Fields" as F {
       + **id** (PK) : VARCHAR(36)
       --
       name : VARCHAR(150)
+      description : TEXT
       status : BOOLEAN
       --
       # //field_type_id// (FK) : VARCHAR(36)
@@ -116,13 +140,16 @@ package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
 ' ========================================
 package "3. KHỐI QUẢN LÝ ĐẶT SÂN & GIÁ CẢ" {
     entity "TimeSlots" as TS {
-      + **id** (PK) : INT
+      + **id** (PK) : INT (AUTO_INCREMENT)
       --
       start_time : TIME
       end_time : TIME
       price : DECIMAL
+      is_peak_hour : BOOLEAN
       --
       # //field_type_id// (FK) : VARCHAR(36)
+      .. Indexes ..
+      UNIQUE(start_time, end_time, field_type_id)
     }
 
     entity "Bookings" as B {
@@ -135,6 +162,8 @@ package "3. KHỐI QUẢN LÝ ĐẶT SÂN & GIÁ CẢ" {
       # //user_profile_id// (FK) : VARCHAR(36)
       # //field_id// (FK) : VARCHAR(36)
       # //time_slot_id// (FK) : INT
+      .. Indexes ..
+      UNIQUE(field_id, booking_date, time_slot_id)
     }
 }
 
@@ -144,13 +173,23 @@ package "4. KHỐI QUẢN LÝ THANH TOÁN & KHUYẾN MÃI" {
       + **id** (PK) : VARCHAR(36)
       --
       code : VARCHAR(50)
-      ...
+      discount_amount : DECIMAL
+      discount_percentage : INT
+      max_discount_amount : DECIMAL
+      min_order_value : DECIMAL
+      valid_from : DATETIME
+      valid_to : DATETIME
+      quantity : INT
+      .. Indexes ..
+      UNIQUE(code)
     }
 
     entity "Payments" as P {
       + **id** (PK) : VARCHAR(36)
       --
       amount : DECIMAL
+      final_amount : DECIMAL
+      payment_method : VARCHAR(50)
       status : ENUM
       --
       # //booking_id// (FK) : VARCHAR(36)
@@ -165,15 +204,21 @@ package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
       --
       rating : INT
       comment : TEXT
+      created_at : TIMESTAMP
       --
       # //booking_id// (FK) : VARCHAR(36)
+      .. Constraints ..
+      CHECK(rating >= 1 AND rating <= 5)
+      UNIQUE(booking_id)
     }
     
     entity "Notifications" as NOTI {
       + **id** (PK) : VARCHAR(36)
       --
       title : VARCHAR(255)
+      content : TEXT
       is_read : BOOLEAN
+      created_at : TIMESTAMP
       --
       # //recipient_id// (FK) : VARCHAR(36)
     }
@@ -182,6 +227,9 @@ package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
       + **id** (PK) : VARCHAR(36)
       --
       title : VARCHAR(255)
+      category : VARCHAR(50)
+      status : VARCHAR(20)
+      created_at : TIMESTAMP
       --
       # //submitter_id// (FK) : VARCHAR(36)
       # //assignee_id// (FK) : VARCHAR(36)
@@ -191,6 +239,7 @@ package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
       + **id** (PK) : VARCHAR(36)
       --
       content : TEXT
+      created_at : TIMESTAMP
       --
       # //feedback_id// (FK) : VARCHAR(36)
       # //responder_id// (FK) : VARCHAR(36)
@@ -206,14 +255,15 @@ ROL ||--o{ AC : "defines"
 
 ' Khối 2
 C  ||--o{ W
-W  ||--o{ ADDR
+W  ||--o{ ADDR : "contains"
+C  }o--|| ADDR : "is in" 
+' Mối quan hệ logic, FK không trực tiếp nhưng cần thiết cho truy vấn
 F }o--|| ADDR : "located at"
-UP }o..|| ADDR : "resides at"
 FT ||--o{ F : "categorizes"
 F  ||--o{ FI : "has"
 F  }|..|{ FU
 UT }|..|{ FU
-UP }o--|| F : "owns"
+UP }o--o{ F : "owns"
 
 ' Khối 3
 FT ||--o{ TS : "has pricing for"
@@ -222,15 +272,15 @@ F  }o--|| B : "is for"
 TS }o--|| B : "at"
 
 ' Khối 4
-B  ||--o{ P : "has" ' Một booking có thể có nhiều payment (đặt cọc, thanh toán đủ)
-V  }o--o{ P : "applies" ' Một voucher có thể áp dụng cho nhiều payment
+B  ||--o{ P : "has"
+V  }o--o{ P : "applies"
 
 ' Khối 5
 B ||--|| REV : "has" ' Một booking chỉ có một review
-UP ||--o{ NOTI : "receives"
-UP ||--o{ FB : "submits"
-UP }o--o{ FB : "assigned to"
+UP }o--o{ NOTI : "receives"
+UP }o--o{ FB : "submits"
+UP }o--o{ FB : "is assigned to"
 FB ||--o{ FBR : "has"
-UP ||--o{ FBR : "responds"
+UP }o--o{ FBR : "responds"
 
 @enduml

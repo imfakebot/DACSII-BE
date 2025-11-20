@@ -59,7 +59,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -106,55 +106,6 @@ export class AuthController {
     );
   }
 
-  // /**
-  //  * @route POST /auth/login
-  //  * @description Xác thực và đăng nhập người dùng bằng email và mật khẩu.
-  //  * `LocalAuthGuard` sẽ xử lý việc xác thực thông tin đăng nhập.
-  //  * Nếu thành công, trả về access token và thiết lập refresh token trong một httpOnly cookie.
-  //  * @param {AuthenticatedUser} user - Đối tượng người dùng đã được xác thực bởi Guard.
-  //  * @param {Response} res - Đối tượng response của Express để thiết lập cookie.
-  //  * @returns {Promise<{ accessToken: string; user: object }>} - Access token và thông tin cơ bản của người dùng.
-  //  */
-  // @UseGuards(LocalAuthGuard)
-  // @Post('login')
-  // @HttpCode(HttpStatus.OK)
-  // @ApiOperation({ summary: 'Đăng nhập bằng email và mật khẩu' })
-  // @ApiBody({
-  //   schema: {
-  //     properties: {
-  //       email: { type: 'string', example: 'user@example.com' },
-  //       password: { type: 'string', example: 'password123' },
-  //     },
-  //   },
-  // })
-  // @ApiResponse({
-  //   status: 200,
-  //   description:
-  //     'Đăng nhập thành công, trả về access token và thông tin người dùng.',
-  // })
-  // @ApiResponse({
-  //   status: 401,
-  //   description: 'Thông tin đăng nhập không chính xác.',
-  // })
-  // async login(
-  //   @User() user: AuthenticatedUser,
-  //   @Res({ passthrough: true }) res: Response,
-  // ) {
-  //   const loginData = await this.authService.login(user);
-
-  //   res.cookie('refresh_token', loginData.refreshToken, {
-  //     httpOnly: true,
-  //     secure: this.configService.get('NODE_ENV') === 'production',
-  //     sameSite: 'strict',
-  //     expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 ngày
-  //     path: '/',
-  //   });
-
-  //   return {
-  //     accessToken: loginData.accessToken,
-  //     user: loginData.user,
-  //   };
-  // }
 
   /**
    * @route GET /auth/google
@@ -217,9 +168,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })},'${frontendURL}');
       window.close();
     </script>
     `;
@@ -319,9 +270,19 @@ export class AuthController {
     );
   }
 
+  /**
+   * @route POST /auth/login/initiate
+   * @description Bước 1 của quá trình đăng nhập bằng email/mật khẩu.
+   * Xác thực thông tin đăng nhập và gửi mã xác thực (OTP) qua email nếu thành công.
+   * @param {LoginUserDto} loginUserDto - DTO chứa email và mật khẩu.
+   * @returns {Promise<{ message: string }>} - Thông báo về việc đã gửi mã xác thực.
+   */
   @Post('login/initiate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'B1 Đăng nhập: Xác thực mật khẩu, gửi mã về email' })
+  @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
+  @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không chính xác.' })
+  @ApiResponse({ status: 404, description: 'Tài khoản không tồn tại.' })
   @ApiBody({ type: LoginUserDto })
   loginInitiate(@Body() loginUserDto: LoginUserDto) {
     return this.authService.loginInitiate(
@@ -330,9 +291,21 @@ export class AuthController {
     );
   }
 
+  /**
+   * @route POST /auth/login/complete
+   * @description Bước 2 của quá trình đăng nhập.
+   * Xác thực mã OTP được gửi qua email để hoàn tất đăng nhập, sau đó cấp access token và refresh token.
+   * @param {LoginCompleteDto} loginCompleteDto - DTO chứa email và mã xác thực.
+   * @param {Response} res - Đối tượng response để set cookie.
+   * @returns {Promise<{ accessToken: string; user: any }>} - Access token và thông tin người dùng.
+   */
   @Post('login/complete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'B2 Đăng nhập: Xác thực mã OTP, nhận tokens' })
+  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access token và thông tin người dùng.' })
+  @ApiResponse({ status: 400, description: 'Mã xác thực không hợp lệ hoặc đã hết hạn.' })
+  @ApiResponse({ status: 401, description: 'Xác thực thất bại.' })
+  @ApiBody({ type: LoginCompleteDto })
   async loginComplete(
     @Body() loginCompleteDto: LoginCompleteDto,
     @Res({ passthrough: true }) res: Response,
@@ -344,7 +317,11 @@ export class AuthController {
 
     // Set cookie và trả về kết quả như logic login cũ
     res.cookie('refresh_token', loginData.refreshToken, {
-      /* ... các tùy chọn an toàn ... */
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      path: '/',
     });
     return {
       accessToken: loginData.accessToken,

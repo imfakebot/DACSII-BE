@@ -15,10 +15,10 @@ export class Ward {
   id!: number;
 
   @Column({ type: 'varchar', length: 255 })
-  name!: string;
+  type!: string;
 
   @Column({ type: 'varchar', length: 255 })
-  type!: string;
+  name!: string;
 
   // --- MỐI QUAN HỆ ---
 
@@ -28,11 +28,10 @@ export class Ward {
    * ERD: Cities ||--o{ Wards
    */
   @ManyToOne(() => City, (city) => city.wards)
-  @JoinColumn({ name: 'cityId' })
-  city!: City;
+  @JoinColumn({ name: 'city_id' })
+  city?: City;
 
-  @Column({ type: 'int' })
-  cityId!: number;
+
 
   /**
    * Một Phường/Xã (Ward) có nhiều Địa chỉ (Address).
@@ -40,5 +39,5 @@ export class Ward {
    * ERD: W ||--o{ ADDR
    */
   @OneToMany(() => Address, (address) => address.ward)
-  addresses!: Address[];
+  addresses?: Address[];
 }

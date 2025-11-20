@@ -1,4 +1,10 @@
 import { Module } from '@nestjs/common';
+import { Review } from './entities/review.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
-@Module({})
-export class ReviewsModule {}
+@Module({
+    imports: [
+        TypeOrmModule.forFeature([Review])
+    ]
+})
+export class ReviewsModule { }

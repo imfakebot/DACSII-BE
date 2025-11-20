@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 import { City } from './city.entity';
 import { Ward } from './ward.entity';
-import { Fields } from '../../fields/entities/field.entity';
+import { Field } from '../../fields/entities/field.entity';
 
 @Entity({ name: 'addresses' })
 export class Address {
@@ -34,7 +34,7 @@ export class Address {
    * ERD: Wards --o{ Addresses
    */
   @ManyToOne(() => Ward, (ward) => ward.addresses)
-  @JoinColumn({ name: 'ward_Id' })
+  @JoinColumn({ name: 'ward_id' })
   ward!: Ward;
 
   /**
@@ -42,6 +42,6 @@ export class Address {
    * Quan hệ: One-to-Many (Một địa chỉ có thể là vị trí của nhiều sân).
    * ERD: ADDR ||--o{ F : "is located at"
    */
-  @OneToMany(() => Fields, (field) => field.address)
-  fields!: Fields[];
+  @OneToMany(() => Field, (field) => field.address)
+  fields!: Field[];
 }
