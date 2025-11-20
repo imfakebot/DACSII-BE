@@ -94,7 +94,10 @@ export class Field {
    * @description Mối quan hệ Nhiều-Một với UserProfile.
    * Mỗi sân bóng thuộc sở hữu của một người dùng (chủ sân).
    */
-  @ManyToOne(() => UserProfile, (userProfile: UserProfile) => userProfile.ownerFields)
+  @ManyToOne(
+    () => UserProfile,
+    (userProfile: UserProfile) => userProfile.ownerFields,
+  )
   @JoinColumn({ name: 'owner_id' })
   owner!: UserProfile;
 
@@ -124,5 +127,4 @@ export class Field {
     inverseJoinColumn: { name: 'utility_id', referencedColumnName: 'id' },
   })
   utilities!: Utility[];
-
 }

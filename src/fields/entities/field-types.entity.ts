@@ -1,5 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
-import { Field, } from './field.entity';
+import { Field } from './field.entity';
 import { TimeSlot } from '@/pricing/entities/time-slot.entity';
 
 /**
@@ -41,5 +41,4 @@ export class FieldType {
    */
   @OneToMany(() => TimeSlot, (timeSlot) => timeSlot.fieldType)
   timeSlots!: TimeSlot[];
-
 }

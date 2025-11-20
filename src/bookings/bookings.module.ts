@@ -9,10 +9,10 @@ import { Booking } from './entities/booking.entity';
  * Nó đăng ký `Booking` entity với TypeORM để tương tác với cơ sở dữ liệu.
  */
 @Module({
-    imports: [
-        // Đăng ký Booking entity với TypeORM.
-        // Điều này cho phép inject BookingRepository vào các service trong module này.
-        TypeOrmModule.forFeature([Booking])
-    ]
+  imports: [
+    // Đăng ký Booking entity với TypeORM.
+    // Điều này cho phép inject BookingRepository vào các service trong module này.
+    TypeOrmModule.forFeature([Booking]),
+  ],
 })
-export class BookingsModule { }
+export class BookingsModule {}

@@ -59,7 +59,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /auth/register/initiate
@@ -105,7 +105,6 @@ export class AuthController {
       verifyEmailDto.verificationCode,
     );
   }
-
 
   /**
    * @route GET /auth/google
@@ -168,9 +167,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-      accessToken: loginData.accessToken,
-      user: loginData.user,
-    })},'${frontendURL}');
+        accessToken: loginData.accessToken,
+        user: loginData.user,
+      })},'${frontendURL}');
       window.close();
     </script>
     `;
@@ -281,7 +280,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'B1 Đăng nhập: Xác thực mật khẩu, gửi mã về email' })
   @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
-  @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không chính xác.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Email hoặc mật khẩu không chính xác.',
+  })
   @ApiResponse({ status: 404, description: 'Tài khoản không tồn tại.' })
   @ApiBody({ type: LoginUserDto })
   loginInitiate(@Body() loginUserDto: LoginUserDto) {
@@ -302,8 +304,15 @@ export class AuthController {
   @Post('login/complete')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'B2 Đăng nhập: Xác thực mã OTP, nhận tokens' })
-  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access token và thông tin người dùng.' })
-  @ApiResponse({ status: 400, description: 'Mã xác thực không hợp lệ hoặc đã hết hạn.' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Đăng nhập thành công, trả về access token và thông tin người dùng.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Mã xác thực không hợp lệ hoặc đã hết hạn.',
+  })
   @ApiResponse({ status: 401, description: 'Xác thực thất bại.' })
   @ApiBody({ type: LoginCompleteDto })
   async loginComplete(

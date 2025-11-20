@@ -28,7 +28,7 @@ import { Utility } from './entities/utility.entity';
     // Import AuthModule để sử dụng các Guards (JwtAuthGuard, RolesGuard) trong FieldsController.
     AuthModule,
     // Import UsersModule để có thể truy cập UsersService, cần thiết để lấy thông tin chủ sân (owner).
-    UsersModule
+    UsersModule,
   ],
   // Cung cấp FieldsService để xử lý logic nghiệp vụ.
   providers: [FieldsService],
@@ -37,4 +37,4 @@ import { Utility } from './entities/utility.entity';
   // Export FieldsService để các module khác (ví dụ: BookingsModule) có thể sử dụng.
   exports: [FieldsService],
 })
-export class FieldsModule { }
+export class FieldsModule {}

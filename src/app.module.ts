@@ -58,11 +58,12 @@ import { ServeStaticModule } from '@nestjs/serve-static';
         storage: diskStorage({
           destination: './uploads',
           filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+            const uniqueSuffix =
+              Date.now() + '-' + Math.round(Math.random() * 1e9);
             const extension = extname(file.originalname);
             const filename = `${file.fieldname}-${uniqueSuffix}${extension}`;
             callback(null, filename);
-          }
+          },
         }),
 
         litmits: {
@@ -74,13 +75,13 @@ import { ServeStaticModule } from '@nestjs/serve-static';
             return callback(new Error('Only image files are allowed!'), false);
           }
           callback(null, true);
-        }
-      })
+        },
+      }),
     }),
 
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
-      serveRoot: '/uploads'
+      serveRoot: '/uploads',
     }),
 
     // Module quản lý kết nối cơ sở dữ liệu.
@@ -122,4 +123,4 @@ import { ServeStaticModule } from '@nestjs/serve-static';
   controllers: [],
   providers: [],
 })
-export class AppModule { }
+export class AppModule {}

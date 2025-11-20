@@ -104,7 +104,6 @@ export class UserProfile {
   @OneToMany(() => Field, (field) => field.owner)
   ownerFields!: Field[];
 
-
   /**
    * Hook tự động tạo ID trước khi lưu vào cơ sở dữ liệu.
    */

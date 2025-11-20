@@ -15,7 +15,12 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FieldsService } from './fields.service';
 import { UsersService } from '../users/users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -43,7 +48,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /fields
@@ -58,16 +63,24 @@ export class FieldsController {
   @Roles(Role.Admin) // Chỉ Admin mới có quyền tạo sân bóng
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Tạo một sân bóng mới' })
-  @ApiResponse({ status: 201, description: 'Tạo sân bóng thành công.', type: Field })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo sân bóng thành công.',
+    type: Field,
+  })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden resource. (Không phải Admin)' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden resource. (Không phải Admin)',
+  })
   async create(
     @Body() createFieldDto: CreateFieldDto,
     @Req() req: AuthenticatedRequest,
   ) {
     const adminAccountId = req.user.sub;
-    const adminProfile = await this.usersService.findProfileByAccountId(adminAccountId);
+    const adminProfile =
+      await this.usersService.findProfileByAccountId(adminAccountId);
     if (!adminProfile) {
       throw new NotFoundException('Không tìm thấy hồ sơ của Admin.');
     }
@@ -114,7 +127,11 @@ export class FieldsController {
   @Roles(Role.Admin) // Chỉ Admin mới có quyền cập nhật
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Cập nhật thông tin sân bóng' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công.', type: Field })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật thành công.',
+    type: Field,
+  })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
