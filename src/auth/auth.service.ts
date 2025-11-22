@@ -161,10 +161,17 @@ export class AuthService {
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình JWT.
    */
   async login(user: AuthenticatedUser | Account) {
+    // Đảm bảo có đủ quan hệ để lấy full_name
+    if (!(user as Account).userProfile || !(user as Account).role) {
+      const enriched = await this.userService.findAccountById(user.id);
+      if (enriched) {
+        user = enriched;
+      }
+    }
     const payload: JwtPayload = {
-      email: user.email,
-      sub: user.id,
-      role: String(user.role.id),
+      email: (user as Account).email,
+      sub: (user as Account).id,
+      role: String((user as Account).role.id),
     };
 
     const accessTokenSecret =
@@ -214,10 +221,11 @@ export class AuthService {
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
-        email: user.email,
-        role: user.role.name,
-        is_profile_complete: user.userProfile?.is_profile_complete || false,
+        id: (user as Account).id,
+        email: (user as Account).email,
+        full_name: (user as Account).userProfile?.full_name,
+        role: (user as Account).role.name,
+        is_profile_complete: (user as Account).userProfile?.is_profile_complete || false,
       },
     };
   }
@@ -399,27 +407,17 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
-    // 1. Hash token nhận được từ client để so sánh với CSDL
-    const hashedToken = await bcrypt.hash(token, 10);
-
-    // 2. Tìm tài khoản dựa trên token đã hash và còn hạn
-    const account =
-      await this.userService.findAccountByValidResetToken(hashedToken);
-
+    // Không hash lại token (bcrypt hash mỗi lần khác nhau). So sánh bằng bcrypt.compare trong service.
+    const account = await this.userService.findAccountByValidResetToken(token);
     if (!account) {
       throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn.');
     }
-
-    // 3. Hash mật khẩu mới và cập nhật
     const newPasswordHash = await this.userService.hashPassword(newPassword);
-
     await this.userService.updateAccount(account.id, {
       password_hash: newPasswordHash,
-      // Vô hiệu hóa token sau khi sử dụng
       password_reset_token: null,
       password_reset_expires: null,
     });
-
     return { message: 'Mật khẩu đã được cập nhật thành công.' };
   }
 

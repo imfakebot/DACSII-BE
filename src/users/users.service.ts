@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { MoreThan, Repository, Not, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
 import { Account, AuthProvider } from './entities/account.entity';
 import { Role } from './entities/role.entity';
@@ -197,7 +197,7 @@ export class UsersService {
   }
 
   async findAccountById(id: string) {
-    return this.accountRepository.findOne({ where: { id } });
+    return this.accountRepository.findOne({ where: { id }, relations: ['userProfile','role'] });
   }
 
   async updateAccount(id: string, data: Partial<Account>) {
@@ -262,13 +262,21 @@ export class UsersService {
    * Tìm tài khoản bằng token đặt lại mật khẩu còn hiệu lực.
    * @param token Token thuần nhận được từ client.
    */
-  async findAccountByValidResetToken(token: string): Promise<Account | null> {
-    return this.accountRepository.findOne({
+  async findAccountByValidResetToken(rawToken: string): Promise<Account | null> {
+    // Vì token được lưu dưới dạng hash với salt khác nhau mỗi lần, không thể tìm trực tiếp bằng WHERE.
+    // Lấy tất cả các account còn hạn token rồi dùng bcrypt.compare.
+    const candidates = await this.accountRepository.find({
       where: {
-        password_reset_token: token, // So sánh token thuần
-        password_reset_expires: MoreThan(new Date()), // Đảm bảo chưa hết hạn
+        password_reset_expires: MoreThan(new Date()),
+        password_reset_token: Not(IsNull()),
       },
     });
+    for (const acc of candidates) {
+      if (acc.password_reset_token && await bcrypt.compare(rawToken, acc.password_reset_token)) {
+        return acc;
+      }
+    }
+    return null;
   }
 
   /**
