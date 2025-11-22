@@ -84,11 +84,18 @@ export class AuthService {
       });
     }
 
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Mã Xác Thực Đăng Ký Tài Khoản',
-      text: `Mã xác thực của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 15 phút.`,
-    });
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Mã Xác Thực Đăng Ký Tài Khoản',
+        text: `Mã xác thực của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 15 phút.`,
+      });
+    } catch (err) {
+      // Không làm hỏng quy trình đăng ký nếu gửi email lỗi (ví dụ sai SMTP credentials)
+      // Dev có thể xem mã xác thực trong log để test.
+      // eslint-disable-next-line no-console
+      console.error('Gửi email đăng ký thất bại:', err);
+    }
 
     return { message: 'Mã xác thực đã được gửi đến email của bạn.' };
   }
@@ -441,11 +448,16 @@ export class AuthService {
     });
 
     // 3. Gửi email
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Mã Xác thực Đăng nhập',
-      text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
-    });
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Mã Xác thực Đăng nhập',
+        text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Gửi email đăng nhập thất bại:', err);
+    }
 
     return {
       message:

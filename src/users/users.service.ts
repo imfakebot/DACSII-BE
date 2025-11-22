@@ -201,7 +201,16 @@ export class UsersService {
   }
 
   async updateAccount(id: string, data: Partial<Account>) {
-    await this.accountRepository.update(id, data);
+    // TypeORM bỏ qua các trường undefined; nếu tất cả đều undefined sẽ gây lỗi UpdateValuesMissingError.
+    // Chuyển undefined -> null khi mục đích là xoá giá trị và lọc bỏ key không có thay đổi thực sự.
+    const sanitizedEntries = Object.entries(data)
+      .filter(([_, v]) => v !== undefined) // loại bỏ undefined để tránh update rỗng
+      .map(([k, v]) => [k, v === undefined ? null : v]);
+    const sanitized: Record<string, any> = Object.fromEntries(sanitizedEntries);
+    if (Object.keys(sanitized).length === 0) {
+      return; // Không có gì để cập nhật -> bỏ qua
+    }
+    await this.accountRepository.update(id, sanitized);
   }
 
   /**

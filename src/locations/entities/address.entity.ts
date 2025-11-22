@@ -33,9 +33,9 @@ export class Address {
    * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một phường/xã).
    * ERD: Wards --o{ Addresses
    */
-  @ManyToOne(() => Ward, (ward) => ward.addresses)
+  @ManyToOne(() => Ward, (ward) => ward.addresses, { nullable: true })
   @JoinColumn({ name: 'ward_id' })
-  ward!: Ward;
+  ward?: Ward | null;
 
   /**
    * Một Địa chỉ (Address) có thể có nhiều Sân bóng (Field).

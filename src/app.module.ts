@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { MailerModule } from '@nestjs-modules/mailer';
+import * as nodemailer from 'nodemailer';
 import { FieldsModule } from './fields/fields.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PricingModule } from './pricing/pricing.module';
@@ -37,19 +38,54 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     // Cấu hình được lấy từ `ConfigService` sau khi `ConfigModule` đã được nạp.
     MailerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        transport: {
-          host: configService.get<string>('MAIL_HOST'),
-          secure: false,
-          auth: {
-            user: configService.get<string>('MAIL_USER'), // Tài khoản email
-            pass: configService.get<string>('MAIL_PASS'), // Mật khẩu email
+      useFactory: async (configService: ConfigService) => {
+        const host = configService.get<string>('MAIL_HOST');
+        const user = configService.get<string>('MAIL_USER');
+        const pass = configService.get<string>('MAIL_PASS');
+        const from = configService.get<string>('MAIL_FROM');
+        const portRaw = configService.get<string>('MAIL_PORT');
+        const secureRaw = configService.get<string>('MAIL_SECURE');
+        const port = portRaw ? Number(portRaw) : 587;
+        // Nếu không khai báo MAIL_SECURE thì tự động chọn secure=true cho port 465 (Implicit TLS),
+        // còn lại (ví dụ 587) dùng STARTTLS (secure=false) và nâng cấp sau.
+        const implicitTLS = port === 465;
+        const secure = secureRaw ? secureRaw === 'true' : implicitTLS;
+
+        let transport: any;
+        if (!host || !user || !pass) {
+          // Fallback tạo tài khoản test Ethereal khi thiếu biến môi trường (chỉ dev)
+          // eslint-disable-next-line no-console
+          console.warn('[Mailer] Missing MAIL_* env vars – creating Ethereal test account');
+          const testAccount = await nodemailer.createTestAccount();
+          transport = {
+            host: testAccount.smtp.host,
+            port: testAccount.smtp.port,
+            secure: testAccount.smtp.secure,
+            auth: {
+              user: testAccount.user,
+              pass: testAccount.pass,
+            },
+          };
+          // eslint-disable-next-line no-console
+          console.warn(`[Mailer] Ethereal account created. Web URL: ${testAccount.web}`);
+        } else {
+          transport = {
+            host,
+            port,
+            secure,
+            auth: { user, pass },
+            // Với STARTTLS (secure=false) ép yêu cầu nâng cấp TLS để tránh downgrade.
+            ...(secure ? {} : { requireTLS: true }),
+          };
+        }
+
+        return {
+          transport,
+          defaults: {
+            from: `"No Reply" <${from || user || 'no-reply@example.com'}>`,
           },
-        },
-        defaults: {
-          from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`, // Email người gửi mặc định
-        },
-      }),
+        };
+      },
       inject: [ConfigService],
     }),
 

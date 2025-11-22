@@ -59,7 +59,7 @@ describe('AuthService', () => {
       email: 'test@example.com',
       password: 'password123',
       full_name: 'Test User',
-      phoneNumber: '123456789',
+      phone_number: '123456789',
     };
 
     it('should create a new unverified user if email does not exist', async () => {
