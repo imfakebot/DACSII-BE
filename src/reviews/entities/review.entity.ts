@@ -1,4 +1,4 @@
-import { Booking } from '@/bookings/entities/booking.entity';
+import { Booking } from '@/booking/entities/booking.entity';
 import {
   Column,
   CreateDateColumn,

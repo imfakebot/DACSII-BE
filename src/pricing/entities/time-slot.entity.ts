@@ -1,11 +1,9 @@
-import { Booking } from '@/bookings/entities/booking.entity';
 import { FieldType } from '@/fields/entities/field-types.entity';
 import {
   Column,
   Entity,
   JoinColumn,
   ManyToOne,
-  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
@@ -32,6 +30,4 @@ export class TimeSlot {
   @JoinColumn({ name: 'field_type_id' })
   fieldType!: FieldType;
 
-  @OneToMany(() => Booking, (booking) => booking.timeSlot)
-  bookings!: Booking[];
 }

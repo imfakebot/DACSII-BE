@@ -14,7 +14,11 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { AuthenticatedUser } from './decorator/users.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { Account, AuthProvider } from '@/users/entities/account.entity';
+import {
+  Account,
+  AccountStatus,
+  AuthProvider,
+} from '@/users/entities/account.entity';
 import { StringValue } from 'ms';
 import { Gender } from '@/users/entities/users-profile.entity';
 
@@ -131,7 +135,12 @@ export class AuthService {
     const account = await this.userService.findAccountByEmail(email);
 
     // Chỉ cho phép tài khoản đã xác thực đăng nhập
-    if (account && account.is_verified && account.password_hash) {
+    if (
+      account &&
+      account.is_verified &&
+      account.password_hash &&
+      account.status === AccountStatus.ACTIVE
+    ) {
       const isMatch = await this.userService.comparePassword(
         pass,
         account.password_hash,
@@ -234,6 +243,10 @@ export class AuthService {
 
     // Nếu tài khoản đã tồn tại
     if (account) {
+      if (account.status !== AccountStatus.ACTIVE) {
+        throw new ForbiddenException('Tài khoản của bạn đã bị vô hiệu hóa.');
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password_hash, ...accountDetails } = account;
       return accountDetails; // userProfile đã được tải cùng với cờ is_profile_complete
@@ -261,8 +274,10 @@ export class AuthService {
    */
   async refreshTokens(userID: string) {
     const account = await this.userService.findAccountById(userID);
-    if (!account) {
-      throw new ForbiddenException('Tài khoản không tồn tại');
+    if (!account || account.status !== AccountStatus.ACTIVE) {
+      throw new ForbiddenException(
+        'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
+      );
     }
 
     const accessToken = await this.createAccessToken(account);
@@ -336,7 +351,11 @@ export class AuthService {
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
     const account = await this.userService.findAccountByEmail(email);
-    if (!account || !account.is_verified) {
+    if (
+      !account ||
+      !account.is_verified ||
+      account.status !== AccountStatus.ACTIVE
+    ) {
       return {
         message:
           'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.',
@@ -466,8 +485,10 @@ export class AuthService {
       'userProfile',
       'role',
     ]);
-    if (!account) {
-      throw new UnauthorizedException('Sai email hoặc mật khẩu.');
+    if (!account || account.status !== AccountStatus.ACTIVE) {
+      throw new UnauthorizedException(
+        'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
+      );
     }
 
     if (
