@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { Account } from './account.entity';
 import { v4 as uuidv4 } from 'uuid';
-import { Booking } from '@/bookings/entities/booking.entity';
+import { Booking } from '@/booking/entities/booking.entity';
 import { Field } from '@/fields/entities/field.entity';
 
 /**
