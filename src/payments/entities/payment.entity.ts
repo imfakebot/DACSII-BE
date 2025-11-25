@@ -1,7 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentMethod } from '../enums/payment-method.enum';
-import { Booking } from '@/bookings/entities/booking.entity';
+import { Booking } from '@/booking/entities/booking.entity';
 import { Voucher } from '@/vouchers/entities/voucher.entity';
 
 @Entity({ name: 'payments' })

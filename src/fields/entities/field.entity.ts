@@ -17,7 +17,7 @@ import { UserProfile } from '../../users/entities/users-profile.entity';
 import { Address } from '../../locations/entities/address.entity';
 import { FieldImage } from './field-image.entity';
 import { Utility } from './utility.entity';
-import { Booking } from '@/bookings/entities/booking.entity';
+import { Booking } from '@/booking/entities/booking.entity';
 
 /**
  * @entity Field

@@ -48,7 +48,6 @@ export class FieldsService {
     createFieldDto: CreateFieldDto,
     ownerProfile: UserProfile,
   ): Promise<Field> {
-    // Sửa tên hàm
     const { street, wardId, cityId, fieldTypeId, ...fieldData } =
       createFieldDto;
 

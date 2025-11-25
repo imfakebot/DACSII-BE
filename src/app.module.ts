@@ -6,7 +6,7 @@ import { UsersModule } from './users/users.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import * as nodemailer from 'nodemailer';
 import { FieldsModule } from './fields/fields.module';
-import { BookingsModule } from './bookings/bookings.module';
+import { BookingsModule } from './booking/booking.module';
 import { PricingModule } from './pricing/pricing.module';
 import { PaymentsModule } from './payments/payments.module';
 import { VouchersModule } from './vouchers/vouchers.module';
@@ -159,4 +159,4 @@ import { ServeStaticModule } from '@nestjs/serve-static';
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }
