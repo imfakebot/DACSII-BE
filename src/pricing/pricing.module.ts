@@ -12,4 +12,4 @@ import { Field } from '@/fields/entities/field.entity';
   controllers: [PricingController],
   exports: [PricingService],
 })
-export class PricingModule { }
+export class PricingModule {}

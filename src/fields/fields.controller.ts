@@ -14,6 +14,7 @@ import {
   HttpStatus,
   UploadedFiles,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -32,6 +33,7 @@ import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { Field } from './entities/field.entity';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilterFieldDto } from './dto/filter-field.dto';
 /**
  * @controller FieldsController
  * @description Xử lý các yêu cầu liên quan đến quản lý sân bóng (Fields).
@@ -48,7 +50,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /fields
@@ -77,7 +79,7 @@ export class FieldsController {
   async create(
     @Body() createFieldDto: CreateFieldDto,
     @Req() req: AuthenticatedRequest,
-  ) {
+  ): Promise<Field> {
     const adminAccountId = req.user.sub;
     const adminProfile =
       await this.usersService.findProfileByAccountId(adminAccountId);
@@ -90,13 +92,11 @@ export class FieldsController {
   /**
    * @route GET /fields
    * @description Lấy danh sách tất cả các sân bóng. Endpoint này công khai cho mọi người dùng.
-   * @returns {Promise<Field[]>} - Danh sách các sân bóng.
    */
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách tất cả sân bóng (Công khai)' })
-  @ApiResponse({ status: 200, description: 'Thành công.', type: [Field] })
-  findAll() {
-    return this.fieldsService.findAll();
+  @ApiOperation({ summary: 'Tìm kiếm sân bóng(Hỗ trợ tìm theo vị trí)' })
+  findAll(@Query() filterDto: FilterFieldDto) {
+    return this.fieldsService.findAll(filterDto);
   }
 
   /**
@@ -110,7 +110,7 @@ export class FieldsController {
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một sân bóng (Công khai)' })
   @ApiResponse({ status: 200, description: 'Thành công.', type: Field })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Field> {
     return this.fieldsService.findOne(id);
   }
 
@@ -136,7 +136,7 @@ export class FieldsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
-  ) {
+  ): Promise<Field> {
     return this.fieldsService.update(id, updateFieldDto);
   }
 
@@ -154,7 +154,7 @@ export class FieldsController {
   @ApiOperation({ summary: '(Admin) Xóa một sân bóng (Xóa mềm)' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string; }> {
     return this.fieldsService.remove(id);
   }
 
