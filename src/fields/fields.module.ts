@@ -20,8 +20,6 @@ import { Utility } from './entities/utility.entity';
 @Module({
   imports: [
     // Đăng ký các entities liên quan đến sân bóng với TypeORM.
-    // Điều này cho phép inject các Repository tương ứng (FieldRepository, FieldTypeRepository, etc.)
-    // vào các service trong module này.
     TypeOrmModule.forFeature([Field, FieldType, FieldImage, Utility]),
     // Import LocationModule để có thể sử dụng các service/entity liên quan đến địa chỉ.
     LocationModule,

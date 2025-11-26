@@ -18,6 +18,12 @@ export class Address {
   @Column({ type: 'varchar', length: 255 })
   street!: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  latitude!: number;
+
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  longitude!: number;
+
   /**
    * Một Địa chỉ (Address) thuộc về một Thành phố (City).
    * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một thành phố).
