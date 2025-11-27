@@ -29,5 +29,4 @@ export class TimeSlot {
   })
   @JoinColumn({ name: 'field_type_id' })
   fieldType!: FieldType;
-
 }

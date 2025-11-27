@@ -52,7 +52,10 @@ export class Booking {
 
   // --- Các mối quan hệ ---
 
-  @ManyToOne(() => UserProfile, (userProfile) => userProfile.bookings as unknown as Booking)
+  @ManyToOne(
+    () => UserProfile,
+    (userProfile) => userProfile.bookings as unknown as Booking,
+  )
   @JoinColumn({ name: 'user_profile_id' })
   userProfile!: UserProfile;
 

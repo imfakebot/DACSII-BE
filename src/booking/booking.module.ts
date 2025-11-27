@@ -23,6 +23,6 @@ import { PricingModule } from '@/pricing/pricing.module';
   ],
   providers: [BookingService],
   controllers: [BookingController],
-  exports:[BookingService]
+  exports: [BookingService],
 })
-export class BookingsModule { }
+export class BookingsModule {}

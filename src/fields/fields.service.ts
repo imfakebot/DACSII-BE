@@ -11,6 +11,7 @@ import { Ward } from '@/locations/entities/ward.entity';
 import { City } from '@/locations/entities/city.entity';
 import { ConfigService } from '@nestjs/config';
 import { FieldImage } from './entities/field-image.entity';
+import { FilterFieldDto } from './dto/filter-field.dto';
 
 /**
  * @service FieldsService
@@ -77,16 +78,73 @@ export class FieldsService {
    * @description Lấy danh sách tất cả các sân bóng cùng với các thông tin liên quan.
    * @returns {Promise<Field[]>} - Một mảng các thực thể Field.
    */
-  async findAll(): Promise<Field[]> {
-    return this.fieldRepository.find({
-      relations: [
-        'address',
-        'address.ward',
-        'address.city',
-        'fieldType',
-        'owner',
-      ],
-    });
+  async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
+    const { name, latitude, longitude, radius, cityId, fieldTypeId } =
+      filterDto;
+
+    const query = this.fieldRepository.createQueryBuilder('field');
+
+    query
+      .leftJoinAndSelect('field.address', 'address')
+      .leftJoinAndSelect('address.ward', 'ward')
+      .leftJoinAndSelect('address.city', 'city')
+      .leftJoinAndSelect('field.fieldType', 'fieldType')
+      .leftJoinAndSelect('field.owner', 'owner')
+      .leftJoinAndSelect('field.images', 'images');
+
+    if (name) {
+      query.andWhere('field.name ILIKE :name', { name: `%${name}%` });
+    }
+
+    if (cityId) {
+      query.andWhere('city.id = :cityId', { cityId });
+    }
+
+    if (fieldTypeId) {
+      query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });
+    }
+
+    if (latitude && longitude) {
+      // Công thức Haversine trong MySQL (trả về km)
+      // 6371 là bán kính trái đất (km)
+
+      query
+        .addSelect(
+          `(
+          6371 * acos(
+            cos ( radians(:userLat))
+            * cos(radians( address.latitude ))
+            * cos( radians( address.longitude ) - radians(:userLong))
+            + sin ( radians (:userLat) )
+            * sin ( radians( address.latitude ))
+          )
+        )`,
+          'distance',
+        )
+        .setParameters({
+          userLat: latitude,
+          userLong: longitude,
+          radius: radius || 10,
+        })
+        // Chỉ lấy sân trong bán kính cho phép
+        .andWhere(
+          `(
+            6371 * acos (
+              cos ( radians(:userLat) )
+              * cos(radians( address.latitude ))
+              * cos( radians( address.longitude ) - radians(:userLong) )
+              + sin ( radians(:userLat) )
+              * sin ( radians( address.latitude ) )
+            )
+          )<= :radius`,
+        )
+        // Sắp xếp sân gần nhất lên đầu
+        .orderBy('distance', 'ASC');
+    } else {
+      query.orderBy('field.createdAt', 'DESC');
+    }
+
+    return query.getMany();
   }
 
   /**
