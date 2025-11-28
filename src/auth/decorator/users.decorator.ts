@@ -5,7 +5,7 @@
  * Decorator này giúp lấy đối tượng `user` được các Guard (ví dụ: JwtAuthGuard, LocalAuthGuard)
  * đính kèm vào đối tượng `request` một cách an toàn và có kiểu dữ liệu rõ ràng.
  */
-import { UserProfile } from '@/users/entities/users-profile.entity';
+import { UserProfile } from '@/user/entities/users-profile.entity';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 /**

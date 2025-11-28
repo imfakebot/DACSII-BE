@@ -4,7 +4,7 @@ import { TimeSlot } from './entities/time-slot.entity';
 import { PricingService } from './pricing.service';
 import { PricingController } from './pricing.controller';
 import { Booking } from '@/booking/entities/booking.entity';
-import { Field } from '@/fields/entities/field.entity';
+import { Field } from '@/field/entities/field.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([TimeSlot, Field, Booking])],

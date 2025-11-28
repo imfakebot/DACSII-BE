@@ -31,18 +31,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { LoginCompleteDto } from './dto/login-complete.dto';
-
-/**
- * Interface để định nghĩa cấu trúc của một Request đã được xác thực,
- * đảm bảo `req.user` có kiểu dữ liệu chặt chẽ.
- */
-export interface AuthenticatedRequest extends Request {
-  user: {
-    sub: string;
-    email: string;
-    role: { id: string; name?: string };
-  };
-}
+import { AuthenticatedRequest } from './interface/authenticated-request.interface';
 
 /**
  * @controller AuthController
