@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 /**
@@ -12,6 +13,10 @@ export class LoginUserDto {
    * @IsEmail - Đảm bảo giá trị phải là một địa chỉ email hợp lệ.
    * @example "user@example.com"
    */
+  @ApiProperty({
+    description: 'Email của người dùng.',
+    example: 'user@example.com',
+  })
   @IsNotEmpty({ message: 'Email is required' })
   @IsEmail({}, { message: 'Invalid email format' })
   email!: string;
@@ -23,6 +28,11 @@ export class LoginUserDto {
    * @MinLength(8) - Đảm bảo mật khẩu có ít nhất 8 ký tự.
    * @example "password123"
    */
+  @ApiProperty({
+    description: 'Mật khẩu của người dùng (tối thiểu 8 ký tự).',
+    example: 'password123',
+    minLength: 8,
+  })
   @IsNotEmpty({ message: 'Password is required' })
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters long' })

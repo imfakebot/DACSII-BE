@@ -1,4 +1,4 @@
-import { FieldType } from '@/fields/entities/field-types.entity';
+import { FieldType } from '@/field/entities/field-types.entity';
 import {
   Column,
   Entity,

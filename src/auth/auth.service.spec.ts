@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
-import { UsersService } from '@/users/users.service';
+import { UsersService } from '@/user/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { Account } from '@/users/entities/account.entity';
+import { Account } from '@/user/entities/account.entity';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -59,7 +59,7 @@ describe('AuthService', () => {
       email: 'test@example.com',
       password: 'password123',
       full_name: 'Test User',
-      phoneNumber: '123456789',
+      phone_number: '123456789',
     };
 
     it('should create a new unverified user if email does not exist', async () => {

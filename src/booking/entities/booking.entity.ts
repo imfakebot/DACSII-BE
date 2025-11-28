@@ -8,10 +8,10 @@ import {
   UpdateDateColumn,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { UserProfile } from '../../users/entities/users-profile.entity';
-import { Field } from '../../fields/entities/field.entity';
-import { Payment } from '../../payments/entities/payment.entity';
-import { Review } from '../../reviews/entities/review.entity';
+import { UserProfile } from '../../user/entities/users-profile.entity';
+import { Field } from '../../field/entities/field.entity';
+import { Payment } from '../../payment/entities/payment.entity';
+import { Review } from '../../review/entities/review.entity';
 import { BookingStatus } from '../enums/booking-status.enum';
 
 @Entity({ name: 'bookings' })
@@ -62,14 +62,6 @@ export class Booking {
   @ManyToOne(() => Field, (field) => field.bookings as unknown as Booking)
   @JoinColumn({ name: 'field_id' })
   field!: Field;
-
-  // --- QUAN TRỌNG: XÓA BỎ QUAN HỆ VỚI TIMESLOT ---
-  // Vì giờ là động, chúng ta không ràng buộc vào một slot ID cố định nữa.
-  /*
-  @ManyToOne(() => TimeSlot)
-  @JoinColumn({ name: 'time_slot_id' })
-  timeSlot!: TimeSlot;
-  */
 
   @OneToOne(() => Payment, (payment) => payment.booking as unknown as Booking)
   payment!: Payment;

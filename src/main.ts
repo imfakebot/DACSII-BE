@@ -1,9 +1,13 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 
+/**
+ * @async
+ * @function bootstrap - Hàm khởi tạo và cấu hình ứng dụng NestJS.
+ */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(
@@ -45,7 +49,10 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
+    method: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
+
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   await app.listen(process.env.PORT ?? 3000);
 }

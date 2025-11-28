@@ -1,11 +1,15 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Booking } from './entities/booking.entity';
 import { BookingService } from './booking.service';
 import { BookingController } from './booking.controller';
-import { Field } from '../fields/entities/field.entity';
-import { UsersModule } from '@/users/users.module';
+import { Field } from '../field/entities/field.entity';
+import { UsersModule } from '@/user/users.module';
 import { PricingModule } from '@/pricing/pricing.module';
+import { VouchersModule } from '@/voucher/vouchers.module';
+import { Voucher } from '@/voucher/entities/voucher.entity';
+import { Payment } from '@/payment/entities/payment.entity';
+import { PaymentsModule } from '@/payment/payments.module';
 /**
  * @module BookingsModule
  * @description
@@ -17,9 +21,11 @@ import { PricingModule } from '@/pricing/pricing.module';
   imports: [
     // Đăng ký Booking entity với TypeORM.
     // Điều này cho phép inject BookingRepository vào các service trong module này.
-    TypeOrmModule.forFeature([Booking, Field]),
+    TypeOrmModule.forFeature([Booking, Field, Voucher, Payment]),
     PricingModule,
     UsersModule,
+    VouchersModule,
+    forwardRef(() => PaymentsModule),
   ],
   providers: [BookingService],
   controllers: [BookingController],
