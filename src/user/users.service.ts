@@ -340,4 +340,30 @@ export class UsersService {
       },
     });
   }
+
+  /**
+  * @method updateAvatar
+  * Cập nhật đường dẫn ảnh đại diện cho người dùng.
+  * @param accountId ID của tài khoản người dùng.
+  * @param avatarPath Đường dẫn đến file ảnh đã được lưu trên server.
+  * @returns Hồ sơ người dùng sau khi cập nhật.
+  */
+  async updateAvatar(
+    accountId: string,
+    avatarPath: string,
+  ): Promise<UserProfile> {
+    const account = await this.accountRepository.findOne({
+      where: { id: accountId },
+      relations: ['userProfile'],
+    });
+
+    if (!account || !account.userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+
+    // Giả sử bạn có một cột 'avatar_url' trong bảng 'user_profiles'
+    account.userProfile.avatar_url = `/${avatarPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
+
+    return this.userProfileRepository.save(account.userProfile);
+  }
 }
