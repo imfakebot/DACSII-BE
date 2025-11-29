@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TimeSlot } from './entities/time-slot.entity';
 import { Booking } from '../booking/entities/booking.entity';
-import { Field } from '../fields/entities/field.entity';
+import { Field } from '../field/entities/field.entity';
 import { CheckPriceDto } from './dto/check-price.dto';
 import { BookingStatus } from '../booking/enums/booking-status.enum';
 

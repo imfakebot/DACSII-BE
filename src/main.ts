@@ -1,10 +1,13 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 
+/**
+ * @async
+ * @function bootstrap - Hàm khởi tạo và cấu hình ứng dụng NestJS.
+ */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(
@@ -46,25 +49,10 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
+    method: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
 
-  // Monkey patch MailerService logger để đổi cấp log của thông điệp sai lệch
-  try {
-    const mailer = app.get(MailerService);
-    const originalError = (mailer as any).logger?.error?.bind((mailer as any).logger);
-    if (originalError) {
-      (mailer as any).logger.error = (message: any, ...rest: any[]) => {
-        if (typeof message === 'string' && message.includes('Transporter is ready')) {
-          // Hạ cấp thành log thường
-          console.log('[MailerService]', message);
-          return;
-        }
-        originalError(message, ...rest);
-      };
-    }
-  } catch (e) {
-    // Không làm gì nếu không lấy được service
-  }
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   await app.listen(process.env.PORT ?? 3000);
 }

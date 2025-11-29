@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
-import { UsersService } from '@/users/users.service';
+import { UsersService } from '@/user/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
-import { Account } from '@/users/entities/account.entity';
+import { Account } from '@/user/entities/account.entity';
 
 describe('AuthService', () => {
   let service: AuthService;

@@ -2,22 +2,24 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from './database/database.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
+import { UsersModule } from './user/users.module';
 import { MailerModule } from '@nestjs-modules/mailer';
-import * as nodemailer from 'nodemailer';
-import { FieldsModule } from './fields/fields.module';
+import { FieldsModule } from './field/fields.module';
 import { BookingsModule } from './booking/booking.module';
 import { PricingModule } from './pricing/pricing.module';
-import { PaymentsModule } from './payments/payments.module';
-import { VouchersModule } from './vouchers/vouchers.module';
-import { ReviewsModule } from './reviews/reviews.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { FeedbacksModule } from './feedbacks/feedbacks.module';
-import { LocationModule } from './locations/locations.module';
+import { PaymentsModule } from './payment/payments.module';
+import { VouchersModule } from './voucher/vouchers.module';
+import { ReviewsModule } from './review/reviews.module';
+import { NotificationsModule } from './notification/notifications.module';
+import { FeedbacksModule } from './feedback/feedbacks.module';
+import { LocationModule } from './location/locations.module';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import vnpayConfig from './payment/config/vnpay.config';
+import googleOauthConfig from './auth/config/google-oauth.config';
+import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 
 /**
  * @module AppModule
@@ -32,6 +34,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     // `isGlobal: true` giúp các service của ConfigModule có thể được inject ở bất kỳ đâu trong ứng dụng.
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [vnpayConfig, googleOauthConfig],
     }),
 
     // Cấu hình module gửi email một cách bất đồng bộ.
@@ -84,8 +87,18 @@ import { ServeStaticModule } from '@nestjs/serve-static';
           defaults: {
             from: `"No Reply" <${from || user || 'no-reply@example.com'}>`,
           },
-        };
-      },
+        },
+        defaults: {
+          from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`, // Email người gửi mặc định
+        },
+        template: {
+          dir: join(process.cwd(), 'src', 'templates'), // Sửa lại đường dẫn ở đây
+          adapter: new HandlebarsAdapter(),
+          options: {
+            strict: true,
+          },
+        },
+      }),
       inject: [ConfigService],
     }),
 
