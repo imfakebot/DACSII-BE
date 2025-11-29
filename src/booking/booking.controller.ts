@@ -27,6 +27,9 @@ import { UsersService } from '../user/users.service'; // Check lại đường d
 import { Role } from '@/auth/enums/role.enum';
 import { BookingResponse } from './dto/booking-response.dto';
 import { FilterBookingDto } from './dto/filter-booking.dto';
+import { BookingStatus } from './enums/booking-status.enum';
+import { RolesGuard } from '@/auth/guards/role.guard';
+import { Roles } from '@/auth/decorator/roles.decorator';
 
 /**
  * @controller BookingsController
@@ -157,5 +160,30 @@ export class BookingController {
     @Query() filterDto: FilterBookingDto,
   ) {
     return await this.bookingService.getUserBooking(req.user.sub, filterDto);
+  }
+
+  /**
+   * @route GET /bookings/admin/all
+   * @description (Admin) Lấy toàn bộ lịch sử đặt sân trên hệ thống, có hỗ trợ lọc và phân trang.
+   * @param {number} [page=1] - Số trang hiện tại.
+   * @param {number} [limit=10] - Số lượng kết quả trên mỗi trang.
+   * @param {BookingStatus} [status] - (Tùy chọn) Lọc các đơn đặt sân theo một trạng thái cụ thể.
+   * @returns {Promise<object>} - Một đối tượng chứa danh sách các đơn đặt sân và thông tin phân trang.
+   */
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin) Lấy tất cả lịch sử đặt sân' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về danh sách tất cả đơn đặt sân.',
+  })
+  async getAllBooking(
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+    @Query('status') status?: BookingStatus,
+  ) {
+    return this.bookingService.findAll(Number(page), Number(limit), status);
   }
 }

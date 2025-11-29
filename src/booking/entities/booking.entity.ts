@@ -50,11 +50,28 @@ export class Booking {
   })
   status!: BookingStatus;
 
+  @Column({
+    name: 'customer_name',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  customerName?: string;
+
+  @Column({
+    name: 'customer_phone',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  customerPhone?: string;
+
   // --- Các mối quan hệ ---
 
   @ManyToOne(
     () => UserProfile,
     (userProfile) => userProfile.bookings as unknown as Booking,
+    { nullable: true },
   )
   @JoinColumn({ name: 'user_profile_id' })
   userProfile!: UserProfile;

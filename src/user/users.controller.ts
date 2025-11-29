@@ -1,4 +1,13 @@
-import { Controller, Get, UseGuards, Put, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  Put,
+  Body,
+  Query,
+  Param,
+  Patch,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -9,6 +18,9 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { AuthenticatedUser, User } from '@/auth/decorator/users.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { Roles } from '@/auth/decorator/roles.decorator';
+import { RolesGuard } from '@/auth/guards/role.guard';
+import { Role } from '../auth/enums/role.enum';
 
 /**
  * @controller UsersController
@@ -58,5 +70,38 @@ export class UsersController {
     @Body() updateUserProfileDto: UpdateUserProfileDto,
   ) {
     return await this.usersService.updateProfile(user.id, updateUserProfileDto);
+  }
+
+  /**
+   * @route GET /users/admin/all
+   * @description (Admin) Lấy danh sách tất cả người dùng trong hệ thống với phân trang.
+   * @param {number} [page=1] - Số trang hiện tại.
+   * @returns {Promise<object>} - Một đối tượng chứa danh sách người dùng và tổng số lượng.
+   */
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
+  @ApiResponse({ status: 200, description: 'Trả về danh sách người dùng.' })
+  async GetUsers(@Query('page') page = 1) {
+    return await this.usersService.findAllUser(Number(page), 10);
+  }
+
+  /**
+   * @route PATCH /users/admin/:id/ban
+   * @description (Admin) Khóa (treo) tài khoản của một người dùng.
+   * @param {string} id - ID của tài khoản cần khóa.
+   * @returns {Promise<{ message: string }>} - Thông báo xác nhận khóa thành công.
+   */
+  @Patch('admin/:id/ban')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin) Khóa tài khoản người dùng' })
+  @ApiResponse({ status: 200, description: 'Khóa tài khoản thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
+  async banUser(@Param('id') id: string) {
+    return await this.usersService.banUser(id);
   }
 }

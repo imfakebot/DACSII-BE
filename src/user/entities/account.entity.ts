@@ -6,35 +6,15 @@ import {
   JoinColumn,
   OneToOne,
   BeforeInsert,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Role } from './role.entity';
 import { UserProfile } from './users-profile.entity';
 import { Exclude } from 'class-transformer';
-
-/**
- * Enum định nghĩa các nhà cung cấp xác thực được hỗ trợ.
- */
-export enum AuthProvider {
-  /** Xác thực bằng email và mật khẩu. */
-  CREDENTIALS = 'credentials',
-  /** Xác thực qua Google. */
-  GOOGLE = 'google',
-  /** Xác thực qua Facebook. */
-  FACEBOOK = 'facebook',
-}
-
-/**
- * Enum định nghĩa các trạng thái có thể có của một tài khoản.
- */
-export enum AccountStatus {
-  /** Tài khoản đang hoạt động bình thường. */
-  ACTIVE = 'active',
-  /** Tài khoản đã bị tạm khóa. */
-  SUSPENDED = 'suspended',
-  /** Tài khoản đã bị xóa. */
-  DELETED = 'deleted',
-}
+import { AccountStatus } from '../enum/account-status.enum';
+import { AuthProvider } from '../enum/auth-provider.enum';
 
 /**
  * @class Account
@@ -147,6 +127,21 @@ export class Account {
    */
   @Column({ name: 'password_reset_expires', type: 'datetime', nullable: true })
   password_reset_expires?: Date | null;
+
+  /**
+   * Dấu thời gian khi tài khoản được tạo.
+   */
+  @CreateDateColumn({
+    name: 'created_at',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  created_at!: Date;
+
+  /**
+   * Dấu thời gian khi tài khoản được cập nhật lần cuối.
+   */
+  @UpdateDateColumn({ name: 'updated_at' })
+  updated_at!: Date;
 
   /**
    * Mối quan hệ nhiều-một với Role, xác định vai trò của tài khoản.
