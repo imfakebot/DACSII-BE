@@ -15,4 +15,4 @@ import { UsersModule } from '@/user/users.module';
   providers: [ReviewService],
   controllers: [ReviewController],
 })
-export class ReviewsModule { }
+export class ReviewsModule {}

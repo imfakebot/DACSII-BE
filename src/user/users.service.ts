@@ -2,10 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
-import { Account, AuthProvider } from './entities/account.entity';
+import { Account } from './entities/account.entity';
 import { Role } from './entities/role.entity';
 import { Gender, UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
+import { AccountStatus } from './enum/account-status.enum';
+import { AuthProvider } from './enum/auth-provider.enum';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -189,22 +191,38 @@ export class UsersService {
     return bcrypt.compare(password, hash);
   }
 
+  /**
+   * Tìm hồ sơ người dùng (UserProfile) dựa trên ID của tài khoản (Account).
+   * @param accountId ID của tài khoản liên quan.
+   * @returns Promise giải quyết thành đối tượng `UserProfile` nếu tìm thấy, ngược lại là `null`.
+   */
   async findProfileByAccountId(accountId: string): Promise<UserProfile | null> {
     return this.userProfileRepository.findOne({
       where: { account: { id: accountId } },
       relations: ['account', 'account.role'],
     });
   }
-
+  /**
+   * Tìm một tài khoản bằng ID của nó.
+   * @param id ID của tài khoản cần tìm.
+   * @returns Promise giải quyết thành đối tượng `Account` nếu tìm thấy, ngược lại là `null`.
+   */
   async findAccountById(id: string) {
     return this.accountRepository.findOne({ where: { id } });
   }
 
+  /**
+   * Cập nhật thông tin của một tài khoản.
+   * @param id ID của tài khoản cần cập nhật.
+   * @param data Dữ liệu cần cập nhật (một phần của đối tượng Account).
+   * @returns {Promise<void>}
+   */
   async updateAccount(id: string, data: Partial<Account>) {
     await this.accountRepository.update(id, data);
   }
 
   /**
+   * @method updateProfile
    * SỬA ĐỔI: Cập nhật các thông tin hồ sơ cơ bản của người dùng (không bao gồm địa chỉ)
    * và đánh dấu hồ sơ là đã hoàn thành.
    * @param accountId ID của tài khoản người dùng (lấy từ token).
@@ -244,6 +262,11 @@ export class UsersService {
     return { message: 'Cập nhật hồ sơ thành công.' };
   }
 
+  /**
+   * Băm một token (dùng cho việc tìm kiếm sau này, nhưng tên hàm có thể gây nhầm lẫn).
+   * @param token Token thuần cần được băm.
+   * @returns Promise giải quyết thành chuỗi token đã được băm.
+   */
   async findAccountByHashedResetToken(token: string): Promise<string> {
     const hashedToken = await bcrypt.hash(token, 10);
     return hashedToken;
@@ -269,6 +292,46 @@ export class UsersService {
   async updateLastLogin(accountId: string): Promise<void> {
     await this.accountRepository.update(accountId, {
       last_login: new Date(),
+    });
+  }
+
+  /**
+   * Lấy danh sách tất cả người dùng với phân trang.
+   * @param page Số trang hiện tại.
+   * @param limit Số lượng kết quả trên mỗi trang.
+   * @returns Promise giải quyết thành một đối tượng chứa dữ liệu người dùng và tổng số lượng.
+   */
+  async findAllUser(page: number, limit: number) {
+    const [user, total] = await this.accountRepository.findAndCount({
+      relations: ['userProfile', 'role'],
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { created_at: 'DESC' },
+    });
+    return {
+      data: user,
+      total,
+    };
+  }
+
+  /**
+   * Khóa (treo) tài khoản của một người dùng.
+   * @param id ID của tài khoản cần khóa.
+   * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
+   */
+  async banUser(id: string) {
+    await this.accountRepository.update(id, {
+      status: AccountStatus.SUSPENDED,
+    });
+
+    return { message: 'Đã khóa tài khoản thành công' };
+  }
+
+  async findProfileByPhoneNumber(phone: string): Promise<UserProfile | null> {
+    return this.userProfileRepository.findOne({
+      where: {
+        phone_number: phone,
+      },
     });
   }
 }

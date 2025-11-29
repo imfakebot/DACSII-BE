@@ -19,6 +19,8 @@ import { PaymentService } from '@/payment/payment.service';
 import { PaymentMethod } from '@/payment/enums/payment-method.enum';
 import { PaymentStatus } from '@/payment/enums/payment-status.enum';
 import { FilterBookingDto } from './dto/filter-booking.dto';
+import { AdminCreateBookingDto } from './dto/admin-create-booking';
+import { UsersService } from '@/user/users.service';
 
 /**
  * @class BookingService
@@ -39,6 +41,7 @@ export class BookingService {
     private readonly pricingService: PricingService,
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
+    private readonly userService: UsersService,
   ) {}
 
   /**
@@ -382,5 +385,101 @@ export class BookingService {
         lastPage: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * @method findAll
+   * @description Lấy danh sách tất cả các đơn đặt sân với phân trang và tùy chọn lọc theo trạng thái.
+   * @param {number} page - Số trang hiện tại.
+   * @param {number} limit - Số lượng kết quả trên mỗi trang.
+   * @param {BookingStatus} [status] - (Tùy chọn) Lọc các đơn đặt sân theo một trạng thái cụ thể.
+   * @returns {Promise<{ data: Booking[]; total: number; page: number; lastPage: number; }>} - Một đối tượng chứa danh sách các đơn đặt sân, tổng số lượng, trang hiện tại và trang cuối cùng.
+   */
+  async findAll(page: number, limit: number, status?: BookingStatus) {
+    const query = this.bookingRepository
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.userProfile', 'user')
+      .leftJoinAndSelect('booking.field', 'field')
+      .orderBy('booking.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (status) {
+      query.andWhere('booking.status=:status', { status });
+    }
+
+    const [data, total] = await query.getManyAndCount();
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
+  }
+
+  async createBookingByAdmin(dto: AdminCreateBookingDto) {
+    // Dùng Transaction để an toàn dữ liệu
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Check giá & Slot
+      const pricingResult = await this.pricingService.checkPriceAndAvailability(
+        {
+          fieldId: dto.fieldId,
+          startTime: dto.startTime,
+          durationMinutes: dto.durationMinutes,
+        },
+      );
+
+      // 2. Tìm User
+      let userProfile: UserProfile | null = null;
+      if (dto.customerPhone) {
+        userProfile = await this.userService.findProfileByPhoneNumber(
+          dto.customerPhone,
+        );
+      }
+
+      const start = new Date(dto.startTime);
+      const end = new Date(start.getTime() + dto.durationMinutes * 60000);
+
+      // 3. Tạo Booking (Dùng queryRunner.manager)
+      const newBooking = queryRunner.manager.create(Booking, {
+        start_time: start,
+        end_time: end,
+        total_price: pricingResult.pricing.total_price,
+        status: BookingStatus.COMPLETED, // Admin chốt đơn
+        bookingDate: new Date(),
+        field: { id: dto.fieldId } as Field,
+        userProfile: userProfile || undefined,
+        customerName:
+          dto.customerName ||
+          (userProfile ? userProfile.full_name : 'Khách vãng lai'),
+        customerPhone: dto.customerPhone,
+      });
+      const savedBooking = await queryRunner.manager.save(Booking, newBooking);
+
+      // 4. Tạo Payment (CASH - Completed)
+      const newPayment = queryRunner.manager.create(Payment, {
+        amount: pricingResult.pricing.total_price,
+        finalAmount: pricingResult.pricing.total_price,
+        paymentMethod: PaymentMethod.CASH,
+        status: PaymentStatus.COMPLETED,
+        booking: savedBooking,
+        createdAt: new Date(),
+        completedAt: new Date(),
+      });
+      await queryRunner.manager.save(Payment, newPayment);
+
+      await queryRunner.commitTransaction();
+      return savedBooking;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

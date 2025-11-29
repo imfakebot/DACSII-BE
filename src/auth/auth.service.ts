@@ -14,13 +14,11 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthenticatedUser } from './decorator/users.decorator';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import {
-  Account,
-  AccountStatus,
-  AuthProvider,
-} from '@/user/entities/account.entity';
+import { Account } from '@/user/entities/account.entity';
 import { StringValue } from 'ms';
 import { Gender } from '@/user/entities/users-profile.entity';
+import { AccountStatus } from '@/user/enum/account-status.enum';
+import { AuthProvider } from '@/user/enum/auth-provider.enum';
 
 interface JwtPayload {
   email: string;
@@ -48,7 +46,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @method initiateRegistration
@@ -236,10 +234,10 @@ export class AuthService {
         role: user.role.name,
         is_profile_complete:
           user.userProfile &&
-          typeof user.userProfile === 'object' &&
-          'is_profile_complete' in user.userProfile
+            typeof user.userProfile === 'object' &&
+            'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-                .is_profile_complete ?? false)
+              .is_profile_complete ?? false)
             : false,
       },
     };

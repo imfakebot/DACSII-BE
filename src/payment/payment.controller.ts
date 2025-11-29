@@ -9,6 +9,7 @@ import {
   HttpStatus,
   NotFoundException,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { Request, Response } from 'express';
@@ -17,6 +18,10 @@ import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { VnpayReturnDto } from './dto/vnpay-return.dto';
 import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { RolesGuard } from '@/auth/guards/role.guard';
+import { Roles } from '@/auth/decorator/roles.decorator';
+import { Role } from '@/auth/enums/role.enum';
 
 /**
  * @controller PaymentController
@@ -166,5 +171,38 @@ export class PaymentController {
     @Query() query: VnpayIpnDto,
   ): Promise<{ RspCode: string; Message: string }> {
     return this.paymentService.handleIpn(query);
+  }
+
+  /**
+   * @route GET /payment/admin/stats
+   * @description (Admin) Lấy thống kê tổng quan về doanh thu và số lượng giao dịch.
+   * Endpoint này cho phép lọc theo một khoảng thời gian cụ thể.
+   * @param {string} [startDate] - Ngày bắt đầu để lọc (định dạng YYYY-MM-DD).
+   * @param {string} [endDate] - Ngày kết thúc để lọc (định dạng YYYY-MM-DD).
+   * @returns {Promise<object>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
+   */
+  @Get('admin/stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  async getAdminStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.paymentService.getStats(startDate, endDate);
+  }
+
+  /**
+   * @route GET /payment/admin/chart
+   * @description (Admin) Lấy dữ liệu doanh thu hàng tháng để vẽ biểu đồ.
+   * @param {number} [year=current_year] - Năm cần lấy dữ liệu. Mặc định là năm hiện tại.
+   * @returns {Promise<Array<object>>} - Một mảng các đối tượng, mỗi đối tượng chứa thông tin doanh thu của một tháng.
+   */
+  @Get('admin/chart')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  async getRevenueChart(
+    @Query('year') year: number = new Date().getFullYear(),
+  ) {
+    return this.paymentService.getRevenueChart(year);
   }
 }

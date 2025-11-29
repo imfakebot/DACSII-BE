@@ -254,8 +254,7 @@ export class PaymentService {
       const userEmail = payment.booking.userProfile.account.email;
       const fullName = payment.booking.userProfile.full_name;
       const fieldName = payment.booking.field.name;
-      // Lấy địa chỉ đầy đủ của sân bóng. Giả định field có quan hệ với location.
-      // Cần đảm bảo relation `booking.field.address` được load.
+      // Lấy địa chỉ đầy đủ của sân bóng.
       const fieldAddress = payment.booking.field.address
         ? `${payment.booking.field.address.street}, ${payment.booking.field.address.ward?.name || ''}, 
         ${payment.booking.field.address.city?.name || ''}`
@@ -463,5 +462,99 @@ export class PaymentService {
       // Ghi log lỗi chi tiết mà không ném ra ngoại lệ để không ảnh hưởng đến luồng IPN
       this.logger.error(`Gửi email thất bại đến ${mailOptions.to}:`, error);
     }
+  }
+
+  /**
+   * @method getStats
+   * @description Thống kê doanh thu và số lượng giao dịch theo trạng thái trong một khoảng thời gian.
+   * @param {string} [startDate] - Ngày bắt đầu (định dạng YYYY-MM-DD).
+   * @param {string} [endDate] - Ngày kết thúc (định dạng YYYY-MM-DD).
+   * @returns {Promise<{ revenue: number; transactions: Record<string, number> }>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
+   */
+  async getStats(startDate?: string, endDate?: string) {
+    const query = this.paymentRepository.createQueryBuilder('payment');
+    if (!query) {
+      this.logger.error(
+        'Failed to create query builder for payment statistics.',
+      );
+      return {
+        revenue: 0,
+        transactions: {},
+      };
+    }
+
+    if (startDate && endDate) {
+      query.where('payment.createdAt BETWEEN :start AND :end', {
+        start: startDate,
+        end: endDate,
+      });
+    }
+
+    // Sửa lỗi any của getRawOne
+    interface RevenueResult {
+      total: string | null;
+    }
+    // 1. Tổng doanh thu (Chỉ tính đơn COMPLETED)
+    const revenue = await query
+      .clone()
+      .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
+      .select('SUM(payment.finalAmount)', 'total')
+      .getRawOne<RevenueResult>();
+
+    interface StatusCountResult {
+      status: string;
+      count: string;
+    }
+    // 2. Số lượng đơn theo trạng thái
+    const statusCounts = await query
+      .clone()
+      .select('payment.status', 'status')
+      .addSelect('COUNT(payment.id)', 'count')
+      .groupBy('payment.status')
+      .getRawMany<StatusCountResult>();
+
+    const transaction = statusCounts.reduce(
+      (acc: Record<string, number>, curr) => {
+        // Ép kiểu
+        const status = curr.status;
+        const count = Number(curr.count);
+
+        acc[status] = count;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+    return {
+      revenue: Number(revenue?.total || 0),
+      transactions: transaction,
+    };
+  }
+
+  /**
+   * @method getRevenueChart
+   * @description Lấy dữ liệu doanh thu hàng tháng cho một năm cụ thể để vẽ biểu đồ.
+   * @param {number} year - Năm cần lấy dữ liệu.
+   * @returns {Promise<Array<{ month: number; revenue: number }>>} - Một mảng các đối tượng, mỗi đối tượng chứa tháng và doanh thu của tháng đó.
+   */
+  async getRevenueChart(year: number) {
+    interface RevenueChartRow {
+      month: number;
+      revenue: number;
+    }
+    const result: RevenueChartRow[] = await this.paymentRepository.query(
+      `SELECT MONTH(created_at) as month, SUM(final_amount) as revenue
+      FROM Payment
+      WHERE status='completed' AND YEAR(created_at) = ?
+      GROUP BY MONTH(created_at)
+      `,
+      [year],
+    );
+
+    if (!result) {
+      this.logger.error('Failed to retrieve revenue chart data.');
+      return [];
+    }
+
+    return result;
   }
 }
