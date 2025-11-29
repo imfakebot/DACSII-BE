@@ -33,7 +33,7 @@ export class UsersController {
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
    */
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   /**
    * @route GET /users/me
@@ -48,7 +48,7 @@ export class UsersController {
     summary: 'Lấy thông tin hồ sơ của người dùng đang đăng nhập',
   })
   getProfile(@User('sub') accountID: string) {
-    return this.usersService.findAccountById(accountID);
+    return this.usersService.findAccountById(accountID, ['userProfile', 'role']);
   }
 
   /**

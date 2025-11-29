@@ -57,6 +57,12 @@ export class JwtRefreshStrategy extends PassportStrategy(
    * @returns {JwtPayload} - Trả về chính payload để `JwtRefreshGuard` có thể truy cập.
    */
   validate(payload: JwtPayload) {
-    return payload;
+    // Trả về một đối tượng nhất quán với JwtStrategy
+    return {
+      id: payload.sub,
+      sub: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
   }
 }
