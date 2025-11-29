@@ -59,7 +59,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    */
   validate(payload: JwtPayload) {
     return {
-      sub: payload.sub,
+      id: payload.sub,
+      sub: payload.sub, // Thêm lại thuộc tính 'sub'
       email: payload.email,
       role: payload.role,
     };

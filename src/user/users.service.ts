@@ -50,7 +50,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -207,8 +207,14 @@ export class UsersService {
    * @param id ID của tài khoản cần tìm.
    * @returns Promise giải quyết thành đối tượng `Account` nếu tìm thấy, ngược lại là `null`.
    */
-  async findAccountById(id: string) {
-    return this.accountRepository.findOne({ where: { id } });
+  async findAccountById(
+    id: string,
+    relations: string[] = [],
+  ): Promise<Account | null> {
+    if (!id) {
+      throw new NotFoundException('ID người dùng không hợp lệ.');
+    }
+    return this.accountRepository.findOne({ where: { id }, relations });
   }
 
   /**
