@@ -77,7 +77,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
           },
         }),
 
-        litmits: {
+        limits: {
           fileSize: 5 * 1024 * 1024, // Giới hạn kích thước file tối đa 5MB
         },
 
