@@ -34,6 +34,7 @@ import { RolesGuard } from '../auth/guards/role.guard';
 import { Field } from './entities/field.entity';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 /**
  * @controller FieldsController
  * @description Xử lý các yêu cầu liên quan đến quản lý sân bóng (Fields).
@@ -50,7 +51,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /fields
@@ -94,6 +95,7 @@ export class FieldsController {
    * @description Lấy danh sách tất cả các sân bóng. Endpoint này công khai cho mọi người dùng.
    */
   @Get()
+  @SkipThrottle()
   @ApiOperation({ summary: 'Tìm kiếm sân bóng(Hỗ trợ tìm theo vị trí)' })
   findAll(@Query() filterDto: FilterFieldDto) {
     return this.fieldsService.findAll(filterDto);
@@ -158,16 +160,25 @@ export class FieldsController {
     return this.fieldsService.remove(id);
   }
 
+  /**
+   * @route POST /fields/:id/images
+   * @description (Admin) Tải lên một hoặc nhiều hình ảnh cho một sân bóng cụ thể.
+   * @param {string} fieldId - ID của sân bóng cần thêm ảnh.
+   * @param {Array<Express.Multer.File>} files - Mảng các file ảnh được gửi lên qua form-data với key là 'images'.
+   * @returns {Promise<FieldImage[]>} - Danh sách các đối tượng hình ảnh đã được lưu.
+   */
   @Post(':id/images')
-  @UseGuards(JwtAuthGuard) // Bảo vệ endpoint
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Tải lên hình ảnh cho một sân bóng' })
+  @ApiOperation({ summary: '(Admin) Tải lên hình ảnh cho một sân bóng' })
   @UseInterceptors(FilesInterceptor('images', 10)) // 'images' là tên field, 10 là số file tối đa
+  @ApiResponse({ status: 201, description: 'Tải ảnh lên thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   uploadImages(
     @Param('id') fieldId: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
-    // Gọi đến một phương thức mới trong FieldsService
     return this.fieldsService.addImagesToField(fieldId, files);
   }
 }

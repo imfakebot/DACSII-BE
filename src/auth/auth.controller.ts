@@ -32,6 +32,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { LoginCompleteDto } from './dto/login-complete.dto';
 import { AuthenticatedRequest } from './interface/authenticated-request.interface';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * @controller AuthController
@@ -48,7 +49,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -116,9 +117,12 @@ export class AuthController {
   /**
    * @route GET /auth/google/callback
    * @description Callback URL cho luồng xác thực Google. `GoogleAuthGuard` xử lý và trả về thông tin người dùng.
+   * Sau khi xác thực thành công, phương thức này sẽ:
+   * 1. Tạo access token và refresh token.
+   * 2. Set refresh token vào một httpOnly cookie.
+   * 3. Trả về một đoạn mã HTML/JavaScript để gửi access token và thông tin người dùng về cho cửa sổ cha (ứng dụng frontend) và sau đó tự đóng cửa sổ popup.
    * @param {AuthenticatedUser} user - Thông tin người dùng lấy được từ Google.
    * @param {Response} res - Đối tượng response của Express để gửi script về cho client.
-   * @returns {Promise<{ accessToken: string; refreshToken: string }>} - Cặp access token và refresh token.
    */
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
@@ -128,7 +132,7 @@ export class AuthController {
   @ApiResponse({
     status: 200,
     description:
-      'Xác thực thành công. Trả về một script để gửi token cho cửa sổ cha và đóng popup.',
+      'Xác thực thành công. Trả về một script để gửi token cho cửa sổ cha và đóng popup. Refresh token được gửi qua cookie.',
   })
   @ApiResponse({
     status: 500,
@@ -145,6 +149,7 @@ export class AuthController {
       throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL');
     }
 
+    // 1. Gửi refresh token về client qua httpOnly cookie để bảo mật
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
@@ -153,16 +158,18 @@ export class AuthController {
       path: '/',
     });
 
+    // 2. Gửi access token và thông tin user về cho frontend qua postMessage
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })},'${frontendURL}');
       window.close();
     </script>
     `;
 
+    // 3. Trả về script để thực thi ở trình duyệt của client
     res.send(script);
   }
 
@@ -267,6 +274,7 @@ export class AuthController {
    */
   @Post('login/initiate')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'B1 Đăng nhập: Xác thực mật khẩu, gửi mã về email' })
   @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
   @ApiResponse({
@@ -313,7 +321,7 @@ export class AuthController {
       loginCompleteDto.verificationCode,
     );
 
-    // Set cookie và trả về kết quả như logic login cũ
+    // Gửi refresh token về client qua httpOnly cookie để bảo mật
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
@@ -321,6 +329,8 @@ export class AuthController {
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       path: '/',
     });
+
+    // Trả về access token và thông tin người dùng trong body của response
     return {
       accessToken: loginData.accessToken,
       user: loginData.user,

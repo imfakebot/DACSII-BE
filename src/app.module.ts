@@ -22,11 +22,13 @@ import googleOauthConfig from './auth/config/google-oauth.config';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventModule } from './event/event.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+
 
 /**
  * @module AppModule
- * @description
- * Module gốc của ứng dụng NestJS.
+ * @description Module gốc của ứng dụng NestJS.
  * Module này chịu trách nhiệm import và cấu hình tất cả các module tính năng khác,
  * cũng như các module cấu hình toàn cục như `ConfigModule` và `MailerModule`.
  */
@@ -34,7 +36,7 @@ import { EventModule } from './event/event.module';
   imports: [
     /**
      * @description
-     * Cấu hình module quản lý biến môi trường (`.env`).
+     * Cấu hình module quản lý biến môi trường từ file `.env`.
      * `isGlobal: true` cho phép truy cập `ConfigService` từ bất kỳ module nào.
      * `load` đăng ký các tệp cấu hình tùy chỉnh (ví dụ: cho VNPay, Google OAuth).
      */
@@ -45,7 +47,7 @@ import { EventModule } from './event/event.module';
 
     /**
      * @description
-     * Cấu hình module gửi email một cách bất đồng bộ.
+     * Cấu hình module gửi email (MailerModule) một cách bất đồng bộ.
      * Cấu hình được lấy từ `ConfigService` sau khi `ConfigModule` đã được nạp.
      */
     MailerModule.forRootAsync({
@@ -63,7 +65,7 @@ import { EventModule } from './event/event.module';
           from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`, // Email người gửi mặc định
         },
         template: {
-          dir: join(process.cwd(), 'src', 'templates'), // Sửa lại đường dẫn ở đây
+          dir: join(__dirname, '..', 'templates'), // Đường dẫn đến thư mục chứa các mẫu email Handlebars.
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,
@@ -75,7 +77,10 @@ import { EventModule } from './event/event.module';
 
     /**
      * @description
-     * Cấu hình MulterModule để xử lý việc tải lên tệp (hình ảnh).
+     * Cấu hình MulterModule để xử lý việc tải lên tệp (file uploads).
+     * - `storage`: Sử dụng `diskStorage` để lưu file vào thư mục `./uploads`.
+     * - `limits`: Giới hạn kích thước file.
+     * - `fileFilter`: Chỉ cho phép các định dạng file ảnh phổ biến.
      */
     MulterModule.registerAsync({
       useFactory: () => ({
@@ -106,7 +111,7 @@ import { EventModule } from './event/event.module';
     /**
      * @description
      * Cấu hình ServeStaticModule để phục vụ các tệp tĩnh từ thư mục 'uploads'.
-     * Các tệp trong thư mục 'uploads' sẽ có thể truy cập được qua đường dẫn '/uploads'.
+     * Các tệp trong thư mục này sẽ có thể truy cập được qua đường dẫn `/uploads`.
      */
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
@@ -115,6 +120,7 @@ import { EventModule } from './event/event.module';
 
     /**
      * @description Các module tính năng của ứng dụng.
+     * Mỗi module đóng gói một tập hợp các chức năng liên quan (controllers, services, entities).
      */
     // Module quản lý kết nối cơ sở dữ liệu.
     DatabaseModule,
@@ -165,8 +171,28 @@ import { EventModule } from './event/event.module';
      * Được đánh dấu là Global để có thể inject `EventGateway` ở mọi nơi.
      */
     EventModule,
+
+    /**
+     * @description
+     * Cấu hình ThrottlerModule để giới hạn số lượng request (rate limiting) nhằm chống lại các cuộc tấn công brute-force.
+     * `ttl`: Time-to-live (thời gian sống của một cửa sổ) tính bằng giây.
+     * `limit`: Số lượng request tối đa trong một cửa sổ `ttl`.
+     */
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 60000, // 1 phút
+        limit: 10, // 10 requests
+      },
+    ]),
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    // Áp dụng ThrottlerGuard cho toàn bộ ứng dụng như một guard toàn cục.
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule { }
