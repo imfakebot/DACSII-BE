@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository, Not, IsNull } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
@@ -8,6 +13,8 @@ import { Gender, UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
 import { AuthProvider } from './enum/auth-provider.enum';
+import { join } from 'path';
+import { Express } from 'express';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -367,7 +374,7 @@ export class UsersService {
   */
   async updateAvatar(
     accountId: string,
-    avatarPath: string,
+    file: Express.Multer.File,
   ): Promise<UserProfile> {
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
@@ -378,8 +385,24 @@ export class UsersService {
       throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
     }
 
+    if (!file) {
+      throw new BadRequestException('Bạn phải cung cấp một file ảnh hợp lệ.');
+    }
+
+    const sanitizedDestination = file.destination || 'uploads';
+    const resolvedFilename = file.filename || file.originalname || null;
+    const diskPath =
+      file.path ||
+      (resolvedFilename ? join(sanitizedDestination, resolvedFilename) : null);
+
+    if (!diskPath) {
+      throw new InternalServerErrorException(
+        'Không xác định được đường dẫn file sau khi tải lên.',
+      );
+    }
+
     // Giả sử bạn có một cột 'avatar_url' trong bảng 'user_profiles'
-    account.userProfile.avatar_url = `/${avatarPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
+    account.userProfile.avatar_url = `/${diskPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
 
     return this.userProfileRepository.save(account.userProfile);
   }

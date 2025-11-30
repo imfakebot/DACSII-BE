@@ -498,6 +498,12 @@ export class AuthService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Mã Xác thực Đăng nhập',
+      // Cung cấp html để Handlebars adapter không cố biên dịch template undefined
+      html: `
+        <p>Xin chào,</p>
+        <p>Mã xác thực đăng nhập của bạn là: <strong>${verificationCode}</strong>.</p>
+        <p>Mã sẽ hết hạn sau <strong>10 phút</strong>. Nếu bạn không yêu cầu đăng nhập, hãy bỏ qua email này.</p>
+      `,
       text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
     });
 

@@ -98,7 +98,7 @@ export class UsersController {
 
     // `file.path` sẽ là đường dẫn file trên server, ví dụ: "uploads/avatar-1678886400000-123456789.jpg"
     // Service của bạn sẽ lưu đường dẫn này vào database
-    return await this.usersService.updateAvatar(accountId, file.path);
+    return await this.usersService.updateAvatar(accountId, file);
   }
 
   /**
