@@ -1,4 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentMethod } from '../enums/payment-method.enum';
 import { Booking } from '@/booking/entities/booking.entity';
@@ -6,7 +6,7 @@ import { Voucher } from '@/voucher/entities/voucher.entity';
 
 @Entity({ name: 'payments' })
 export class Payment {
-  @Column({ type: 'varchar', length: 36, primary: true })
+  @PrimaryGeneratedColumn('uuid')
   id?: string;
 
   @Column({ name: 'amount', type: 'decimal', precision: 10, scale: 2 })

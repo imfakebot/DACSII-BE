@@ -133,4 +133,21 @@ export class UsersController {
   async banUser(@Param('id') id: string) {
     return await this.usersService.banUser(id);
   }
+
+  /**
+   * @route PATCH /users/admin/:id/unban
+   * @description (Admin) Mở khóa tài khoản của một người dùng.
+   * @param {string} id - ID của tài khoản cần mở khóa.
+   * @returns {Promise<{ message: string }>} - Thông báo xác nhận mở khóa thành công.
+   */
+  @Patch('admin/:id/unban')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin) Mở khóa tài khoản người dùng' })
+  @ApiResponse({ status: 200, description: 'Mở khóa tài khoản thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
+  async unbanUser(@Param('id') id: string) {
+    return await this.usersService.unbanUser(id);
+  }
 }

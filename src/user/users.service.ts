@@ -342,6 +342,23 @@ export class UsersService {
     return { message: 'Đã khóa tài khoản thành công' };
   }
 
+  /**
+   * Mở khóa (unban) tài khoản của một người dùng.
+   * @param id ID của tài khoản cần mở khóa.
+   * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
+   */
+  async unbanUser(id: string) {
+    const account = await this.accountRepository.findOneBy({ id });
+    if (!account) {
+      throw new NotFoundException('Không tìm thấy tài khoản.');
+    }
+    await this.accountRepository.update(id, {
+      status: AccountStatus.ACTIVE,
+    });
+
+    return { message: 'Đã mở khóa tài khoản thành công' };
+  }
+
   async findProfileByPhoneNumber(phone: string): Promise<UserProfile | null> {
     return this.userProfileRepository.findOne({
       where: {
