@@ -46,7 +46,7 @@ export class PaymentService {
     private readonly voucherRepository: Repository<Voucher>,
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
-    private readonly eventGateWay: EventGateway
+    private readonly eventGateWay: EventGateway,
   ) { }
 
   /**
