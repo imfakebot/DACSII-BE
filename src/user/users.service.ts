@@ -50,7 +50,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -207,8 +207,19 @@ export class UsersService {
    * @param id ID của tài khoản cần tìm.
    * @returns Promise giải quyết thành đối tượng `Account` nếu tìm thấy, ngược lại là `null`.
    */
+<<<<<<< HEAD
   async findAccountById(id: string) {
     return this.accountRepository.findOne({ where: { id }, relations: ['userProfile','role'] });
+=======
+  async findAccountById(
+    id: string,
+    relations: string[] = [],
+  ): Promise<Account | null> {
+    if (!id) {
+      throw new NotFoundException('ID người dùng không hợp lệ.');
+    }
+    return this.accountRepository.findOne({ where: { id }, relations });
+>>>>>>> 88d7a2d692f7c72361546dc06c91d7e862edff74
   }
 
   /**
@@ -350,5 +361,31 @@ export class UsersService {
         phone_number: phone,
       },
     });
+  }
+
+  /**
+  * @method updateAvatar
+  * Cập nhật đường dẫn ảnh đại diện cho người dùng.
+  * @param accountId ID của tài khoản người dùng.
+  * @param avatarPath Đường dẫn đến file ảnh đã được lưu trên server.
+  * @returns Hồ sơ người dùng sau khi cập nhật.
+  */
+  async updateAvatar(
+    accountId: string,
+    avatarPath: string,
+  ): Promise<UserProfile> {
+    const account = await this.accountRepository.findOne({
+      where: { id: accountId },
+      relations: ['userProfile'],
+    });
+
+    if (!account || !account.userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+
+    // Giả sử bạn có một cột 'avatar_url' trong bảng 'user_profiles'
+    account.userProfile.avatar_url = `/${avatarPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
+
+    return this.userProfileRepository.save(account.userProfile);
   }
 }

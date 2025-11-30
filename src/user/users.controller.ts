@@ -7,6 +7,8 @@ import {
   Query,
   Param,
   Patch,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,6 +16,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { AuthenticatedUser, User } from '@/auth/decorator/users.decorator';
@@ -33,7 +36,7 @@ export class UsersController {
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
    */
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   /**
    * @route GET /users/me
@@ -48,7 +51,7 @@ export class UsersController {
     summary: 'Lấy thông tin hồ sơ của người dùng đang đăng nhập',
   })
   getProfile(@User('sub') accountID: string) {
-    return this.usersService.findAccountById(accountID);
+    return this.usersService.findAccountById(accountID, ['userProfile', 'role']);
   }
 
   /**
@@ -70,6 +73,32 @@ export class UsersController {
     @Body() updateUserProfileDto: UpdateUserProfileDto,
   ) {
     return await this.usersService.updateProfile(user.id, updateUserProfileDto);
+  }
+
+  /**
+   * @route PATCH /users/me/avatar
+   * @description Cập nhật ảnh đại diện cho người dùng đang đăng nhập.
+   * @param {string} accountId - ID của tài khoản người dùng.
+   * @param {Express.Multer.File} file - Đối tượng file đã được upload.
+   * @returns {Promise<object>} - Thông tin hồ sơ người dùng sau khi cập nhật.
+   */
+  @Patch('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('avatar')) // 'avatar' là tên field trong FormData
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật ảnh đại diện' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công.' })
+  async uploadAvatar(
+    @User('id') accountId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new Error('Bạn phải cung cấp một file ảnh.');
+    }
+
+    // `file.path` sẽ là đường dẫn file trên server, ví dụ: "uploads/avatar-1678886400000-123456789.jpg"
+    // Service của bạn sẽ lưu đường dẫn này vào database
+    return await this.usersService.updateAvatar(accountId, file.path);
   }
 
   /**

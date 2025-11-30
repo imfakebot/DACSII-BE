@@ -91,7 +91,7 @@ export class AuthService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Mã Xác Thực Đăng Ký Tài Khoản',
-      template: '../hbs/welcome.hbs',
+      template: './welcome',
       context: {
         name: full_name,
         code: verificationCode,
@@ -191,7 +191,8 @@ export class AuthService {
     const payload: JwtPayload = {
       email: user.email,
       sub: user.id,
-      role: String(user.role.name),
+      // Sửa lỗi: Kiểm tra nếu role là object thì lấy name, ngược lại dùng chính nó
+      role: typeof user.role === 'object' && user.role !== null ? user.role.name : String(user.role),
     };
 
     const accessTokenSecret =
@@ -238,7 +239,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role.name,
+        // Sửa lỗi: Tương tự như trên, chuẩn hóa cách lấy role name
+        role: typeof user.role === 'object' && user.role !== null ? user.role.name : String(user.role),
         is_profile_complete:
           user.userProfile &&
             typeof user.userProfile === 'object' &&
@@ -301,20 +303,16 @@ export class AuthService {
    * @throws {ForbiddenException} Nếu tài khoản không tồn tại.
    */
   async refreshTokens(userID: string): Promise<{ accessToken: string }> {
-    const account = await this.userService.findAccountById(userID);
+    // Tải tài khoản cùng với vai trò để tạo token
+    const account = await this.userService.findAccountById(userID, ['role']);
     if (!account || account.status !== AccountStatus.ACTIVE) {
       throw new ForbiddenException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
       );
     }
 
-    const accountWithRole = await this.userService.findAccountByEmail(
-      account.email,
-      ['role'],
-    );
-
     const accessToken = await this.createAccessToken(
-      accountWithRole as unknown as AuthenticatedUser,
+      account as unknown as AuthenticatedUser,
     );
 
     return { accessToken };
@@ -362,7 +360,7 @@ export class AuthService {
     const payload = {
       email: user.email,
       sub: user.id,
-      role: String(user.role.name),
+      role: user.role,
     };
 
     const accessTokenSecret =
@@ -421,7 +419,7 @@ export class AuthService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Yêu cầu Đặt lại Mật khẩu',
-      template: './reset-pasword', // Chỉ cần tên file (không cần .hbs)
+      template: './reset-password',
       context: {
         resetUrl: resetUrl,
         currentYear: new Date().getFullYear(),
@@ -497,16 +495,11 @@ export class AuthService {
     });
 
     // 3. Gửi email
-    try {
-      await this.mailerService.sendMail({
-        to: email,
-        subject: 'Mã Xác thực Đăng nhập',
-        text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
-      });
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Gửi email đăng nhập thất bại:', err);
-    }
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Mã Xác thực Đăng nhập',
+      text: `Mã xác thực đăng nhập của bạn là: ${verificationCode}. Mã này sẽ hết hạn sau 10 phút.`,
+    });
 
     return {
       message:
