@@ -6,6 +6,7 @@ import {
   IsIn,
   MaxLength,
   MinLength,
+  IsDateString,
 } from 'class-validator';
 
 /**
@@ -45,6 +46,16 @@ export class UpdateUserProfileDto {
     message: 'Giới tính phải là một trong các giá trị: male, female, other.',
   })
   gender?: string;
+
+  @ApiProperty({
+    description: 'Ngày sinh của người dùng.',
+    example: '2000-01-30',
+    required: false,
+    format: 'date',
+  })
+  @IsOptional()
+  @IsDateString({}, { message: 'Ngày sinh phải là một ngày hợp lệ (YYYY-MM-DD).' })
+  date_of_birth?: Date;
 
   @ApiProperty({
     description: 'Tiểu sử hoặc mô tả ngắn về bản thân.',

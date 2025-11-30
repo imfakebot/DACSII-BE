@@ -14,6 +14,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
 import { NotificationService } from '@/notification/notification.service';
 import { MailerService } from '@nestjs-modules/mailer';
+import { EventGateway } from '@/event/event.gateway';
 
 /**
  * @class PaymentService
@@ -30,6 +31,9 @@ export class PaymentService {
    * @param bookingService Service để cập nhật trạng thái đặt sân.
    * @param paymentRepository Repository để tương tác với thực thể Payment.
    * @param voucherRepository Repository để tương tác với thực thể Voucher (cần cho việc hoàn voucher).
+   * @param notificationService Service để tạo thông báo cho người dùng.
+   * @param mailerService Service để gửi email xác nhận hoặc thông báo lỗi.
+   * @param eventGateWay Gateway để gửi sự kiện real-time (WebSocket) đến client (ví dụ: admin).
    */
   constructor(
     @Inject(vnpayConfig.KEY)
@@ -42,7 +46,8 @@ export class PaymentService {
     private readonly voucherRepository: Repository<Voucher>,
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
-  ) {}
+    private readonly eventGateWay: EventGateway
+  ) { }
 
   /**
    * @method createVnPayUrl
@@ -113,7 +118,6 @@ export class PaymentService {
 
     const { secretKey } = this.vnpayConfiguration;
     if (!secretKey) {
-      // This check is redundant because vnpayConfiguration is already checked in createVnPayUrl
       throw new Error('VNPAY configuration is missing');
     }
     const signData = qs.stringify(sortedParams, { encode: false });
@@ -210,7 +214,7 @@ export class PaymentService {
       // Bước 1: Tìm Payment để check số tiền (finalAmount - đã trừ voucher)
       // Query theo Relation booking
       const payment = await this.paymentRepository.findOne({
-        where: { booking: { id: bookingId } },
+        where: { booking: { id: bookingId }, status: PaymentStatus.PENDING },
         relations: [
           'voucher',
           'booking',
@@ -242,15 +246,6 @@ export class PaymentService {
         };
       }
 
-      // Bước 3: Check trạng thái tránh trùng lặp
-      if (payment.status === PaymentStatus.COMPLETED) {
-        this.logger.log(`Thanh toán ${payment.id} đã được hoàn thành`);
-        return {
-          RspCode: '02',
-          Message: 'Đơn hàng đã được xác nhận hoặc hoàn thành',
-        };
-      }
-
       const userEmail = payment.booking.userProfile.account.email;
       const fullName = payment.booking.userProfile.full_name;
       const fieldName = payment.booking.field.name;
@@ -258,9 +253,9 @@ export class PaymentService {
       const fieldAddress = payment.booking.field.address
         ? `${payment.booking.field.address.street}, ${payment.booking.field.address.ward?.name || ''}, 
         ${payment.booking.field.address.city?.name || ''}`
-            .replace(/,\s*,/g, ',')
-            .trim()
-            .replace(/,\s*$/, '')
+          .replace(/,\s*,/g, ',')
+          .trim()
+          .replace(/,\s*$/, '')
         : 'N/A';
       const startTime = moment(payment.booking.start_time).format(
         'HH:mm [ngày] DD/MM/YYYY',
@@ -272,7 +267,7 @@ export class PaymentService {
         style: 'currency',
         currency: 'VND',
       });
-      // Bước 4: Xử lý kết quả
+      // Bước 3: Xử lý kết quả
       if (rspCode == '00') {
         // --- THÀNH CÔNG ---
         await this.bookingService.updateStatus(
@@ -310,6 +305,14 @@ export class PaymentService {
               )[0] ?? '',
             currentYear: new Date().getFullYear(),
           },
+        });
+
+        this.eventGateWay.notifyAdminNewBooking({
+          message: `Có đơn đặt sân mới!`,
+          bookingId: bookingId,
+          field: fieldName,
+          amount: finalAmount,
+          time: new Date()
         });
         this.logger.log(`Booking ${bookingId} đã được xác nhận`);
       } else {
@@ -374,14 +377,14 @@ export class PaymentService {
 
   /**
    * @method sortObject
-   * @description (Private) Sắp xếp các thuộc tính của một đối tượng theo thứ tự bảng chữ cái và mã hóa giá trị. Đây là yêu cầu bắt buộc của VNPAY để tạo chữ ký (secure hash).
+   * @description (Private) Sắp xếp các thuộc tính của một đối tượng theo thứ tự bảng chữ cái. Đây là yêu cầu bắt buộc của VNPAY để tạo chữ ký (secure hash).
    * @private
    * @param obj Đối tượng cần sắp xếp.
-   * @returns Đối tượng đã được sắp xếp và mã hóa.
+   * @returns Đối tượng đã được sắp xếp.
    */
   private sortObject(obj: Record<string, any>): Record<string, any> {
     const sorted: Record<string, any> = {};
-    const keys = Object.keys(obj).sort();
+    const keys = Object.keys(obj).sort(); // Sắp xếp key theo alphabet
 
     keys.forEach((key) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -389,6 +392,7 @@ export class PaymentService {
       const valueString =
         value === null || value === undefined ? '' : String(value);
 
+      // VNPAY yêu cầu encode giá trị trước khi tạo chuỗi query
       sorted[key] = encodeURIComponent(valueString).replace(/%20/g, '+');
     });
     return sorted;

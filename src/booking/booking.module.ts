@@ -10,6 +10,7 @@ import { VouchersModule } from '@/voucher/vouchers.module';
 import { Voucher } from '@/voucher/entities/voucher.entity';
 import { Payment } from '@/payment/entities/payment.entity';
 import { PaymentsModule } from '@/payment/payments.module';
+import { BookingCronService } from './booking.cron';
 /**
  * @module BookingsModule
  * @description
@@ -19,16 +20,14 @@ import { PaymentsModule } from '@/payment/payments.module';
  */
 @Module({
   imports: [
-    // Đăng ký Booking entity với TypeORM.
-    // Điều này cho phép inject BookingRepository vào các service trong module này.
     TypeOrmModule.forFeature([Booking, Field, Voucher, Payment]),
     PricingModule,
     UsersModule,
     VouchersModule,
     forwardRef(() => PaymentsModule),
   ],
-  providers: [BookingService],
+  providers: [BookingService, BookingCronService],
   controllers: [BookingController],
   exports: [BookingService],
 })
-export class BookingsModule {}
+export class BookingsModule { }

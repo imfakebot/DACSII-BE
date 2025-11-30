@@ -20,6 +20,8 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import vnpayConfig from './payment/config/vnpay.config';
 import googleOauthConfig from './auth/config/google-oauth.config';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { EventModule } from './event/event.module';
 
 /**
  * @module AppModule
@@ -30,15 +32,22 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
  */
 @Module({
   imports: [
-    // Cấu hình module quản lý biến môi trường.
-    // `isGlobal: true` giúp các service của ConfigModule có thể được inject ở bất kỳ đâu trong ứng dụng.
+    /**
+     * @description
+     * Cấu hình module quản lý biến môi trường (`.env`).
+     * `isGlobal: true` cho phép truy cập `ConfigService` từ bất kỳ module nào.
+     * `load` đăng ký các tệp cấu hình tùy chỉnh (ví dụ: cho VNPay, Google OAuth).
+     */
     ConfigModule.forRoot({
       isGlobal: true,
       load: [vnpayConfig, googleOauthConfig],
     }),
 
-    // Cấu hình module gửi email một cách bất đồng bộ.
-    // Cấu hình được lấy từ `ConfigService` sau khi `ConfigModule` đã được nạp.
+    /**
+     * @description
+     * Cấu hình module gửi email một cách bất đồng bộ.
+     * Cấu hình được lấy từ `ConfigService` sau khi `ConfigModule` đã được nạp.
+     */
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -64,6 +73,10 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
       inject: [ConfigService],
     }),
 
+    /**
+     * @description
+     * Cấu hình MulterModule để xử lý việc tải lên tệp (hình ảnh).
+     */
     MulterModule.registerAsync({
       useFactory: () => ({
         storage: diskStorage({
@@ -90,11 +103,19 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
       }),
     }),
 
+    /**
+     * @description
+     * Cấu hình ServeStaticModule để phục vụ các tệp tĩnh từ thư mục 'uploads'.
+     * Các tệp trong thư mục 'uploads' sẽ có thể truy cập được qua đường dẫn '/uploads'.
+     */
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
     }),
 
+    /**
+     * @description Các module tính năng của ứng dụng.
+     */
     // Module quản lý kết nối cơ sở dữ liệu.
     DatabaseModule,
 
@@ -130,6 +151,20 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 
     // Module quản lý các phản hồi từ người dùng.
     FeedbacksModule,
+
+    /**
+     * @description
+     * Cấu hình ScheduleModule để chạy các tác vụ định kỳ (cron jobs).
+     * Cần thiết cho các công việc tự động như kiểm tra trạng thái đặt sân, gửi thông báo,...
+     */
+    ScheduleModule.forRoot(),
+
+    /**
+     * @description
+     * Module quản lý giao tiếp thời gian thực qua WebSocket (Socket.IO).
+     * Được đánh dấu là Global để có thể inject `EventGateway` ở mọi nơi.
+     */
+    EventModule,
   ],
   controllers: [],
   providers: [],

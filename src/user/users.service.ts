@@ -251,13 +251,22 @@ export class UsersService {
 
     const userProfile = account.userProfile;
 
-    // 2. Cập nhật các trường thông tin của UserProfile
-    // DTO của bạn cũng không cần các trường street, ward_id, city_id.
-    // Ép kiểu `data.gender` thành `Gender` vì DTO nhận `string` nhưng entity cần `Gender` enum.
-    this.userProfileRepository.merge(userProfile, {
-      ...data,
-      gender: data.gender as Gender,
-    });
+    // 2. Cập nhật các trường một cách tường minh thay vì dùng spread operator
+    if (data.full_name) {
+      userProfile.full_name = data.full_name;
+    }
+    if (data.phone_number) {
+      userProfile.phone_number = data.phone_number;
+    }
+    if (data.gender) {
+      userProfile.gender = data.gender as Gender;
+    }
+    if (data.date_of_birth) {
+      userProfile.date_of_birth = data.date_of_birth;
+    }
+    if (data.bio) {
+      userProfile.bio = data.bio;
+    }
 
     // 3. Quan trọng: Đánh dấu hồ sơ đã hoàn thành
     userProfile.is_profile_complete = true;
