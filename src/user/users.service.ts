@@ -207,10 +207,6 @@ export class UsersService {
    * @param id ID của tài khoản cần tìm.
    * @returns Promise giải quyết thành đối tượng `Account` nếu tìm thấy, ngược lại là `null`.
    */
-<<<<<<< HEAD
-  async findAccountById(id: string) {
-    return this.accountRepository.findOne({ where: { id }, relations: ['userProfile','role'] });
-=======
   async findAccountById(
     id: string,
     relations: string[] = [],
@@ -219,7 +215,6 @@ export class UsersService {
       throw new NotFoundException('ID người dùng không hợp lệ.');
     }
     return this.accountRepository.findOne({ where: { id }, relations });
->>>>>>> 88d7a2d692f7c72361546dc06c91d7e862edff74
   }
 
   /**
