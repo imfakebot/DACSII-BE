@@ -64,7 +64,7 @@ import { APP_GUARD } from '@nestjs/core';
           from: `"No Reply" <${configService.get<string>('MAIL_FROM')}>`, // Email người gửi mặc định
         },
         template: {
-          dir: join(__dirname, '..', 'templates'), // Đường dẫn đến thư mục chứa các mẫu email Handlebars.
+          dir: join(process.cwd(), 'src', 'templates'), // Đường dẫn đến thư mục chứa các mẫu email Handlebars.
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,
@@ -194,4 +194,4 @@ import { APP_GUARD } from '@nestjs/core';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -19,11 +19,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { AuthenticatedUser, User } from '@/auth/decorator/users.decorator';
+import { User } from '@/auth/decorator/users.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Role } from '../auth/enums/role.enum';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 
 /**
  * @controller UsersController
@@ -36,7 +37,7 @@ export class UsersController {
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
    */
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   /**
    * @route GET /users/me

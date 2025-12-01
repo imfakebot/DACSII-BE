@@ -22,7 +22,7 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
-import { AuthenticatedUser, User } from './decorator/users.decorator';
+import { User } from './decorator/users.decorator';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -33,6 +33,7 @@ import { LoginUserDto } from './dto/login-user.dto';
 import { LoginCompleteDto } from './dto/login-complete.dto';
 import { AuthenticatedRequest } from './interface/authenticated-request.interface';
 import { Throttle } from '@nestjs/throttler';
+import { AuthenticatedUser } from './interface/authenicated-user.interface';
 
 /**
  * @controller AuthController
@@ -49,7 +50,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -162,9 +163,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })},'${frontendURL}');
       window.close();
     </script>
     `;
