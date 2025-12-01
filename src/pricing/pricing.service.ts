@@ -159,16 +159,11 @@ export class PricingService {
    * @throws {BadRequestException} Nếu thời gian bắt đầu hoặc kết thúc nằm ngoài giờ hoạt động.
    */
   private validateOperatingHour(start: Date, end: Date) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const startHCM = moment(start).tz('Asia/Ho_Chi_Minh');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const endHCM = moment(end).tz('Asia/Ho_Chi_Minh');
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const startH = Number(startHCM.hour());
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const endH = Number(endHCM.hour());
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const endM = Number(endHCM.minute());
 
     // 1. Check giờ bắt đầu: Phải từ 7h trở đi và trước 21h
