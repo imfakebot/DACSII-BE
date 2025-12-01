@@ -36,7 +36,7 @@ export class PricingService {
     private readonly bookingRepository: Repository<Booking>,
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
-  ) { }
+  ) {}
 
   /**
    * Kiểm tra tính khả dụng của sân và tính toán giá tiền cho một yêu cầu đặt sân cụ thể.
@@ -168,12 +168,19 @@ export class PricingService {
 
     // 1. Check giờ bắt đầu: Phải từ 7h trở đi và trước 21h
     if (startH < Number(this.OPEN_HOUR) || startH > Number(this.CLOSE_HOUR)) {
-      throw new BadRequestException(`Sân chỉ hoạt động từ ${this.OPEN_HOUR}h đến ${this.CLOSE_HOUR}h.`)
+      throw new BadRequestException(
+        `Sân chỉ hoạt động từ ${this.OPEN_HOUR}h đến ${this.CLOSE_HOUR}h.`,
+      );
     }
 
     // 2. Check giờ kết thúc: Không được vượt quá 23:00
-    if (endH > Number(this.CLOSE_HOUR) || (endH === Number(this.CLOSE_HOUR) && endM > 0)) {
-      throw new BadRequestException(`Sân đóng cửa lúc ${this.CLOSE_HOUR}h. Vui lòng chọn giờ kết thúc sớm hơn.`);
+    if (
+      endH > Number(this.CLOSE_HOUR) ||
+      (endH === Number(this.CLOSE_HOUR) && endM > 0)
+    ) {
+      throw new BadRequestException(
+        `Sân đóng cửa lúc ${this.CLOSE_HOUR}h. Vui lòng chọn giờ kết thúc sớm hơn.`,
+      );
     }
   }
 }

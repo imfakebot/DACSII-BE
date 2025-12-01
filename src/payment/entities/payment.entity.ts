@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentMethod } from '../enums/payment-method.enum';
 import { Booking } from '@/booking/entities/booking.entity';

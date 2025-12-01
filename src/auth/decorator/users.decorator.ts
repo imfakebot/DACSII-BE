@@ -61,13 +61,15 @@ export interface AuthenticatedUser {
  * }
  * ```
  */
-export const User = createParamDecorator(<T extends keyof AuthenticatedUser>(
-  key: T | undefined,
-  ctx: ExecutionContext,
-): AuthenticatedUser | AuthenticatedUser[T] => {
-  const request = ctx
-    .switchToHttp()
-    .getRequest<{ user: AuthenticatedUser }>();
-  const user = request.user;
-  return key ? user?.[key] : user; // Nếu có key, trả về thuộc tính tương ứng, ngược lại trả về cả object user
-});
+export const User = createParamDecorator(
+  <T extends keyof AuthenticatedUser>(
+    key: T | undefined,
+    ctx: ExecutionContext,
+  ): AuthenticatedUser | AuthenticatedUser[T] => {
+    const request = ctx
+      .switchToHttp()
+      .getRequest<{ user: AuthenticatedUser }>();
+    const user = request.user;
+    return key ? user?.[key] : user; // Nếu có key, trả về thuộc tính tương ứng, ngược lại trả về cả object user
+  },
+);

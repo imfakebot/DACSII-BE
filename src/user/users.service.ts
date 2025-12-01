@@ -50,7 +50,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) { }
+  ) {}
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -368,12 +368,12 @@ export class UsersService {
   }
 
   /**
-  * @method updateAvatar
-  * Cập nhật đường dẫn ảnh đại diện cho người dùng.
-  * @param accountId ID của tài khoản người dùng.
-  * @param avatarPath Đường dẫn đến file ảnh đã được lưu trên server.
-  * @returns Hồ sơ người dùng sau khi cập nhật.
-  */
+   * @method updateAvatar
+   * Cập nhật đường dẫn ảnh đại diện cho người dùng.
+   * @param accountId ID của tài khoản người dùng.
+   * @param avatarPath Đường dẫn đến file ảnh đã được lưu trên server.
+   * @returns Hồ sơ người dùng sau khi cập nhật.
+   */
   async updateAvatar(
     accountId: string,
     avatarPath: string,

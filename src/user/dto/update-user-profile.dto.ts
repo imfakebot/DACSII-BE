@@ -54,7 +54,10 @@ export class UpdateUserProfileDto {
     format: 'date',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Ngày sinh phải là một ngày hợp lệ (YYYY-MM-DD).' })
+  @IsDateString(
+    {},
+    { message: 'Ngày sinh phải là một ngày hợp lệ (YYYY-MM-DD).' },
+  )
   date_of_birth?: Date;
 
   @ApiProperty({

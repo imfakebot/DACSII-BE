@@ -25,7 +25,6 @@ import { EventModule } from './event/event.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
-
 /**
  * @module AppModule
  * @description Module gốc của ứng dụng NestJS.
@@ -195,4 +194,4 @@ import { APP_GUARD } from '@nestjs/core';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

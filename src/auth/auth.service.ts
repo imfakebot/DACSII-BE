@@ -46,7 +46,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method initiateRegistration
@@ -185,7 +185,10 @@ export class AuthService {
       email: user.email,
       sub: user.id,
       // Sửa lỗi: Kiểm tra nếu role là object thì lấy name, ngược lại dùng chính nó
-      role: typeof user.role === 'object' && user.role !== null ? user.role.name : String(user.role),
+      role:
+        typeof user.role === 'object' && user.role !== null
+          ? user.role.name
+          : String(user.role),
     };
 
     const accessTokenSecret =
@@ -233,13 +236,16 @@ export class AuthService {
         id: user.id,
         email: user.email,
         // Sửa lỗi: Tương tự như trên, chuẩn hóa cách lấy role name
-        role: typeof user.role === 'object' && user.role !== null ? user.role.name : String(user.role),
+        role:
+          typeof user.role === 'object' && user.role !== null
+            ? user.role.name
+            : String(user.role),
         is_profile_complete:
           user.userProfile &&
-            typeof user.userProfile === 'object' &&
-            'is_profile_complete' in user.userProfile
+          typeof user.userProfile === 'object' &&
+          'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-              .is_profile_complete ?? false)
+                .is_profile_complete ?? false)
             : false,
       },
     };

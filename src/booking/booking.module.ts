@@ -30,4 +30,4 @@ import { BookingCronService } from './booking.cron';
   controllers: [BookingController],
   exports: [BookingService],
 })
-export class BookingsModule { }
+export class BookingsModule {}
