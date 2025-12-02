@@ -109,7 +109,10 @@ export class FieldsController {
       example: { latitude: 10.8507, longitude: 106.7719 },
     },
   })
-  @ApiResponse({ status: 400, description: 'Không thể tìm thấy tọa độ từ địa chỉ được cung cấp.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Không thể tìm thấy tọa độ từ địa chỉ được cung cấp.',
+  })
   @HttpCode(HttpStatus.OK)
   previewCoordinates(@Body() geocodeAddressDto: GeocodeAddressDto) {
     return this.fieldsService.getCoordinatesFromAddress(geocodeAddressDto);

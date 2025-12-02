@@ -1,6 +1,5 @@
 import {
   Injectable,
-  InternalServerErrorException,
   BadRequestException,
   NotFoundException,
   Logger,
@@ -8,7 +7,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
-import { isAxiosError } from 'axios';
 import { Field } from './entities/field.entity';
 import { Address } from '../location/entities/address.entity';
 import { UpdateFieldDto } from '../field/dto/update-fields.dto';
@@ -22,29 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { FieldImage } from './entities/field-image.entity';
 import { firstValueFrom } from 'rxjs';
 import { FilterFieldDto } from './dto/filter-field.dto';
-
-/**
- * @interface GeocodingResult
- * @description Định nghĩa cấu trúc cho một kết quả trong mảng `results` từ Google Geocoding API.
- */
-interface GeocodingResult {
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
-  };
-}
-
-/**
- * @interface GeocodingResponse
- * @description Định nghĩa cấu trúc cho toàn bộ phản hồi từ Google Geocoding API.
- */
-interface GeocodingResponse {
-  results: GeocodingResult[];
-  status: 'OK' | 'ZERO_RESULTS' | 'OVER_QUERY_LIMIT' | 'REQUEST_DENIED' | 'INVALID_REQUEST' | 'UNKNOWN_ERROR';
-}
-
+import { NominatimResponse } from './interface/nominatim-response.interface';
 
 /**
  * @service FieldsService
@@ -75,7 +51,7 @@ export class FieldsService {
     private readonly fieldImageRepository: Repository<FieldImage>,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-  ) { }
+  ) {}
 
   /**
    * @method create
@@ -137,51 +113,62 @@ export class FieldsService {
     const city = await this.cityRepository.findOneBy({ id: cityId });
 
     if (!ward || !city) {
-      throw new NotFoundException('Không tìm thấy thông tin Phường/Xã hoặc Thành phố.');
+      throw new NotFoundException(
+        'Không tìm thấy thông tin Phường/Xã hoặc Thành phố.',
+      );
     }
 
-    const apiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
     const searchQueries = [
-      `${street}, ${ward.name}, ${city.name}, Việt Nam`,
-      `${street}, ${city.name}, Việt Nam`,
+      `${street}, ${ward.name}, ${city.name}, Vietnam`,
+      `${street}, ${city.name}, Vietnam`,
     ];
 
     let foundCoordinates: { latitude: number; longitude: number } | null = null;
 
     for (const query of searchQueries) {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
         query,
-      )}&key=${apiKey}`;
-      try {
-        const response = await firstValueFrom(this.httpService.get(url));
-        const { results, status } = response.data as GeocodingResponse;
+      )}&format=json&limit=1`;
 
-        if (status === 'OK' && results[0]) {
-          const location = results[0].geometry.location;
-          foundCoordinates = { latitude: location.lat, longitude: location.lng };
-          this.logger.log(`Geocoding found via Google: "${query}" -> [${location.lat}, ${location.lng}]`);
+      try {
+        const response = await firstValueFrom(
+          this.httpService.get<NominatimResponse[]>(url, {
+            headers: { 'User-Agent': 'SanBongApp/1.0' }, // Nominatim yêu cầu User-Agent
+          }),
+        );
+
+        if (response.data && response.data.length > 0) {
+          const location = response.data[0];
+          foundCoordinates = {
+            latitude: parseFloat(location.lat),
+            longitude: parseFloat(location.lon),
+          };
+          this.logger.log(
+            `Geocoding found via OSM: "${query}" -> [${location.lat}, ${location.lon}]`,
+          );
           break;
         } else {
-          this.logger.warn(`Google Geocoding failed for query: "${query}". Status: ${status}`);
+          this.logger.warn(
+            `OSM Geocoding failed for query: "${query}". No results found.`,
+          );
         }
       } catch (error) {
-        this.logger.error(`Error calling Google Geocoding API for query: "${query}"`, error);
-        // Sử dụng type guard isAxiosError để kiểm tra lỗi một cách an toàn
-        if (isAxiosError(error) && error.response) {
-          // Nếu là lỗi từ Google API (ví dụ: sai key), error.response.data sẽ an toàn để truy cập
-          const errorData = error.response.data as GeocodingResponse;
-          if (errorData.status === 'REQUEST_DENIED') {
-            throw new InternalServerErrorException('Lỗi xác thực với dịch vụ Geocoding. Vui lòng kiểm tra lại API Key.');
-          }
-        }
+        this.logger.error(
+          `Error calling Google Geocoding API for query: "${query}"`,
+          error,
+        );
       }
     }
 
     if (foundCoordinates) {
       return foundCoordinates;
     } else {
-      this.logger.error(`Could not geocode address for street: "${street}", wardId: ${wardId}.`);
-      throw new BadRequestException('Không thể tự động xác định vị trí từ địa chỉ được cung cấp.');
+      this.logger.error(
+        `Could not geocode address for street: "${street}", wardId: ${wardId}.`,
+      );
+      throw new BadRequestException(
+        'Không thể tự động xác định vị trí từ địa chỉ được cung cấp.',
+      );
     }
   }
 
