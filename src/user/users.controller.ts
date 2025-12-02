@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  HttpCode,
   UseGuards,
   Put,
   Body,
@@ -9,12 +10,14 @@ import {
   Patch,
   UseInterceptors,
   UploadedFile,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -25,6 +28,7 @@ import { Roles } from '@/auth/decorator/roles.decorator';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Role } from '../auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 /**
  * @controller UsersController
@@ -103,6 +107,36 @@ export class UsersController {
     // `file.path` sẽ là đường dẫn file trên server, ví dụ: "uploads/avatar-1678886400000-123456789.jpg"
     // Service của bạn sẽ lưu đường dẫn này vào database
     return await this.usersService.updateAvatar(accountId, file.path);
+  }
+
+  /**
+   * @route PATCH /users/me/password
+   * @description Thay đổi mật khẩu cho người dùng đang đăng nhập.
+   * @param {AuthenticatedUser} user - Đối tượng người dùng đã xác thực.
+   * @param {ChangePasswordDto} changePasswordDto - DTO chứa mật khẩu cũ và mới.
+   * @returns {Promise<{ message: string }>} - Thông báo thành công.
+   */
+  @Patch('me/password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Thay đổi mật khẩu của người dùng đang đăng nhập' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công.' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu mới không hợp lệ.' })
+  @ApiResponse({ status: 401, description: 'Mật khẩu cũ không chính xác.' })
+  async changePassword(
+    @User() user: AuthenticatedUser,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    if (changePasswordDto.oldPassword === changePasswordDto.newPassword) {
+      throw new Error('Mật khẩu mới không được trùng với mật khẩu cũ.');
+    }
+    return this.usersService.changePassword(
+      user.id,
+      changePasswordDto.oldPassword,
+      changePasswordDto.newPassword,
+    );
   }
 
   /**

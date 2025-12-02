@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
@@ -50,7 +55,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -391,5 +396,44 @@ export class UsersService {
     account.userProfile.avatar_url = `/${avatarPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
 
     return this.userProfileRepository.save(account.userProfile);
+  }
+
+  /**
+   * @method changePassword
+   * @description Thay đổi mật khẩu cho người dùng đã đăng nhập.
+   * @param accountId ID của tài khoản người dùng.
+   * @param oldPassword Mật khẩu cũ để xác thực.
+   * @param newPassword Mật khẩu mới.
+   * @returns Một thông báo thành công.
+   * @throws {NotFoundException} Nếu không tìm thấy tài khoản.
+   * @throws {BadRequestException} Nếu tài khoản là tài khoản OAuth hoặc mật khẩu mới trùng mật khẩu cũ.
+   * @throws {UnauthorizedException} Nếu mật khẩu cũ không đúng.
+   */
+  async changePassword(
+    accountId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const account = await this.findAccountById(accountId);
+    if (!account) {
+      throw new NotFoundException('Không tìm thấy tài khoản.');
+    }
+
+    if (!account.password_hash) {
+      throw new BadRequestException(
+        'Tài khoản đăng nhập bằng mạng xã hội không thể đổi mật khẩu.',
+      );
+    }
+
+    const isPasswordMatching = await this.comparePassword(
+      oldPassword,
+      account.password_hash,
+    );
+    if (!isPasswordMatching) {
+      throw new UnauthorizedException('Mật khẩu cũ không chính xác.');
+    }
+    account.password_hash = await this.hashPassword(newPassword);
+    await this.accountRepository.save(account);
+    return { message: 'Đổi mật khẩu thành công.' };
   }
 }

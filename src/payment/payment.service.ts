@@ -47,7 +47,7 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
-  ) {}
+  ) { }
 
   /**
    * @method createVnPayUrl
@@ -253,9 +253,9 @@ export class PaymentService {
       const fieldAddress = payment.booking.field.address
         ? `${payment.booking.field.address.street}, ${payment.booking.field.address.ward?.name || ''}, 
         ${payment.booking.field.address.city?.name || ''}`
-            .replace(/,\s*,/g, ',')
-            .trim()
-            .replace(/,\s*$/, '')
+          .replace(/,\s*,/g, ',')
+          .trim()
+          .replace(/,\s*$/, '')
         : 'N/A';
       const startTime = moment(payment.booking.start_time).format(
         'HH:mm [ngày] DD/MM/YYYY',
