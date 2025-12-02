@@ -12,15 +12,6 @@ import { Injectable } from '@nestjs/common';
  * 3. Nếu token hợp lệ, hàm `validate` trong `JwtStrategy` sẽ được thực thi.
  * 4. Dữ liệu trả về từ hàm `validate` (thường là payload của token) sẽ được gắn vào `req.user`.
  * 5. Nếu token không hợp lệ hoặc không được cung cấp, Guard sẽ trả về lỗi `401 Unauthorized`.
- *
- * @example
- *
- * @UseGuards(JwtAuthGuard)
- * @Get('profile')
- * getProfile(@Req() req) {
- *   return req.user;
- * }
- * ```
  */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {}

@@ -8,8 +8,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { AuthenticatedUser } from '../interface/authenicated-user.interface';
 
-
-
 /**
  * @decorator User
  * @description Một custom parameter decorator để trích xuất đối tượng `user` từ `request`.

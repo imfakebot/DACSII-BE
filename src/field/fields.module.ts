@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FieldsService } from './fields.service';
+import { HttpModule } from '@nestjs/axios';
 import { FieldsController } from './fields.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Field } from './entities/field.entity';
@@ -8,6 +9,8 @@ import { LocationModule } from '@/location/locations.module';
 import { UsersModule } from '@/user/users.module';
 import { AuthModule } from '@/auth/auth.module';
 import { FieldImage } from './entities/field-image.entity';
+import { Ward } from '@/location/entities/ward.entity';
+import { City } from '@/location/entities/city.entity';
 import { Utility } from './entities/utility.entity';
 
 /**
@@ -20,7 +23,16 @@ import { Utility } from './entities/utility.entity';
 @Module({
   imports: [
     // Đăng ký các entities liên quan đến sân bóng với TypeORM.
-    TypeOrmModule.forFeature([Field, FieldType, FieldImage, Utility]),
+    TypeOrmModule.forFeature([
+      Field,
+      FieldType,
+      FieldImage,
+      Utility,
+      Ward,
+      City,
+    ]),
+    // Import HttpModule để có thể inject HttpService
+    HttpModule,
     // Import LocationModule để có thể sử dụng các service/entity liên quan đến địa chỉ.
     LocationModule,
     // Import AuthModule để sử dụng các Guards (JwtAuthGuard, RolesGuard) trong FieldsController.

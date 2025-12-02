@@ -1,5 +1,5 @@
-import { UserProfile } from "@/user/entities/users-profile.entity";
-import { Role } from "../enums/role.enum";
+import { UserProfile } from '@/user/entities/users-profile.entity';
+import { Role } from '../enums/role.enum';
 
 /**
  * @interface AuthenticatedUser
@@ -15,10 +15,10 @@ import { Role } from "../enums/role.enum";
  * @property {boolean} [is_profile_complete] - Cờ báo hiệu hồ sơ người dùng đã hoàn chỉnh hay chưa.
  */
 export interface AuthenticatedUser {
-    userProfile?: UserProfile;
-    id: string;
-    sub?: string;
-    email: string;
-    role: Role;
-    is_profile_complete?: boolean;
+  userProfile?: UserProfile;
+  id: string;
+  sub?: string;
+  email: string;
+  role: Role;
+  is_profile_complete?: boolean;
 }

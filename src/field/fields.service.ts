@@ -1,17 +1,50 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  BadRequestException,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { HttpService } from '@nestjs/axios';
+import { isAxiosError } from 'axios';
 import { Field } from './entities/field.entity';
 import { Address } from '../location/entities/address.entity';
 import { UpdateFieldDto } from '../field/dto/update-fields.dto';
 import { CreateFieldDto } from '../field/dto/create-fields.dto';
 import { UserProfile } from '../user/entities/users-profile.entity';
 import { FieldType } from '../field/entities/field-types.entity';
+import { GeocodeAddressDto } from './dto/geocode-address.dto';
 import { Ward } from '@/location/entities/ward.entity';
 import { City } from '@/location/entities/city.entity';
 import { ConfigService } from '@nestjs/config';
 import { FieldImage } from './entities/field-image.entity';
+import { firstValueFrom } from 'rxjs';
 import { FilterFieldDto } from './dto/filter-field.dto';
+
+/**
+ * @interface GeocodingResult
+ * @description Định nghĩa cấu trúc cho một kết quả trong mảng `results` từ Google Geocoding API.
+ */
+interface GeocodingResult {
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
+/**
+ * @interface GeocodingResponse
+ * @description Định nghĩa cấu trúc cho toàn bộ phản hồi từ Google Geocoding API.
+ */
+interface GeocodingResponse {
+  results: GeocodingResult[];
+  status: 'OK' | 'ZERO_RESULTS' | 'OVER_QUERY_LIMIT' | 'REQUEST_DENIED' | 'INVALID_REQUEST' | 'UNKNOWN_ERROR';
+}
+
 
 /**
  * @service FieldsService
@@ -21,6 +54,8 @@ import { FilterFieldDto } from './dto/filter-field.dto';
  */
 @Injectable()
 export class FieldsService {
+  private readonly logger = new Logger(FieldsService.name);
+
   /**
    * @param {Repository<Field>} fieldRepository - Repository để tương tác với bảng 'fields'.
    * @param {Repository<Address>} addressRepository - Repository để tương tác với bảng 'addresses'.
@@ -31,11 +66,16 @@ export class FieldsService {
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
     @InjectRepository(Address)
-    private readonly addressRepository: Repository<Address>,
+    private readonly addressRepository: Repository<Address>, // Có thể không cần nếu không dùng trực tiếp
+    @InjectRepository(Ward)
+    private readonly wardRepository: Repository<Ward>,
+    @InjectRepository(City)
+    private readonly cityRepository: Repository<City>,
     @InjectRepository(FieldImage)
     private readonly fieldImageRepository: Repository<FieldImage>,
     private readonly configService: ConfigService,
-  ) {}
+    private readonly httpService: HttpService,
+  ) { }
 
   /**
    * @method create
@@ -49,21 +89,30 @@ export class FieldsService {
     createFieldDto: CreateFieldDto,
     ownerProfile: UserProfile,
   ): Promise<Field> {
-    const { street, wardId, cityId, fieldTypeId, ...fieldData } =
-      createFieldDto;
+    const {
+      street,
+      wardId,
+      cityId,
+      fieldTypeId,
+      latitude,
+      longitude,
+      ...fieldData
+    } = createFieldDto;
 
     // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu.
     return this.fieldRepository.manager.transaction(
       async (transactionalEntityManager) => {
         const address = transactionalEntityManager.create(Address, {
           street,
+          latitude: latitude,
+          longitude: longitude,
           ward: { id: wardId },
           city: { id: cityId },
         });
         const savedAddress = await transactionalEntityManager.save(address);
 
         const newField = transactionalEntityManager.create(Field, {
-          ...fieldData,
+          ...fieldData, // name, description
           address: savedAddress,
           fieldType: { id: fieldTypeId } as unknown as FieldType,
           owner: ownerProfile,
@@ -71,6 +120,69 @@ export class FieldsService {
         return transactionalEntityManager.save(newField);
       },
     );
+  }
+
+  /**
+   * @method getCoordinatesFromAddress
+   * @description Lấy tọa độ (kinh độ, vĩ độ) từ thông tin địa chỉ bằng Google Geocoding API.
+   * @param {GeocodeAddressDto} addressDto - DTO chứa thông tin địa chỉ.
+   * @returns {Promise<{latitude: number, longitude: number}>} - Tọa độ tìm được.
+   * @throws {BadRequestException} - Nếu không thể tìm thấy tọa độ từ địa chỉ đã cho.
+   */
+  async getCoordinatesFromAddress(
+    addressDto: GeocodeAddressDto,
+  ): Promise<{ latitude: number; longitude: number }> {
+    const { street, wardId, cityId } = addressDto;
+    const ward = await this.wardRepository.findOneBy({ id: wardId });
+    const city = await this.cityRepository.findOneBy({ id: cityId });
+
+    if (!ward || !city) {
+      throw new NotFoundException('Không tìm thấy thông tin Phường/Xã hoặc Thành phố.');
+    }
+
+    const apiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
+    const searchQueries = [
+      `${street}, ${ward.name}, ${city.name}, Việt Nam`,
+      `${street}, ${city.name}, Việt Nam`,
+    ];
+
+    let foundCoordinates: { latitude: number; longitude: number } | null = null;
+
+    for (const query of searchQueries) {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+        query,
+      )}&key=${apiKey}`;
+      try {
+        const response = await firstValueFrom(this.httpService.get(url));
+        const { results, status } = response.data as GeocodingResponse;
+
+        if (status === 'OK' && results[0]) {
+          const location = results[0].geometry.location;
+          foundCoordinates = { latitude: location.lat, longitude: location.lng };
+          this.logger.log(`Geocoding found via Google: "${query}" -> [${location.lat}, ${location.lng}]`);
+          break;
+        } else {
+          this.logger.warn(`Google Geocoding failed for query: "${query}". Status: ${status}`);
+        }
+      } catch (error) {
+        this.logger.error(`Error calling Google Geocoding API for query: "${query}"`, error);
+        // Sử dụng type guard isAxiosError để kiểm tra lỗi một cách an toàn
+        if (isAxiosError(error) && error.response) {
+          // Nếu là lỗi từ Google API (ví dụ: sai key), error.response.data sẽ an toàn để truy cập
+          const errorData = error.response.data as GeocodingResponse;
+          if (errorData.status === 'REQUEST_DENIED') {
+            throw new InternalServerErrorException('Lỗi xác thực với dịch vụ Geocoding. Vui lòng kiểm tra lại API Key.');
+          }
+        }
+      }
+    }
+
+    if (foundCoordinates) {
+      return foundCoordinates;
+    } else {
+      this.logger.error(`Could not geocode address for street: "${street}", wardId: ${wardId}.`);
+      throw new BadRequestException('Không thể tự động xác định vị trí từ địa chỉ được cung cấp.');
+    }
   }
 
   /**

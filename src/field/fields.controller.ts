@@ -32,6 +32,7 @@ import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { Field } from './entities/field.entity';
+import { GeocodeAddressDto } from './dto/geocode-address.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -51,7 +52,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /fields
@@ -88,6 +89,30 @@ export class FieldsController {
       throw new NotFoundException('Không tìm thấy hồ sơ của Admin.');
     }
     return this.fieldsService.create(createFieldDto, adminProfile);
+  }
+
+  /**
+   * @route POST /fields/geocode
+   * @description (Admin) Lấy tọa độ gợi ý từ địa chỉ.
+   * @param {GeocodeAddressDto} geocodeAddressDto - DTO chứa thông tin địa chỉ.
+   * @returns {Promise<{latitude: number, longitude: number}>} - Tọa độ tìm được.
+   */
+  @Post('geocode')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: '(Admin) Lấy tọa độ gợi ý từ địa chỉ' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tìm thấy tọa độ thành công.',
+    schema: {
+      example: { latitude: 10.8507, longitude: 106.7719 },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Không thể tìm thấy tọa độ từ địa chỉ được cung cấp.' })
+  @HttpCode(HttpStatus.OK)
+  previewCoordinates(@Body() geocodeAddressDto: GeocodeAddressDto) {
+    return this.fieldsService.getCoordinatesFromAddress(geocodeAddressDto);
   }
 
   /**

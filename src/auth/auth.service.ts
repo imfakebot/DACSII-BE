@@ -46,7 +46,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method initiateRegistration
@@ -242,10 +242,10 @@ export class AuthService {
             : String(user.role),
         is_profile_complete:
           user.userProfile &&
-            typeof user.userProfile === 'object' &&
-            'is_profile_complete' in user.userProfile
+          typeof user.userProfile === 'object' &&
+          'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-              .is_profile_complete ?? false)
+                .is_profile_complete ?? false)
             : false,
       },
     };

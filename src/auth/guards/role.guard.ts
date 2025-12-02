@@ -9,14 +9,6 @@ import { AuthenticatedRequest } from '../interface/authenticated-request.interfa
  * @description Một Guard để kiểm tra xem người dùng hiện tại có vai trò (role)
  * được yêu cầu để truy cập một route cụ thể hay không.
  * Guard này hoạt động kết hợp với decorator `@Roles(...roles)`.
- *
- * @example
- * ```
- * @UseGuards(JwtAuthGuard, RolesGuard)
- * @Roles(Role.Admin)
- * @Get('admin-only-route')
- * getAdminData() { ... }
- * ```
  */
 @Injectable()
 export class RolesGuard implements CanActivate {

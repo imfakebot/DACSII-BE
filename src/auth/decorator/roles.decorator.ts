@@ -21,17 +21,5 @@ export const ROLES_KEY = 'roles';
  *
  * @param {...Role[]} roles - Một danh sách các vai trò (dưới dạng enum) được phép.
  * @returns Một decorator function của NestJS.
- *
- * @example
- * ```
- * import { Roles } from './roles.decorator';
- * import { RolesGuard } from '../guards/roles.guard'; // Giả sử có RolesGuard
- * import { Role } from '../enums/role.enum';
- *
- * @Get('admin-data')
- * @UseGuards(JwtAuthGuard, RolesGuard) // Áp dụng các guard cần thiết
- * @Roles(Role.Admin) // Chỉ vai trò Admin mới có thể truy cập route này
- * getAdminData() { ... }
- * ```
  */
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);

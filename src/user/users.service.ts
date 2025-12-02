@@ -55,7 +55,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) { }
+  ) {}
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
