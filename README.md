@@ -39,7 +39,7 @@ Hệ thống được xây dựng với nhiều lớp bảo vệ để đảm b�
 
 - **Framework:** NestJS
 - **Ngôn ngữ:** TypeScript
-- **Cơ sở dữ liệu:** PostgreSQL (quản lý qua TypeORM)
+- **Cơ sở dữ liệu:** MySQL (quản lý qua TypeORM)
 - **Xác thực:** JWT (Access & Refresh Tokens), OAuth 2.0 (Google)
 - **Thanh toán:** VNPay
 - **Real-time:** WebSocket (Socket.IO)
