@@ -13,9 +13,6 @@ import { ReviewsModule } from './review/reviews.module';
 import { NotificationsModule } from './notification/notifications.module';
 import { FeedbacksModule } from './feedback/feedbacks.module';
 import { LocationModule } from './location/locations.module';
-import { MulterModule } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import vnpayConfig from './payment/config/vnpay.config';
 import googleOauthConfig from './auth/config/google-oauth.config';
@@ -24,6 +21,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { EventModule } from './event/event.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { join } from 'path';
 
 /**
  * @module AppModule
@@ -74,38 +72,7 @@ import { APP_GUARD } from '@nestjs/core';
       inject: [ConfigService],
     }),
 
-    /**
-     * @description
-     * Cấu hình MulterModule để xử lý việc tải lên tệp (file uploads).
-     * - `storage`: Sử dụng `diskStorage` để lưu file vào thư mục `./uploads`.
-     * - `limits`: Giới hạn kích thước file.
-     * - `fileFilter`: Chỉ cho phép các định dạng file ảnh phổ biến.
-     */
-    MulterModule.registerAsync({
-      useFactory: () => ({
-        storage: diskStorage({
-          destination: './uploads',
-          filename: (req, file, callback) => {
-            const uniqueSuffix =
-              Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const extension = extname(file.originalname);
-            const filename = `${file.fieldname}-${uniqueSuffix}${extension}`;
-            callback(null, filename);
-          },
-        }),
 
-        limits: {
-          fileSize: 5 * 1024 * 1024, // Giới hạn kích thước file tối đa 5MB
-        },
-
-        fileFilter: (req, file, callback) => {
-          if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-            return callback(new Error('Only image files are allowed!'), false);
-          }
-          callback(null, true);
-        },
-      }),
-    }),
 
     /**
      * @description
@@ -181,7 +148,7 @@ import { APP_GUARD } from '@nestjs/core';
       {
         name: 'short',
         ttl: 60000, // 1 phút
-        limit: 10, // 10 requests
+        limit: 50, // 10 requests
       },
     ]),
   ],
@@ -194,4 +161,4 @@ import { APP_GUARD } from '@nestjs/core';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

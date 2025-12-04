@@ -28,6 +28,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { RolesGuard } from '@/auth/guards/role.guard';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * @controller ReviewController
@@ -45,7 +46,7 @@ export class ReviewController {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /review
@@ -58,6 +59,7 @@ export class ReviewController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: '(User) Tạo một bài đánh giá mới' })
   @ApiResponse({ status: 201, description: 'Tạo đánh giá thành công.' })
   @ApiResponse({

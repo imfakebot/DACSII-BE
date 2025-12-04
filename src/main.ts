@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 /**
  * @async
@@ -10,11 +11,13 @@ import cookieParser from 'cookie-parser';
  */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(helmet());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      stopAtFirstError: true, // Nếu gặp 1 lỗi thì báo luôn, không cần check hết các trường khác
     }),
   );
 
@@ -49,11 +52,11 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
-    method: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    methods: ['GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS'],
   });
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 void bootstrap();

@@ -6,6 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 
 @Entity({ name: 'vouchers' })
@@ -60,6 +61,9 @@ export class Voucher {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deleteAt!: Date
 
   @OneToMany(() => Payment, (payment) => payment.voucher)
   payments!: Payment[];

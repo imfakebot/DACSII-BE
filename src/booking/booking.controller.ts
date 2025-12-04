@@ -30,6 +30,7 @@ import { FilterBookingDto } from './dto/filter-booking.dto';
 import { BookingStatus } from './enums/booking-status.enum';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * @controller BookingsController
@@ -47,7 +48,7 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /bookings
@@ -58,6 +59,7 @@ export class BookingController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Throttle({ default: { limit: 5, ttl: 60000 } },)
   @ApiOperation({
     summary: 'Tạo yêu cầu đặt sân mới (Kèm xử lý Voucher & VNPay)',
   })

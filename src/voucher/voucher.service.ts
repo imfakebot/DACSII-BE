@@ -18,7 +18,7 @@ export class VoucherService {
   constructor(
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
-  ) {}
+  ) { }
 
   /**
    * (Admin) Tạo một mã giảm giá mới.
@@ -105,4 +105,18 @@ export class VoucherService {
       message: 'Áp dụng mã giảm giá thành công',
     };
   }
+
+  async remove(id: string) {
+    // Kiểm tra tồn tại
+    const voucher = await this.voucherRepository.findOne({ where: { id } });
+    if (!voucher) {
+      throw new NotFoundException('Voucher không tồn tại.');
+    }
+
+    // Soft delete (TypeORM tự động set deletedAt = now())
+    await this.voucherRepository.softDelete(id);
+
+    return { message: 'Xóa voucher thành công.' };
+  }
 }
+

@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   HttpStatus,
+  BadRequestException
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -41,7 +42,7 @@ export class UsersController {
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
    */
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   /**
    * @route GET /users/me
@@ -100,8 +101,9 @@ export class UsersController {
     @User('id') accountId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    console.log(file);
     if (!file) {
-      throw new Error('Bạn phải cung cấp một file ảnh.');
+      throw new BadRequestException('Bạn phải cung cấp một file ảnh.');
     }
 
     // `file.path` sẽ là đường dẫn file trên server, ví dụ: "uploads/avatar-1678886400000-123456789.jpg"

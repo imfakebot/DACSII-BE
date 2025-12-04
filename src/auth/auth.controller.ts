@@ -50,7 +50,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -163,9 +163,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })},'${frontendURL}');
       window.close();
     </script>
     `;
@@ -301,6 +301,7 @@ export class AuthController {
    */
   @Post('login/complete')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'B2 Đăng nhập: Xác thực mã OTP, nhận tokens' })
   @ApiResponse({
     status: 200,

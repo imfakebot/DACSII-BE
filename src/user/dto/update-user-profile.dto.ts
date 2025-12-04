@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   MinLength,
   IsDateString,
 } from 'class-validator';
+import sanitizeHtml from 'sanitize-html';
 
 /**
  * @class UpdateUserProfileDto
@@ -68,5 +70,7 @@ export class UpdateUserProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(500, { message: 'Tiểu sử không được vượt quá 500 ký tự.' })
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  @Transform(({ value }) => sanitizeHtml(value))
   bio?: string;
 }

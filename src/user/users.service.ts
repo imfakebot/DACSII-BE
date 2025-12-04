@@ -9,10 +9,11 @@ import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
 import { Account } from './entities/account.entity';
 import { Role } from './entities/role.entity';
-import { Gender, UserProfile } from './entities/users-profile.entity';
+import {  UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
 import { AuthProvider } from './enum/auth-provider.enum';
+import { Gender } from './enum/gender.enum';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -39,6 +40,18 @@ type CreateOAuthUserPayload = {
 };
 
 /**
+ * Kiểu dữ liệu cho việc cập nhật tài khoản chưa xác thực,
+ * bao gồm cả dữ liệu cho hồ sơ người dùng.
+ */
+type UpdateUnverifiedAccountPayload = Partial<Account> & {
+  profile_data?: {
+    full_name?: string;
+    phone_number?: string;
+    gender?: Gender | null;
+  };
+};
+
+/**
  * UsersService chịu trách nhiệm xử lý logic nghiệp vụ liên quan đến người dùng,
  * bao gồm tạo, tìm kiếm, và quản lý tài khoản, hồ sơ người dùng.
  */
@@ -55,7 +68,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -153,14 +166,33 @@ export class UsersService {
   /**
    * Cập nhật thông tin cho một tài khoản chưa được xác thực.
    * Thường dùng để cập nhật mã xác thực mới và thời gian hết hạn.
+   * SỬA ĐỔI: Hàm này giờ đây chạy trong một transaction để cập nhật cả Account và UserProfile,
+   * giải quyết vấn đề số điện thoại bị "kẹt" khi người dùng đăng ký lại.
    * @param id ID của tài khoản cần cập nhật.
-   * @param data Dữ liệu cần cập nhật (một phần của đối tượng Account).
+   * @param data Dữ liệu cần cập nhật, có thể bao gồm cả `profile_data`.
    */
   async updateUnverifiedAccount(
     id: string,
-    data: Partial<Account>,
+    data: UpdateUnverifiedAccountPayload,
   ): Promise<void> {
-    await this.accountRepository.update(id, data);
+    const { profile_data, ...accountData } = data;
+
+    await this.accountRepository.manager.transaction(
+      async (transactionalEntityManager) => {
+        // Nếu có profile_data, tìm và cập nhật UserProfile
+        if (profile_data) {
+          const account = await transactionalEntityManager.findOne(Account, {
+            where: { id },
+            relations: ['userProfile'],
+          });
+          if (account && account.userProfile) {
+            await transactionalEntityManager.update(UserProfile, account.userProfile.id, profile_data);
+          }
+        }
+        // Cập nhật Account
+        await transactionalEntityManager.update(Account, id, accountData);
+      },
+    );
   }
 
   /**
@@ -369,6 +401,7 @@ export class UsersService {
       where: {
         phone_number: phone,
       },
+      relations: ['account'], // Tải kèm thông tin tài khoản để kiểm tra
     });
   }
 
@@ -383,6 +416,9 @@ export class UsersService {
     accountId: string,
     avatarPath: string,
   ): Promise<UserProfile> {
+    if (!avatarPath) {
+      throw new Error("Thiếu đường dẫn");
+    }
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
       relations: ['userProfile'],
@@ -435,5 +471,20 @@ export class UsersService {
     account.password_hash = await this.hashPassword(newPassword);
     await this.accountRepository.save(account);
     return { message: 'Đổi mật khẩu thành công.' };
+  }
+
+  /**
+   * Tìm một hồ sơ người dùng đã được xác thực bằng số điện thoại.
+   * @param phone Số điện thoại cần tìm.
+   * @returns Promise giải quyết thành đối tượng `UserProfile` nếu tìm thấy, ngược lại là `null`.
+   */
+  async findVerifiedProfileByPhoneNumber(phone: string): Promise<UserProfile | null> {
+    return this.userProfileRepository.findOne({
+      where: {
+        phone_number: phone,
+        account: { is_verified: true }, // Chỉ tìm các tài khoản đã xác thực
+      },
+      relations: ['account'], // Tải kèm thông tin tài khoản để kiểm tra
+    });
   }
 }

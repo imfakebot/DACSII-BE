@@ -51,7 +51,7 @@ export class FieldsService {
     private readonly fieldImageRepository: Repository<FieldImage>,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-  ) {}
+  ) { }
 
   /**
    * @method create
@@ -154,7 +154,7 @@ export class FieldsService {
         }
       } catch (error) {
         this.logger.error(
-          `Error calling Google Geocoding API for query: "${query}"`,
+          `Error calling  Geocoding API for query: "${query}"`,
           error,
         );
       }

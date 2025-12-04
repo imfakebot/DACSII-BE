@@ -1,18 +1,18 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, LessThan, MoreThan, Not, Repository } from 'typeorm';
 import { Booking } from './entities/booking.entity';
 import { Field } from '../field/entities/field.entity';
 import { PricingService } from '@/pricing/pricing.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from './enums/booking-status.enum';
-import { Role } from '@/auth/enums/role.enum';
 import { Voucher } from '@/voucher/entities/voucher.entity';
 import { Payment } from '@/payment/entities/payment.entity';
 import { PaymentService } from '@/payment/payment.service';
@@ -21,6 +21,7 @@ import { PaymentStatus } from '@/payment/enums/payment-status.enum';
 import { FilterBookingDto } from './dto/filter-booking.dto';
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { UsersService } from '@/user/users.service';
+import { Role } from '@/auth/enums/role.enum';
 
 /**
  * @class BookingService
@@ -42,7 +43,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * Tạo một đơn đặt sân mới.
@@ -54,109 +55,99 @@ export class BookingService {
    * @throws {NotFoundException} Nếu mã giảm giá không tồn tại.
    * @throws {BadRequestException} Nếu mã giảm giá không hợp lệ hoặc không đáp ứng điều kiện.
    */
-  async createBooking(
-    createBookingDto: CreateBookingDto,
-    userProfile: UserProfile,
-  ) {
-    // Transaction: Bắt đầu phiên làm việc
+  async createBooking(createBookingDto: CreateBookingDto, userProfile: UserProfile) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 1. TÁI SỬ DỤNG LOGIC KIỂM TRA & TÍNH GIÁ
-      // Bước này cực quan trọng: Nó đảm bảo giá đúng và sân chưa bị ai cướp
-      // Nếu sân đã bị đặt, hàm này sẽ ném lỗi ConflictException ngay lập tức.
-      const pricingResult = await this.pricingService.checkPriceAndAvailability(
-        {
-          fieldId: createBookingDto.fieldId,
-          startTime: createBookingDto.startTime,
-          durationMinutes: createBookingDto.durationMinutes,
-        },
-      );
-
-      // 2. Chuẩn bị dữ liệu để lưu
-      // pricingResult trả về booking_details dạng chuỗi, cần tính lại Date object để lưu DB
+      // --- 1. TÍNH TOÁN THỜI GIAN ---
       const start = new Date(createBookingDto.startTime);
-      const end = new Date(
-        start.getTime() + createBookingDto.durationMinutes * 60000,
-      );
+      const end = new Date(start.getTime() + createBookingDto.durationMinutes * 60000);
+
+      // --- 2. [FIX RACE CONDITION 1] KIỂM TRA SÂN & KHÓA DÒNG DỮ LIỆU ---
+      // Thay vì tin tưởng pricingService, ta tự kiểm tra lại trong Transaction với khóa 'pessimistic_write'
+
+      // Tìm xem có đơn nào đang trùng giờ không
+      const overlappingBooking = await queryRunner.manager.findOne(Booking, {
+        where: {
+          field: { id: createBookingDto.fieldId },
+          status: Not(BookingStatus.CANCELLED), // Chỉ tính các đơn chưa hủy
+          // Logic trùng giờ: (StartA < EndB) && (EndA > StartB)
+          start_time: LessThan(end),
+          end_time: MoreThan(start),
+        },
+        lock: { mode: 'pessimistic_write' }, // 👈 QUAN TRỌNG: Khóa lại ngay khi đọc!
+      });
+
+      if (overlappingBooking) {
+        throw new ConflictException('Sân đã bị người khác đặt trong khung giờ này (hoặc đang thanh toán)!');
+      }
+
+      // --- 3. GỌI SERVICE TÍNH GIÁ ---
+      // Lúc này sân đã an toàn, ta gọi service để lấy giá tiền chuẩn
+      const pricingResult = await this.pricingService.checkPriceAndAvailability({
+        fieldId: createBookingDto.fieldId,
+        startTime: createBookingDto.startTime,
+        durationMinutes: createBookingDto.durationMinutes,
+      });
+
       const originalPrice = pricingResult.pricing.total_price;
       let finalPrice = originalPrice;
       let appliedVoucher: Voucher | null = null;
 
-      // Xử lí voucher
+      // --- 4. [FIX RACE CONDITION 2] XỬ LÝ VOUCHER ---
       if (createBookingDto.voucherCode) {
         const voucher = await queryRunner.manager.findOne(Voucher, {
           where: { code: createBookingDto.voucherCode },
+          lock: { mode: 'pessimistic_write' }, //  QUAN TRỌNG: Khóa Voucher để tránh 2 người cùng dùng cái cuối cùng
         });
 
-        // Validate voucher
-        if (!voucher) {
-          throw new NotFoundException('Mã giảm giá không tồn tại');
-        }
-        if (voucher.quantity <= 0) {
-          throw new BadRequestException('Mã giảm giá đã hết');
-        }
-        if (new Date() > voucher.validTo) {
-          throw new BadRequestException('Mã giảm giá đã hết hạn');
-        }
-        if (new Date() < voucher.validFrom) {
-          throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
-        }
+        // Validate Voucher
+        if (!voucher) throw new NotFoundException('Mã giảm giá không tồn tại');
+        if (voucher.quantity <= 0) throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
+
+        const now = new Date();
+        if (now > voucher.validTo) throw new BadRequestException('Mã giảm giá đã hết hạn');
+        if (now < voucher.validFrom) throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
         if (originalPrice < Number(voucher.minOrderValue)) {
-          throw new BadRequestException(
-            `Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ để áp dụng`,
-          );
+          throw new BadRequestException(`Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ`);
         }
 
-        //Tính giảm giá
+        // Tính toán giảm giá
         let discountAmount = 0;
         if (voucher.discountAmount) {
           discountAmount = Number(voucher.discountAmount);
         } else if (voucher.discountPercentage) {
           discountAmount = originalPrice * (voucher.discountPercentage / 100);
-          if (
-            voucher.maxDiscountAmount &&
-            discountAmount > Number(voucher.maxDiscountAmount)
-          ) {
+          if (voucher.maxDiscountAmount && discountAmount > Number(voucher.maxDiscountAmount)) {
             discountAmount = Number(voucher.maxDiscountAmount);
           }
         }
 
-        finalPrice = originalPrice - discountAmount;
-        if (finalPrice < 0) {
-          finalPrice = 0;
-        }
-
+        finalPrice = Math.max(0, originalPrice - discountAmount);
         appliedVoucher = voucher;
 
-        await queryRunner.manager.decrement(
-          Voucher,
-          { id: voucher.id },
-          'quantity',
-          1,
-        );
+        // Trừ số lượng (Vì đã lock nên đoạn này an toàn tuyệt đối)
+        await queryRunner.manager.decrement(Voucher, { id: voucher.id }, 'quantity', 1);
       }
 
-      // 3. Tạo Booking Entity
+      // --- 5. LƯU BOOKING & PAYMENT ---
       const newBooking = queryRunner.manager.create(Booking, {
         start_time: start,
         end_time: end,
-        total_price: pricingResult.pricing.total_price, // Lấy giá đã tính từ PricingService
-        status: BookingStatus.PENDING, // Mặc định là chờ thanh toán/xác nhận
-        bookingDate: new Date(), // Ngày thực hiện đặt đơn
-        userProfile: userProfile, // Người đặt
-        field: { id: createBookingDto.fieldId } as Field, // Sân bóng
+        total_price: originalPrice, // Giá gốc
+        status: BookingStatus.PENDING,
+        bookingDate: new Date(),
+        userProfile: userProfile,
+        field: { id: createBookingDto.fieldId } as Field,
       });
-      // 4. Lưu vào CSDL
-      const savedBooking = await queryRunner.manager.save(Booking, newBooking);
 
-      // 5. Tạo Payment Record (Pending)
+      const savedBooking = await queryRunner.manager.save(Booking, newBooking);
 
       const newPayment = queryRunner.manager.create(Payment, {
         amount: originalPrice,
-        finalAmount: finalPrice,
+        finalAmount: finalPrice, // Giá sau giảm
         paymentMethod: PaymentMethod.VNPAY,
         status: PaymentStatus.PENDING,
         booking: savedBooking,
@@ -166,13 +157,14 @@ export class BookingService {
 
       await queryRunner.manager.save(Payment, newPayment);
 
-      // 6. Commit transaction
+      // --- 6. COMMIT ---
       await queryRunner.commitTransaction();
 
+      // Tạo URL thanh toán (Làm ngoài transaction cho nhanh cũng được, hoặc trong cũng ok)
       const paymentUrl = this.paymentService.createVnPayUrl(
         finalPrice,
         savedBooking.id,
-        '127.0.0.1',
+        '127.0.0.1', // Nên lấy IP thật từ request nếu có thể
       );
 
       return {
@@ -181,11 +173,13 @@ export class BookingService {
         finalAmount: finalPrice,
         message: 'Đặt sân thành công, vui lòng thanh toán.',
       };
+
     } catch (error) {
-      // Nếu có lỗi, rollback toàn bộ (không tạo booking, không trừ voucher)
+      // Rollback nếu có bất kỳ lỗi nào (kể cả lỗi Conflict ở bước 2)
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
+      // Giải phóng kết nối
       await queryRunner.release();
     }
   }

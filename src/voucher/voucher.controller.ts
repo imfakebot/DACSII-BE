@@ -3,10 +3,13 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Query,
   UseGuards,
   ParseFloatPipe,
   HttpStatus,
+  Param,
+  ParseUUIDPipe
 } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -29,7 +32,7 @@ import { Role } from '@/auth/enums/role.enum';
 @ApiTags('Vouchers (Mã giảm giá)')
 @Controller('voucher')
 export class VoucherController {
-  constructor(private readonly voucherService: VoucherService) {}
+  constructor(private readonly voucherService: VoucherService) { }
 
   /**
    * (Admin) Endpoint để tạo một voucher mới.
@@ -101,5 +104,15 @@ export class VoucherController {
     @Query('orderValue', ParseFloatPipe) orderValue: number,
   ): Promise<object> {
     return this.voucherService.checkVoucher(code, Number(orderValue));
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: '(Admin) Xóa mã giảm giá' })
+  @ApiResponse({ status: 200, description: 'Xóa thành công.' })
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.voucherService.remove(id);
   }
 }

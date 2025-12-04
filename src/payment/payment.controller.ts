@@ -22,6 +22,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 
 /**
  * @controller PaymentController
@@ -39,7 +40,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly bookingService: BookingService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /payment/create_payment_url
@@ -53,6 +54,7 @@ export class PaymentController {
    */
   @Post('create_payment_url')
   @ApiOperation({ summary: 'Tạo URL thanh toán VNPAY cho một đơn đặt sân' })
+  @SkipThrottle()
   @ApiBody({
     schema: { properties: { bookingId: { type: 'string', format: 'uuid' } } },
   })
@@ -119,6 +121,7 @@ export class PaymentController {
    */
   @Get('vnpay_return')
   @ApiOperation({ summary: '(VNPAY) Xử lý URL trả về cho phía Client' })
+  @SkipThrottle()
   @ApiResponse({
     status: 200,
     description: 'Giao dịch thành công (phía client).',

@@ -15,10 +15,10 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { Account } from '@/user/entities/account.entity';
 import { StringValue } from 'ms';
-import { Gender } from '@/user/entities/users-profile.entity';
 import { AccountStatus } from '@/user/enum/account-status.enum';
 import { AuthProvider } from '@/user/enum/auth-provider.enum';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
+import { Gender } from '@/user/enum/gender.enum';
 
 interface JwtPayload {
   email: string;
@@ -46,7 +46,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @method initiateRegistration
@@ -61,11 +61,33 @@ export class AuthService {
   ): Promise<{ message: string }> {
     const { email, full_name, password, phone_number, gender } = registerDto;
     const existingAccount = await this.userService.findAccountByEmail(email);
+
+    // 1. Kiểm tra xem email đã được xác thực chưa
     if (existingAccount && existingAccount.is_verified) {
       throw new ConflictException('Email này đã được sử dụng.');
     }
 
+    // 2. Kiểm tra xem SĐT đã tồn tại hay chưa.
+    const profileWithPhone =
+      await this.userService.findProfileByPhoneNumber(phone_number);
+
+    // Nếu SĐT đã tồn tại, kiểm tra các trường hợp xung đột:
+    if (
+      profileWithPhone &&
+      // TH1: Tài khoản của SĐT đó đã được xác thực.
+      (profileWithPhone.account.is_verified === true ||
+        // TH2: SĐT thuộc về một tài khoản chưa xác thực KHÁC.
+        // (Cho phép ghi đè nếu SĐT thuộc về chính tài khoản email đang đăng ký lại).
+        (!existingAccount || profileWithPhone.account.id !== existingAccount.id))
+    ) {
+      throw new ConflictException(
+        'Số điện thoại này đã được sử dụng.',
+      );
+    }
+
+    // 3. Nếu tất cả kiểm tra đều qua, tiến hành tạo/cập nhật
     const verificationCode = randomBytes(3).toString('hex').toUpperCase();
+    console.log(verificationCode);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
     const passwordHash = await this.userService.hashPassword(password);
 
@@ -74,6 +96,12 @@ export class AuthService {
         password_hash: passwordHash,
         verification_code: verificationCode,
         verification_code_expires_at: expiresAt,
+        // Gửi dữ liệu profile mới để cập nhật, giải quyết lỗi SĐT bị "kẹt"
+        profile_data: {
+          full_name: full_name,
+          phone_number: phone_number,
+          gender: (gender as Gender) || null,
+        },
       });
     } else {
       await this.userService.createUnverifiedUser({
@@ -242,10 +270,10 @@ export class AuthService {
             : String(user.role),
         is_profile_complete:
           user.userProfile &&
-          typeof user.userProfile === 'object' &&
-          'is_profile_complete' in user.userProfile
+            typeof user.userProfile === 'object' &&
+            'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-                .is_profile_complete ?? false)
+              .is_profile_complete ?? false)
             : false,
       },
     };
@@ -491,6 +519,7 @@ export class AuthService {
 
     // 2. Tạo và lưu mã OTP (tái sử dụng logic của register)
     const verificationCode = randomBytes(3).toString('hex').toUpperCase();
+    console.log(verificationCode);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Mã OTP có hạn 10 phút
 
     await this.userService.updateAccount(account.id, {

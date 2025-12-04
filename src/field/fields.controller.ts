@@ -15,6 +15,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   Query,
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -125,6 +126,7 @@ export class FieldsController {
   @Get()
   @SkipThrottle()
   @ApiOperation({ summary: 'Tìm kiếm sân bóng(Hỗ trợ tìm theo vị trí)' })
+  @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query() filterDto: FilterFieldDto) {
     return this.fieldsService.findAll(filterDto);
   }
