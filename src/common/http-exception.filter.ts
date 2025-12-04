@@ -18,36 +18,38 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const request = ctx.getRequest<Request>();
 
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
-        let message: string | object = 'Internal server error';
+        let responseMessage: string | string[] = 'Internal server error';
 
-        // 1. Nếu là lỗi HTTP do mình chủ động ném ra (BadRequest, Forbidden...)
+        // 1. Xử lý các lỗi HTTP đã được định nghĩa (BadRequest, NotFound, v.v.)
         if (exception instanceof HttpException) {
             status = exception.getStatus();
-            message = exception.getResponse();
+            const responseBody = exception.getResponse();
+
+            // Trích xuất message từ response body một cách an toàn
+            if (typeof responseBody === 'object' && responseBody !== null && 'message' in responseBody) {
+                responseMessage = (responseBody as { message: string | string[] }).message;
+            } else if (typeof responseBody === 'string') {
+                responseMessage = responseBody;
+            }
         }
-        // 2. Nếu là lỗi hệ thống (như cái ENOENT bạn vừa gặp, hoặc lỗi DB)
+        // 2. Xử lý các lỗi hệ thống (Error) chưa được lường trước
         else if (exception instanceof Error) {
-            // Log lỗi ra console server để Dev sửa (nhưng KHÔNG trả về client)
             this.logger.error(`System Error: ${exception.message}`, exception.stack);
 
-            // Xử lý riêng cái lỗi ENOENT (File not found) cho nó thân thiện
+            // Xử lý riêng cho lỗi không tìm thấy file (ENOENT) để trả về 404
+            // Đây là cách an toàn để chống path disclosure thay vì kiểm tra chuỗi.
             if ('code' in exception && exception.code === 'ENOENT') {
                 status = HttpStatus.NOT_FOUND;
-                message = 'File not found'; // Trả về câu này thay vì đường dẫn D:\...
+                responseMessage = 'File not found';
+            } else {
+                // Đối với tất cả các lỗi hệ thống khác, luôn trả về thông báo chung
+                // để tránh rò rỉ chi tiết lỗi.
+                status = HttpStatus.INTERNAL_SERVER_ERROR;
+                responseMessage = 'Internal server error';
             }
         }
 
-        // Chuẩn hóa message trả về
-        let responseMessage: string | string[];
-        if (typeof message === 'object' && message !== null && 'message' in message) {
-            responseMessage = (message as { message: string | string[] }).message;
-        } else if (typeof message === 'string') {
-            responseMessage = message;
-        } else {
-            responseMessage = 'Internal server error';
-        }
-
-        // 3. Chuẩn hóa format trả về (Luôn sạch sẽ)
+        // 3. Trả về response đã được chuẩn hóa
         response.status(status).json({
             statusCode: status,
             message: responseMessage,

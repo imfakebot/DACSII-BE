@@ -1,98 +1,137 @@
+# Backend - API Đặt Sân Bóng (DACS II)
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+<p align="center">
+  Backend API được xây dựng bằng <a href="http://nestjs.com/" target="blank">NestJS</a> cho dự án ứng dụng đặt sân bóng đá.
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+## 📜 Giới thiệu
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Đây là mã nguồn backend cho dự án Đồ án cơ sở ngành 2 (DACS II). Hệ thống cung cấp các API cần thiết để quản lý người dùng, sân bóng, lịch đặt, thanh toán, và nhiều tính năng khác.
 
-## Project setup
+## ✨ Tính năng nổi bật
+
+- **Quản lý người dùng & Xác thực:** Đăng ký, đăng nhập (Email/Password, Google), quản lý hồ sơ, phân quyền.
+- **Quản lý sân bóng:** Tạo, xem, cập nhật, xóa thông tin sân, tìm kiếm sân theo vị trí, thời gian.
+- **Đặt sân (Booking):** Xử lý logic đặt sân theo khung giờ, đảm bảo không bị trùng lặp (sử dụng transaction và locking).
+- **Thanh toán:** Tích hợp cổng thanh toán VNPay để xử lý giao dịch.
+- **Quản lý Voucher:** Tạo và áp dụng mã giảm giá.
+- **Đánh giá & Phản hồi:** Người dùng có thể đánh giá sân bóng và gửi phản hồi.
+- **Thông báo:** Hệ thống thông báo real-time qua WebSocket (Socket.IO).
+- **Bảo mật:** Tích hợp `helmet`, `rate-limiting` (throttler), và `CORS` để tăng cường bảo mật.
+
+## 🚀 Công nghệ sử dụng
+
+## 🛡️ Bảo mật
+
+Hệ thống được xây dựng với nhiều lớp bảo vệ để đảm bảo an toàn dữ liệu và chống lại các hình thức tấn công phổ biến:
+
+-   **HTTP Headers với `helmet`**: Tự động thiết lập các HTTP header bảo mật (như `X-Content-Type-Options`, `Strict-Transport-Security`, `X-Frame-Options`) để bảo vệ ứng dụng khỏi các lỗ hổng như Clickjacking và XSS.
+-   **CORS (Cross-Origin Resource Sharing)**: Cấu hình chặt chẽ để chỉ cho phép các yêu cầu từ địa chỉ frontend (`FRONTEND_URL`), ngăn chặn các trang web không mong muốn truy cập tài nguyên.
+-   **Rate Limiting (Giới hạn yêu cầu)**: Sử dụng `@nestjs/throttler` để chống lại các cuộc tấn công brute-force vào các endpoint nhạy cảm như đăng nhập và đặt sân.
+-   **Validation Pipes**: Mọi dữ liệu đầu vào từ client đều được xác thực (`whitelist: true`, `forbidNonWhitelisted: true`), đảm bảo chỉ các dữ liệu hợp lệ mới được xử lý và ngăn chặn các payload độc hại.
+-   **Global Exception Filter**: Một bộ lọc lỗi toàn cục được áp dụng để bắt tất cả các lỗi, ngăn chặn việc rò rỉ thông tin nhạy cảm (như stack trace, đường dẫn file) ra phía client.
+-   **Data Serialization**: Sử dụng `ClassSerializerInterceptor` và decorator `@Exclude` để đảm bảo các thông tin nhạy cảm (ví dụ: `password_hash`, `phone_number`) không bao giờ bị lộ trong các phản hồi API.
+
+## 🚀 Công nghệ sử dụng
+
+- **Framework:** NestJS
+- **Ngôn ngữ:** TypeScript
+- **Cơ sở dữ liệu:** PostgreSQL (quản lý qua TypeORM)
+- **Xác thực:** JWT (Access & Refresh Tokens), OAuth 2.0 (Google)
+- **Thanh toán:** VNPay
+- **Real-time:** WebSocket (Socket.IO)
+- **API Documentation:** Swagger
+- **Validation:** `class-validator`, `class-transformer`
+
+## ⚙️ Cài đặt và Chạy dự án
+
+### 1. Yêu cầu
+
+- Node.js (v18.x trở lên)
+- npm hoặc yarn
+- Một instance Mysql đang chạy
+
+### 2. Cài đặt
 
 ```bash
-$ npm install
+# Clone repository
+git clone <your-repository-url>
+cd backend
+
+# Cài đặt các dependencies
+npm install
 ```
 
-## Compile and run the project
+### 3. Cấu hình biến môi trường
+
+Tạo một file `.env` ở thư mục gốc của backend và sao chép nội dung từ file `.env.example` (nếu có) hoặc sử dụng mẫu dưới đây.
+
+```env
+# Application
+PORT=3001
+FRONTEND_URL=http://localhost:3000
+
+# Database (PostgreSQL)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=your_db_password
+DB_DATABASE=your_db_name
+
+# JWT Secrets
+ACCESS_TOKEN_SECRET=your_access_token_secret
+REFRESH_TOKEN_SECRET=your_refresh_token_secret
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
+
+# Google OAuth 2.0
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/google/callback
+
+# VNPay
+VNP_TMNCODE=your_tmn_code
+VNP_HASHSECRET=your_hash_secret
+VNP_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+VNP_RETURNURL=http://localhost:3001/api/v1/payments/vnpay-return
+
+# Mailer (Sử dụng cho việc gửi OTP, thông báo)
+MAIL_HOST=smtp.gmail.com
+MAIL_USER=your_email@gmail.com
+MAIL_PASS=your_app_password # Mật khẩu ứng dụng của Gmail
+MAIL_FROM="Your App Name" <no-reply@yourapp.com>
+```
+
+### 4. Chạy ứng dụng
 
 ```bash
-# development
-$ npm run start
+# Chế độ development (với hot-reload)
+npm run start:dev
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# Chế độ production
+npm run build
+npm run start:prod
 ```
 
-## Run tests
+## 📚 API Documentation
+
+Sau khi khởi động server, truy cập vào đường dẫn sau để xem tài liệu API được tạo bởi Swagger:
+
+**http://localhost:3001/api-doc**
+
+## 🧪 Chạy Tests
 
 ```bash
-# unit tests
-$ npm run test
+# Unit tests
+npm run test
 
-# e2e tests
-$ npm run test:e2e
+# End-to-end tests
+npm run test:e2e
 
-# test coverage
-$ npm run test:cov
+# Test coverage
+npm run test:cov
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

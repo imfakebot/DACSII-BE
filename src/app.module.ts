@@ -22,6 +22,7 @@ import { EventModule } from './event/event.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
+import { Response } from 'express';
 
 /**
  * @module AppModule
@@ -82,6 +83,19 @@ import { join } from 'path';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
+      serveStaticOptions: {
+        // 1. [FIX ENOENT/PATH DISCLOSURE] Tắt chế độ tìm kiếm file mặc định khi truy cập thư mục
+        index: false,
+        // 2. [CHỐNG XSS/MIME SNIFFING] Ép trình duyệt tuân thủ Content-Type và cách hiển thị file
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        setHeaders: (res: Response, path: string) => {
+          // Ngăn chặn trình duyệt đoán loại file (MIME Sniffing)
+          res.setHeader('X-Content-Type-Options', 'nosniff');
+          // Gợi ý trình duyệt hiển thị file trực tiếp thay vì luôn tải xuống
+          res.setHeader('Content-Disposition', 'inline');
+        },
+        fallthrough: true,
+      },
     }),
 
     /**
