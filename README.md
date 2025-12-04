@@ -23,7 +23,6 @@
 - **Thông báo:** Hệ thống thông báo real-time qua WebSocket (Socket.IO).
 - **Bảo mật:** Tích hợp `helmet`, `rate-limiting` (throttler), và `CORS` để tăng cường bảo mật.
 
-## 🚀 Công nghệ sử dụng
 
 ## 🛡️ Bảo mật
 
@@ -73,7 +72,7 @@ Tạo một file `.env` ở thư mục gốc của backend và sao chép nội d
 ```env
 # Application
 PORT=3001
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:4200
 
 # Database (PostgreSQL)
 DB_HOST=localhost
@@ -97,7 +96,7 @@ GOOGLE_CALLBACK_URL=http://localhost:3001/api/v1/auth/google/callback
 VNP_TMNCODE=your_tmn_code
 VNP_HASHSECRET=your_hash_secret
 VNP_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-VNP_RETURNURL=http://localhost:3001/api/v1/payments/vnpay-return
+VNP_RETURNURL=http://localhost:3000/api/v1/payments/vnpay-return
 
 # Mailer (Sử dụng cho việc gửi OTP, thông báo)
 MAIL_HOST=smtp.gmail.com
@@ -121,7 +120,7 @@ npm run start:prod
 
 Sau khi khởi động server, truy cập vào đường dẫn sau để xem tài liệu API được tạo bởi Swagger:
 
-**http://localhost:3001/api-doc**
+**http://localhost:3000/api-doc**
 
 ## 🧪 Chạy Tests
 
