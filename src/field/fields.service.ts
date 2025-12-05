@@ -17,10 +17,21 @@ import { ConfigService } from '@nestjs/config';
 import { Branch } from '@/branch/entities/branch.entity';
 import { UserProfile } from '../user/entities/users-profile.entity';
 
+/**
+ * @class FieldsService
+ * @description Service xử lý logic nghiệp vụ liên quan đến sân bóng.
+ */
 @Injectable()
 export class FieldsService {
   private readonly logger = new Logger(FieldsService.name);
 
+  /**
+   * @constructor
+   * @param {Repository<Field>} fieldRepository - Repository cho thực thể Field.
+   * @param {Repository<FieldImage>} fieldImageRepository - Repository cho thực thể FieldImage.
+   * @param {Repository<Branch>} branchRepository - Repository cho thực thể Branch.
+   * @param {ConfigService} configService - Service để truy cập biến môi trường.
+   */
   constructor(
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
@@ -33,7 +44,10 @@ export class FieldsService {
 
   /**
    * @method create
-   * @description Tạo sân bóng mới thuộc về một Chi nhánh cụ thể.
+   * @description Tạo sân bóng mới thuộc về một chi nhánh cụ thể.
+   * @param {CreateFieldDto} createFieldDto - DTO chứa thông tin để tạo sân.
+   * @param {UserProfile} userProfile - Hồ sơ người dùng của người tạo (để kiểm tra quyền).
+   * @returns {Promise<Field>} - Sân bóng vừa được tạo.
    */
   async create(
     createFieldDto: CreateFieldDto,
@@ -41,11 +55,8 @@ export class FieldsService {
   ): Promise<Field> {
     const { branchId, fieldTypeId, ...fieldData } = createFieldDto;
 
-    // 1. Kiểm tra Chi nhánh có tồn tại không
     const branch: Branch | null = await this.branchRepository.findOne({
-      where: {
-        id: branchId,
-      },
+      where: { id: branchId },
       relations: ['manager'],
     });
 
@@ -55,7 +66,6 @@ export class FieldsService {
       );
     }
 
-    // 2. (Optional) Kiểm tra quyền: Chỉ Manager của chi nhánh này (hoặc Admin) mới được thêm sân
     if (
       branch.manager.id !== userProfile.id &&
       userProfile.role !== 'super_admin'
@@ -65,7 +75,6 @@ export class FieldsService {
       );
     }
 
-    // 3. Tạo sân mới
     const newField = this.fieldRepository.create({
       ...fieldData,
       branch: branch,
@@ -77,7 +86,10 @@ export class FieldsService {
 
   /**
    * @method findAll
-   * @description Tìm kiếm sân bóng (Hỗ trợ lọc theo Chi nhánh, Vị trí).
+   * @description Tìm kiếm và lọc danh sách các sân bóng.
+   * Hỗ trợ lọc theo tên, chi nhánh, loại sân, thành phố và tìm kiếm theo vị trí địa lý.
+   * @param {FilterFieldDto} filterDto - DTO chứa các tham số lọc.
+   * @returns {Promise<Field[]>} - Danh sách các sân bóng phù hợp.
    */
   async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
     const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } =
@@ -85,36 +97,28 @@ export class FieldsService {
 
     const query = this.fieldRepository.createQueryBuilder('field');
 
-    // Join các bảng liên quan
     query
       .leftJoinAndSelect('field.fieldType', 'fieldType')
       .leftJoinAndSelect('field.images', 'images')
-      .leftJoinAndSelect('field.branch', 'branch') // Join với Chi nhánh
-      .leftJoinAndSelect('branch.address', 'address') // Lấy địa chỉ từ Chi nhánh
+      .leftJoinAndSelect('field.branch', 'branch')
+      .leftJoinAndSelect('branch.address', 'address')
       .leftJoinAndSelect('address.ward', 'ward')
       .leftJoinAndSelect('address.city', 'city');
-
-    // --- CÁC ĐIỀU KIỆN LỌC ---
 
     if (branchId) {
       query.andWhere('branch.id = :branchId', { branchId });
     }
-
     if (name) {
       query.andWhere('field.name ILIKE :name', { name: `%${name}%` });
     }
-
     if (fieldTypeId) {
       query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });
     }
-
     if (cityId) {
       query.andWhere('city.id = :cityId', { cityId });
     }
 
-    // --- TÍNH KHOẢNG CÁCH (HAVERSINE) ---
     if (latitude && longitude) {
-      // Lưu ý: Tính khoảng cách tới branch.address (vì sân không có địa chỉ riêng nữa)
       query
         .addSelect(
           `(6371 * acos(
@@ -148,6 +152,13 @@ export class FieldsService {
     return query.getMany();
   }
 
+  /**
+   * @method findOne
+   * @description Tìm thông tin chi tiết của một sân bóng bằng ID.
+   * @param {string} id - ID của sân bóng.
+   * @returns {Promise<Field>} - Thông tin chi tiết của sân bóng.
+   * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
+   */
   async findOne(id: string): Promise<Field> {
     const field = await this.fieldRepository.findOne({
       where: { id },
@@ -155,9 +166,9 @@ export class FieldsService {
         'fieldType',
         'images',
         'utilities',
-        'branch', // Lấy thông tin chi nhánh
-        'branch.address', // Lấy địa chỉ chi nhánh
-        'branch.manager', // Lấy người quản lý
+        'branch',
+        'branch.address',
+        'branch.manager',
       ],
     });
 
@@ -165,30 +176,41 @@ export class FieldsService {
     return field;
   }
 
+  /**
+   * @method update
+   * @description Cập nhật thông tin của một sân bóng.
+   * @param {string} id - ID của sân bóng cần cập nhật.
+   * @param {UpdateFieldDto} updateFieldDto - DTO chứa thông tin cập nhật.
+   * @returns {Promise<Field>} - Sân bóng sau khi đã được cập nhật.
+   */
   async update(id: string, updateFieldDto: UpdateFieldDto): Promise<Field> {
     const field = await this.findOne(id);
     const { branchId, fieldTypeId, ...fieldData } = updateFieldDto;
 
-    // Cập nhật thông tin cơ bản
     this.fieldRepository.merge(field, fieldData);
 
-    // Cập nhật loại sân
     if (fieldTypeId) {
       field.fieldType = { id: fieldTypeId } as FieldType;
     }
 
-    // Cập nhật chi nhánh (Chuyển sân sang cơ sở khác)
     if (branchId) {
       const branch: Branch | null = await this.branchRepository.findOneBy({
         id: branchId,
       });
       if (!branch) throw new BadRequestException('Chi nhánh mới không tồn tại');
-      field.branch = branch; // Safe assignment: branch is guaranteed to be a Branch object here.
+      field.branch = branch;
     }
 
     return this.fieldRepository.save(field);
   }
 
+  /**
+   * @method remove
+   * @description Xóa mềm một sân bóng.
+   * @param {string} id - ID của sân bóng cần xóa.
+   * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa thành công.
+   * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
+   */
   async remove(id: string): Promise<{ message: string }> {
     const result = await this.fieldRepository.softDelete(id);
     if (result.affected === 0) {
@@ -197,6 +219,13 @@ export class FieldsService {
     return { message: 'Đã xóa sân bóng thành công' };
   }
 
+  /**
+   * @method addImagesToField
+   * @description Thêm một hoặc nhiều hình ảnh cho một sân bóng.
+   * @param {string} fieldID - ID của sân bóng.
+   * @param {Array<Express.Multer.File>} files - Mảng các file ảnh được tải lên.
+   * @returns {Promise<FieldImage[]>} - Mảng các đối tượng hình ảnh vừa được lưu.
+   */
   async addImagesToField(
     fieldID: string,
     files: Array<Express.Multer.File>,
@@ -215,7 +244,4 @@ export class FieldsService {
 
     return this.fieldImageRepository.save(images);
   }
-
-  // Hàm Geocoding đã chuyển sang BranchService, không cần ở đây nữa
-  // Vì địa chỉ gắn với Branch, không phải Field.
 }

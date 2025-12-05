@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional } from 'class-validator';
 
+/**
+ * @class VnpayReturnDto
+ * @description DTO để nhận và xác thực dữ liệu từ VNPAY trả về qua URL của client.
+ */
 export class VnpayReturnDto {
   @ApiProperty({
     description: 'Số tiền thanh toán (đơn vị: VNĐ * 100)',

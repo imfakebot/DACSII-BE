@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * @class PaymentResponseDto
+ * @description DTO cho phản hồi sau khi xử lý một giao dịch thanh toán.
+ */
 export class PaymentResponseDto {
   @ApiProperty({ description: 'Trạng thái thành công', example: true })
   isSuccess!: boolean;

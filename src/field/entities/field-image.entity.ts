@@ -1,5 +1,6 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { Field } from './field.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * @entity FieldImage
@@ -11,12 +12,20 @@ export class FieldImage {
   /**
    * @property {string} id - ID duy nhất của hình ảnh (UUID).
    */
+  @ApiProperty({
+    description: 'ID duy nhất của hình ảnh',
+    format: 'uuid',
+  })
   @Column({ type: 'varchar', length: 36, primary: true })
   id!: string;
 
   /**
    * @property {string} image_url - URL dẫn đến tệp hình ảnh.
    */
+  @ApiProperty({
+    description: 'URL dẫn đến tệp hình ảnh',
+    example: 'https://example.com/images/field1.jpg',
+  })
   @Column({ type: 'text' })
   image_url!: string;
 
@@ -24,6 +33,10 @@ export class FieldImage {
    * @property {boolean} isCover - Cờ cho biết đây có phải là ảnh bìa (ảnh đại diện) của sân bóng hay không.
    * Mặc định là `false`.
    */
+  @ApiProperty({
+    description: 'Là ảnh bìa (ảnh đại diện) của sân bóng?',
+    default: false,
+  })
   @Column({ name: 'is_cover', type: 'boolean', default: false })
   isCover!: boolean;
 

@@ -6,6 +6,11 @@ import { Feedback } from './entities/feedback.entity';
 import { FeedbackResponse } from './entities/feedback-response.entity';
 import { UsersModule } from '@/user/users.module';
 
+/**
+ * @module FeedbacksModule
+ * @description Module quản lý các chức năng liên quan đến feedback và hỗ trợ khách hàng.
+ * Bao gồm controller, service và các entity cho feedback và các phản hồi.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Feedback, FeedbackResponse]),

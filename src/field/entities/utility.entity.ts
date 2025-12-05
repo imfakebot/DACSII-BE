@@ -1,5 +1,6 @@
 import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Field } from './field.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * @entity Utility
@@ -10,6 +11,7 @@ export class Utility {
   /**
    * @property {number} id - ID duy nhất của tiện ích (số tự tăng).
    */
+  @ApiProperty({ description: 'ID duy nhất của tiện ích', example: 1 })
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -17,6 +19,7 @@ export class Utility {
    * @property {string} name - Tên của tiện ích.
    * @description Tên này là duy nhất (unique) trong toàn hệ thống.
    */
+  @ApiProperty({ description: 'Tên của tiện ích', example: 'Wi-Fi miễn phí' })
   @Column({ type: 'varchar', length: 100, unique: true })
   name!: string;
 
@@ -24,6 +27,11 @@ export class Utility {
    * @property {string} iconUrl - URL đến icon đại diện cho tiện ích.
    * @description Có thể để trống (nullable).
    */
+  @ApiProperty({
+    description: 'URL đến icon đại diện cho tiện ích',
+    required: false,
+    example: 'https://example.com/icons/wifi.png',
+  })
   @Column({ name: 'icon_url', type: 'text', nullable: true })
   iconUrl!: string;
 

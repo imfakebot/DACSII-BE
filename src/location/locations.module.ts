@@ -6,6 +6,10 @@ import { Address } from './entities/address.entity';
 import { Ward } from './entities/ward.entity';
 import { City } from './entities/city.entity';
 
+/**
+ * @module LocationModule
+ * @description Module quản lý các chức năng liên quan đến địa điểm (Tỉnh/Thành, Phường/Xã, Địa chỉ).
+ */
 @Module({
   imports: [TypeOrmModule.forFeature([Address, Ward, City])],
   controllers: [LocationsController],

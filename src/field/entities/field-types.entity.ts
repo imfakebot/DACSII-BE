@@ -1,6 +1,7 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { Field } from './field.entity';
 import { TimeSlot } from '@/pricing/entities/time-slot.entity';
+import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * @entity FieldType
@@ -12,12 +13,20 @@ export class FieldType {
   /**
    * @property {string} id - ID duy nhất của loại sân (UUID).
    */
+  @ApiProperty({
+    description: 'ID duy nhất của loại sân',
+    format: 'uuid',
+  })
   @PrimaryColumn({ type: 'varchar', length: 36 })
   id!: string;
 
   /**
    * @property {string} name - Tên của loại sân (ví dụ: "Sân 5 người").
    */
+  @ApiProperty({
+    description: 'Tên của loại sân',
+    example: 'Sân 5 người',
+  })
   @Column({ type: 'varchar', length: 100 })
   name!: string;
 
@@ -25,6 +34,10 @@ export class FieldType {
    * @property {string} description - Mô tả chi tiết về loại sân.
    * @description Có thể để trống (nullable).
    */
+  @ApiProperty({
+    description: 'Mô tả chi tiết về loại sân',
+    required: false,
+  })
   @Column({ type: 'text', nullable: true })
   description!: string;
 

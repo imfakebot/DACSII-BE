@@ -112,6 +112,16 @@
                 <p><strong>Thời gian:</strong> {{startTime}} - {{endTime}}</p>
                 <p><strong>Tổng thanh toán:</strong> {{finalAmount}}</p>
             </div>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <p>Dưới đây là mã vé điện tử của bạn. Vui lòng đưa mã này cho nhân viên khi đến sân:</p>
+
+                <img src="{{qrCode}}" alt="QR Code Check-in"
+                    style="width: 200px; height: 200px; border: 1px solid #ddd;" />
+
+                <p>Mã đặt sân: <b>{{bookingId}}</b></p>
+            </div>
+
             <p>Vui lòng có mặt tại sân trước giờ đặt khoảng 5-10 phút để chuẩn bị. Chúc bạn có một trận đấu vui vẻ!</p>
             <a href="{{frontendUrl}}/history" class="cta-button">Xem Lịch Sử Đặt Sân</a>
         </div>

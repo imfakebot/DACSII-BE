@@ -9,6 +9,10 @@ import { Voucher } from '@/voucher/entities/voucher.entity';
 import { PricingModule } from '@/pricing/pricing.module';
 import { NotificationsModule } from '@/notification/notifications.module';
 
+/**
+ * @module PaymentsModule
+ * @description Module quản lý các chức năng liên quan đến thanh toán.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Payment, Voucher]),

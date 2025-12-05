@@ -33,6 +33,8 @@ import { Throttle } from '@nestjs/throttler';
 import { User } from '@/auth/decorator/users.decorator';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
+import { CheckInDto } from './dto/check-in.dto';
+import { Booking } from './entities/booking.entity';
 
 /**
  * @controller BookingsController
@@ -199,5 +201,28 @@ export class BookingController {
     @User() user: AuthenticatedUser, // <--- Truyền User để check xem có tạo đúng chi nhánh không
   ) {
     return this.bookingService.createBookingByAdmin(dto, user);
+  }
+
+  /**
+   * @route POST /bookings/check-in
+   * @description (Manager/Admin) Check-in cho khách hàng khi đến sân.
+   * Cập nhật trạng thái của đơn đặt sân thành 'CHECKED_IN'.
+   */
+  @Post('check-in')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Manager, Role.Admin) // Chỉ Manager/Admin mới được check-in
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Manager/Admin) Check-in cho khách hàng tại sân' })
+  @ApiResponse({
+    status: 200,
+    description: 'Check-in thành công. Trả về thông tin đơn đặt sân đã cập nhật.',
+    type: Booking, 
+  })
+  @ApiResponse({ status: 400, description: 'Đơn không hợp lệ để check-in (sai trạng thái, đã check-in...).' })
+  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
+  checkIn(@Body() checkInDto: CheckInDto) {
+    return this.bookingService.checkInCustomer(checkInDto.bookingId);
   }
 }

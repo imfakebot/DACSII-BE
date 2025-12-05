@@ -8,8 +8,19 @@ import { ReplyFeedbackDto } from './dto/reply-feedback.dto';
 import { Account } from '../user/entities/account.entity';
 import { EventGateway } from '@/event/event.gateway';
 
+/**
+ * @class FeedbackService
+ * @description Service xử lý logic nghiệp vụ cho hệ thống feedback và hỗ trợ.
+ */
 @Injectable()
 export class FeedbackService {
+  /**
+   * @constructor
+   * @param {Repository<Feedback>} feedbackRepo - Repository cho thực thể Feedback.
+   * @param {Repository<FeedbackResponse>} responseRepo - Repository cho thực thể FeedbackResponse.
+   * @param {EventGateway} eventGateway - Gateway để gửi sự kiện real-time qua WebSocket.
+   * @param {DataSource} dataSource - Quản lý các transaction của TypeORM.
+   */
   constructor(
     @InjectRepository(Feedback)
     private feedbackRepo: Repository<Feedback>,
@@ -19,18 +30,22 @@ export class FeedbackService {
     private dataSource: DataSource,
   ) {}
 
-  // 1. Tạo Feedback
-  // Tham số đầu vào là Account (lấy từ req.user)
-  async create(createDto: CreateFeedbackDto, account: Account) {
+  /**
+   * @method create
+   * @description Tạo một ticket feedback mới cùng với tin nhắn đầu tiên.
+   * @param {CreateFeedbackDto} createDto - DTO chứa thông tin để tạo feedback.
+   * @param {Account} account - Tài khoản của người dùng tạo feedback.
+   * @returns {Promise<Feedback>} - Ticket feedback vừa được tạo.
+   */
+  async create(createDto: CreateFeedbackDto, account: Account): Promise<Feedback> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // Quan trọng: Bảng feedback link với UserProfile, nên phải lấy profile từ account
       const userProfile = account.userProfile;
 
-      // B1: Tạo Ticket
+      // Tạo ticket feedback
       const feedback = queryRunner.manager.create(Feedback, {
         title: createDto.title,
         category: createDto.category,
@@ -39,7 +54,7 @@ export class FeedbackService {
       });
       const savedFeedback = await queryRunner.manager.save(feedback);
 
-      // B2: Tạo tin nhắn đầu tiên
+      // Tạo tin nhắn đầu tiên trong ticket
       const firstResponse = queryRunner.manager.create(FeedbackResponse, {
         content: createDto.content,
         feedback: savedFeedback,
@@ -48,6 +63,8 @@ export class FeedbackService {
       await queryRunner.manager.save(firstResponse);
 
       await queryRunner.commitTransaction();
+      // Thông báo cho admin về ticket mới
+      this.eventGateway.notifyAdminsNewFeedback(savedFeedback);
       return savedFeedback;
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -57,26 +74,40 @@ export class FeedbackService {
     }
   }
 
-  // 2. Xem danh sách của tôi
-  async findMyFeedbacks(account: Account) {
+  /**
+   * @method findMyFeedbacks
+   * @description Tìm tất cả các ticket feedback do một người dùng cụ thể tạo.
+   * @param {Account} account - Tài khoản của người dùng.
+   * @returns {Promise<Feedback[]>} - Danh sách các ticket.
+   */
+  async findMyFeedbacks(account: Account): Promise<Feedback[]> {
     return this.feedbackRepo.find({
-      // Lọc theo userProfile.id
       where: { submitter: { id: account.userProfile.id } },
       order: { created_at: 'DESC' },
       relations: ['responses'],
     });
   }
 
-  // 3. Admin xem tất cả
-  async findAll() {
+  /**
+   * @method findAll
+   * @description (Admin/Manager) Lấy tất cả các ticket feedback trong hệ thống.
+   * @returns {Promise<Feedback[]>} - Danh sách tất cả các ticket.
+   */
+  async findAll(): Promise<Feedback[]> {
     return this.feedbackRepo.find({
       order: { created_at: 'DESC' },
       relations: ['submitter'], // Load thông tin người gửi
     });
   }
 
-  // 4. Xem chi tiết
-  async findOne(id: string) {
+  /**
+   * @method findOne
+   * @description Tìm chi tiết một ticket feedback, bao gồm tất cả các tin nhắn trả lời.
+   * @param {string} id - ID của ticket.
+   * @returns {Promise<Feedback>} - Chi tiết của ticket.
+   * @throws {NotFoundException} Nếu không tìm thấy ticket.
+   */
+  async findOne(id: string): Promise<Feedback> {
     const feedback = await this.feedbackRepo.findOne({
       where: { id },
       relations: ['responses', 'responses.responder', 'submitter'],
@@ -84,45 +115,50 @@ export class FeedbackService {
         responses: { created_at: 'ASC' },
       },
     });
-    if (!feedback) throw new NotFoundException('Feedback not found');
+    if (!feedback) throw new NotFoundException('Không tìm thấy ticket feedback.');
     return feedback;
   }
 
-  // 5. Trả lời (Dùng Account để lấy Profile)
-  async reply(feedbackId: string, dto: ReplyFeedbackDto, account: Account) {
+  /**
+   * @method reply
+   * @description Gửi một tin nhắn trả lời vào một ticket feedback.
+   * Tự động cập nhật trạng thái ticket và gửi sự kiện real-time.
+   * @param {string} feedbackId - ID của ticket để trả lời.
+   * @param {ReplyFeedbackDto} dto - DTO chứa nội dung trả lời.
+   * @param {Account} account - Tài khoản của người gửi trả lời.
+   * @returns {Promise<FeedbackResponse>} - Tin nhắn trả lời vừa được lưu.
+   */
+  async reply(feedbackId: string, dto: ReplyFeedbackDto, account: Account): Promise<FeedbackResponse> {
     const feedback = await this.findOne(feedbackId);
     const userProfile = account.userProfile;
+    const roleName = account.role?.name || 'user';
 
-    // Logic kiểm tra Role nằm trong Account
-    // Giả sử account.role là object { name: 'admin' } hoặc string
-    // Bạn cần check lại entity Role của bạn
-    const roleName = account.role?.name || '';
-
-    // Nếu không phải user thường trả lời -> Đổi trạng thái thành đang xử lý
+    // Nếu admin/manager trả lời, cập nhật trạng thái ticket
     if (roleName !== 'user' && feedback.status === 'open') {
       await this.feedbackRepo.update(feedbackId, { status: 'in_progress' });
     }
 
+    // Tạo và lưu tin nhắn mới
     const response = this.responseRepo.create({
       content: dto.content,
       feedback: { id: feedbackId } as Feedback,
-      responder: userProfile, // 👈 Lưu người trả lời là Profile
+      responder: userProfile,
     });
-
     const savedResponse = await this.responseRepo.save(response);
 
+    // Gửi sự kiện real-time đến những người đang xem ticket
     this.eventGateway.sendNewMessage(feedbackId, {
       id: savedResponse.id,
       content: savedResponse.content,
-      createdAt: savedResponse.created_at,
+      created_at: savedResponse.created_at,
       responder: {
         id: account.userProfile.id,
         fullName: account.userProfile.full_name,
         avatarUrl: account.userProfile.avatar_url,
-        // Cần cờ này để Frontend biết tin nhắn này của mình hay của người khác
         role: account.role.name,
       },
     });
-    return this.responseRepo.save(response);
+
+    return savedResponse;
   }
 }

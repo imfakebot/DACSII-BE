@@ -1,4 +1,5 @@
 import { Payment } from '@/payment/entities/payment.entity';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
@@ -11,12 +12,19 @@ import {
 
 @Entity({ name: 'vouchers' })
 export class Voucher {
+  @ApiProperty({ format: 'uuid' })
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  @ApiProperty({ example: 'SUMMER2024' })
   @Column({ type: 'varchar', length: 50, unique: true })
   code!: string;
 
+  @ApiProperty({
+    description: 'Số tiền giảm giá cố định',
+    example: 50000,
+    required: false,
+  })
   @Column({
     name: 'discount_amount',
     type: 'decimal',
@@ -26,9 +34,19 @@ export class Voucher {
   })
   discountAmount!: number | null;
 
+  @ApiProperty({
+    description: 'Tỷ lệ giảm giá (%)',
+    example: 10,
+    required: false,
+  })
   @Column({ name: 'discount_percentage', type: 'int', nullable: true })
   discountPercentage!: number | null;
 
+  @ApiProperty({
+    description: 'Số tiền giảm giá tối đa',
+    example: 100000,
+    required: false,
+  })
   @Column({
     name: 'max_discount_amount',
     type: 'decimal',
@@ -38,6 +56,7 @@ export class Voucher {
   })
   maxDiscountAmount!: number | null;
 
+  @ApiProperty({ description: 'Giá trị đơn hàng tối thiểu', example: 500000 })
   @Column({
     name: 'min_order_value',
     type: 'decimal',
@@ -47,18 +66,23 @@ export class Voucher {
   })
   minOrderValue!: number;
 
+  @ApiProperty({ description: 'Ngày bắt đầu hiệu lực' })
   @Column({ name: 'valid_from', type: 'datetime' })
   validFrom!: Date;
 
+  @ApiProperty({ description: 'Ngày kết thúc hiệu lực' })
   @Column({ name: 'valid_to', type: 'datetime' })
   validTo!: Date;
 
+  @ApiProperty({ description: 'Số lượng voucher', example: 100 })
   @Column({ type: 'int' })
   quantity!: number;
 
+  @ApiProperty({ description: 'Ngày tạo' })
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
+  @ApiProperty({ description: 'Ngày cập nhật cuối' })
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 

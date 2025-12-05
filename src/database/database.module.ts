@@ -2,6 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+/**
+ * @module DatabaseModule
+ * @description Module chịu trách nhiệm cấu hình và cung cấp kết nối cơ sở dữ liệu cho toàn bộ ứng dụng.
+ * Nó sử dụng TypeOrmModule.forRootAsync để đọc cấu hình từ ConfigService,
+ * cho phép cấu hình kết nối một cách linh hoạt thông qua các biến môi trường.
+ */
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({

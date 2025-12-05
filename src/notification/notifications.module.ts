@@ -5,6 +5,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Notification } from './entities/notification.entities';
 import { UsersModule } from '@/user/users.module';
 
+/**
+ * @module NotificationsModule
+ * @description Module quản lý hệ thống thông báo người dùng.
+ */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Notification]),

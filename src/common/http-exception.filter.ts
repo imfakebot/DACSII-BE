@@ -8,10 +8,22 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+/**
+ * @class AllExceptionsFilter
+ * @description Một bộ lọc ngoại lệ toàn cục để bắt và xử lý tất cả các lỗi xảy ra trong ứng dụng.
+ * Nó chuẩn hóa định dạng phản hồi lỗi trả về cho client.
+ * Bắt cả `HttpException` và các lỗi hệ thống `Error` chưa được xử lý.
+ */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  /**
+   * @method catch
+   * @description Phương thức chính để xử lý ngoại lệ.
+   * @param exception - Ngoại lệ đã được ném ra.
+   * @param host - Bối cảnh thực thi của request.
+   */
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();

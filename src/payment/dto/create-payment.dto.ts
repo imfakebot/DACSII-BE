@@ -1,6 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 
+/**
+ * @class CreatePaymentDto
+ * @description DTO để tạo một yêu cầu thanh toán mới.
+ */
 export class CreatePaymentDto {
   @ApiProperty({
     description: 'Số tiền thanh toán (VNĐ)',

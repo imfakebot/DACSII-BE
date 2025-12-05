@@ -4,9 +4,17 @@ import { PricingService } from './pricing.service';
 import { CheckPriceResponseDto } from './dto/check-price-response.dto';
 import { CheckPriceDto } from './dto/check-price.dto';
 
+/**
+ * @controller PricingController
+ * @description Xử lý các yêu cầu liên quan đến việc tính giá và kiểm tra tính khả dụng của sân.
+ */
 @ApiTags('Pricing(Tính giá)')
 @Controller('pricing')
 export class PricingController {
+  /**
+   * @constructor
+   * @param {PricingService} pricingService - Service xử lý logic tính giá.
+   */
   constructor(private readonly pricingService: PricingService) {}
 
   @Post('check-availability')

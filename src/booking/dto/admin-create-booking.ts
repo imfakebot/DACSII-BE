@@ -9,28 +9,37 @@ import {
 } from 'class-validator';
 import { BookingStatus } from '../enums/booking-status.enum';
 
+/**
+ * @class AdminCreateBookingDto
+ * @description DTO để Admin/Manager/Staff tạo đơn đặt sân trực tiếp (tại quầy).
+ * Cho phép tạo đơn cho khách vãng lai hoặc khách đã có tài khoản.
+ */
 export class AdminCreateBookingDto {
-  @ApiProperty({ description: 'ID của sân bóng', format: 'uuid' })
+  @ApiProperty({
+    description: 'ID của sân bóng cần đặt',
+    format: 'uuid',
+    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
+  })
   @IsNotEmpty()
   @IsString()
   fieldId!: string;
 
   @ApiProperty({
-    description: 'Thời gian bắt đầu (ISO 8601)',
+    description: 'Thời gian bắt đầu đặt sân (định dạng ISO 8601)',
     example: '2025-12-25T10:00:00.000Z',
   })
   @IsNotEmpty()
   @IsDateString()
   startTime!: string;
 
-  @ApiProperty({ description: 'Thời lượng đá (phút)', example: 90 })
+  @ApiProperty({ description: 'Thời lượng đá (tính bằng phút)', example: 90 })
   @IsNotEmpty()
   @IsNumber()
   durationMinutes!: number;
 
-  // Admin có thể nhập SĐT để tìm user, hoặc nhập tên khách vãng lai
   @ApiPropertyOptional({
-    description: 'SĐT khách hàng (nếu là thành viên)',
+    description:
+      'Số điện thoại của khách hàng. Dùng để tìm và gán đơn cho tài khoản đã tồn tại.',
     example: '0987654321',
   })
   @IsOptional()
@@ -38,19 +47,20 @@ export class AdminCreateBookingDto {
   customerPhone?: string;
 
   @ApiPropertyOptional({
-    description: 'Tên khách hàng (nếu là khách vãng lai)',
+    description:
+      'Tên khách hàng. Bắt buộc nếu không cung cấp SĐT, hoặc để ghi đè tên của khách vãng lai.',
     example: 'Anh Tuấn',
   })
   @IsOptional()
   @IsString()
-  customerName?: string; // Dùng cho khách vãng lai không có account
+  customerName?: string;
 
   @ApiPropertyOptional({
-    description: 'Trạng thái của đơn đặt sân',
+    description: 'Trạng thái ban đầu của đơn đặt sân (mặc định là COMPLETED)',
     enum: BookingStatus,
-    default: BookingStatus.CONFIRMED,
+    default: BookingStatus.COMPLETED,
   })
   @IsOptional()
   @IsEnum(BookingStatus)
-  status?: BookingStatus = BookingStatus.CONFIRMED; // Mặc định là đã xác nhận
+  status?: BookingStatus = BookingStatus.COMPLETED;
 }

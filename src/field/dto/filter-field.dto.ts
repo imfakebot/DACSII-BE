@@ -3,6 +3,11 @@ import { Type, Transform } from 'class-transformer';
 import { IsOptional, IsString, IsNumber, IsUUID } from 'class-validator';
 import sanitizeHtml from 'sanitize-html';
 
+/**
+ * @class FilterFieldDto
+ * @description DTO để lọc và tìm kiếm sân bóng. Hỗ trợ tìm kiếm theo tên,
+ * chi nhánh, vị trí địa lý (latitude, longitude, radius), thành phố và loại sân.
+ */
 export class FilterFieldDto {
   @ApiPropertyOptional({ description: 'Tìm theo tên sân (VD: Sân 5)' })
   @IsOptional()

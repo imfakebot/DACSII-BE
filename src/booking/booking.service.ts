@@ -23,6 +23,7 @@ import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { UsersService } from '@/user/users.service';
 import { Role } from '@/auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
+import moment from 'moment';
 
 /**
  * @class BookingService
@@ -44,7 +45,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * Tạo một đơn đặt sân mới.
@@ -161,6 +162,7 @@ export class BookingService {
         end_time: end,
         total_price: originalPrice, // Giá gốc
         status: BookingStatus.PENDING,
+        code: this.generateBookingCode(), // <--- Tự động sinh mã
         bookingDate: new Date(),
         userProfile: userProfile,
         field: { id: createBookingDto.fieldId } as Field,
@@ -287,7 +289,7 @@ export class BookingService {
             'Hủy đơn đặt sân thành công. Mã giảm giá (nếu có) đã được hoàn lại.',
         };
       }
-    } catch (error) {
+  } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -520,5 +522,47 @@ export class BookingService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * Xử lý check-in cho khách hàng tại sân.
+   * @param bookingId ID của đơn đặt sân cần check-in.
+   * @returns Thông tin đơn đặt sân đã được cập nhật.
+   * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
+   * @throws {BadRequestException} Nếu đơn đặt sân không ở trạng thái 'COMPLETED' hoặc đã được check-in.
+   */
+  async checkInCustomer(bookingId: string): Promise<Booking> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+    });
+
+    if (!booking) {
+      throw new NotFoundException(`Không tìm thấy đơn đặt sân với mã: ${bookingId}`);
+    }
+
+    if (booking.status === BookingStatus.CHECKED_IN) {
+      throw new BadRequestException('Đơn đặt sân này đã được check-in trước đó.');
+    }
+
+    if (booking.status !== BookingStatus.COMPLETED) {
+      throw new BadRequestException(`Không thể check-in cho đơn ở trạng thái "${booking.status}". Đơn phải được thanh toán thành công.`);
+    }
+
+    booking.status = BookingStatus.CHECKED_IN;
+    booking.check_in_at = new Date();
+    return this.bookingRepository.save(booking);
+  }
+
+  private generateBookingCode(): string {
+    const now = new Date();
+    const datePrefix = moment(now).format('YYMMDD'); // Cần import moment hoặc tự format
+
+    // Sinh 4 ký tự ngẫu nhiên
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let suffix = '';
+    for (let i = 0; i < 4; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${datePrefix}-${suffix}`; // VD: 251206-AH92
   }
 }

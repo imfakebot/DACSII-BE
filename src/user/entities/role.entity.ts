@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Account } from './account.entity';
 
@@ -12,6 +13,7 @@ export class Role {
    * ID duy nhất của vai trò, được tạo tự động.
    * Thường là một số nguyên tự tăng.
    */
+  @ApiProperty({ description: 'ID duy nhất của vai trò', example: 1 })
   @PrimaryGeneratedColumn()
   id!: string;
 
@@ -19,6 +21,7 @@ export class Role {
    * Tên của vai trò, phải là duy nhất để dễ dàng nhận dạng.
    * Ví dụ: 'ADMIN', 'USER', 'OWNER'.
    */
+  @ApiProperty({ description: 'Tên của vai trò', example: 'super_admin' })
   @Column()
   name!: string;
 

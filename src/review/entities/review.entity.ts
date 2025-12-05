@@ -1,6 +1,7 @@
 import { Booking } from '@/booking/entities/booking.entity';
 import { Field } from '@/field/entities/field.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
@@ -21,12 +22,17 @@ export class Review {
    * ID duy nhất của bài đánh giá.
    * Thường được liên kết với ID của lượt đặt sân (Booking).
    */
+  @ApiProperty({
+    description: 'ID duy nhất của bài đánh giá (trùng với ID đơn đặt sân)',
+    format: 'uuid',
+  })
   @Column({ type: 'varchar', length: 36, primary: true })
   id!: string;
 
   /**
    * Điểm đánh giá của người dùng, thường theo thang điểm từ 1 đến 5.
    */
+  @ApiProperty({ description: 'Điểm đánh giá (1-5)', example: 5 })
   @Column({ type: 'int' })
   rating!: number;
 
@@ -34,6 +40,11 @@ export class Review {
    * Nội dung bình luận chi tiết của người dùng về lượt đặt sân.
    * Có thể để trống.
    */
+  @ApiProperty({
+    description: 'Nội dung bình luận',
+    example: 'Sân tốt, dịch vụ tuyệt vời!',
+    required: false,
+  })
   @Column({ type: 'text', nullable: true })
   comment!: string;
 
@@ -41,6 +52,7 @@ export class Review {
    * Dấu thời gian khi bài đánh giá được tạo.
    * Được tự động gán bởi TypeORM.
    */
+  @ApiProperty({ description: 'Thời điểm tạo đánh giá' })
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
@@ -58,6 +70,7 @@ export class Review {
   @JoinColumn({ name: 'field_id' })
   field!: Field;
 
+  @ApiProperty({ type: () => UserProfile })
   @ManyToOne(() => UserProfile)
   @JoinColumn({ name: 'user_profile_id' })
   userProfile!: UserProfile;

@@ -15,6 +15,8 @@ import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
 import { NotificationService } from '@/notification/notification.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { EventGateway } from '@/event/event.gateway';
+import * as QRCode from 'qrcode';
+
 
 @Injectable()
 export class PaymentService {
@@ -32,7 +34,7 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
-  ) {}
+  ) { }
 
   createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
     const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
@@ -195,9 +197,9 @@ export class PaymentService {
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
         ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${branchAddressObj.city?.name || ''}`
-            .replace(/,\s*,/g, ',')
-            .trim()
-            .replace(/,\s*$/, '')
+          .replace(/,\s*,/g, ',')
+          .trim()
+          .replace(/,\s*$/, '')
         : 'Đang cập nhật';
 
       const startTime = moment(payment.booking.start_time).format(
@@ -225,11 +227,15 @@ export class PaymentService {
           payDate,
         );
 
+
+
         await this.notificationService.createNotification({
           title: 'Thanh toán thành công',
           content: `Đơn đặt sân ${bookingId} của bạn đã được xác nhận.`,
           recipientId: payment.booking.userProfile.id,
         });
+
+        const qrCodeImage = await this.generateQRCode(bookingId);
 
         await this.sendEmailSafely({
           to: userEmail,
@@ -243,6 +249,7 @@ export class PaymentService {
             endTime: endTime,
             finalAmount: finalAmountStr,
             bookingId: bookingId,
+            qrCode: qrCodeImage,
             frontendUrl:
               this.vnpayConfiguration.returnUrl?.split(
                 '/payment/vnpay_return',
@@ -439,5 +446,15 @@ export class PaymentService {
       month: Number(row.month),
       revenue: Number(row.revenue),
     }));
+  }
+
+  private async generateQRCode(data: string): Promise<string> {
+    try {
+
+      return await QRCode.toDataURL(data);
+    } catch (err) {
+      this.logger.error('Lỗi tạo QR Code', err);
+      return '';
+    }
   }
 }

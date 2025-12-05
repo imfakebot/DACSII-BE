@@ -38,13 +38,13 @@ describe('AuthController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('initiateRegistaration', () => {
-    it('should call authService.initateRegistration with the correct DTO', async () => {
+  describe('initiateRegistration', () => {
+    it('should call authService.initiateRegistration with the correct DTO', async () => {
       const registerDto: RegisterUserDto = {
         email: 'test@example.com',
         password: 'password123',
         full_name: 'Test User',
-        phoneNumber: '098765432',
+        phone_number: '0987654321',
       };
       mockAuthService.initateRegistration.mockResolvedValue({
         message: 'Success',

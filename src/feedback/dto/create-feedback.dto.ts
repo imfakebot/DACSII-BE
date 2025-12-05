@@ -1,6 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString } from 'class-validator';
 
+/**
+ * @class CreateFeedbackDto
+ * @description Data Transfer Object để tạo một ticket feedback/hỗ trợ mới.
+ * Chứa tiêu đề, danh mục và nội dung tin nhắn đầu tiên.
+ */
 export class CreateFeedbackDto {
   @ApiProperty({ description: 'Tiêu đề của feedback', example: 'Góp ý về sân' })
   @IsNotEmpty()
