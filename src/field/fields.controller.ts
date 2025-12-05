@@ -33,23 +33,17 @@ import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { Field } from './entities/field.entity';
-import { GeocodeAddressDto } from './dto/geocode-address.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
 import { SkipThrottle } from '@nestjs/throttler';
+
 /**
  * @controller FieldsController
  * @description Xử lý các yêu cầu liên quan đến quản lý sân bóng (Fields).
- * Bao gồm các hoạt động CRUD (Tạo, Đọc, Cập nhật, Xóa) cho sân bóng.
- * Các hoạt động tạo, cập nhật, xóa yêu cầu quyền Admin.
  */
 @ApiTags('Fields (Sân bóng)')
 @Controller('fields')
 export class FieldsController {
-  /**
-   * @param {FieldsService} fieldsService - Service xử lý logic nghiệp vụ cho sân bóng.
-   * @param {UsersService} usersService - Service để truy xuất thông tin người dùng (cụ thể là Admin).
-   */
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
@@ -57,75 +51,45 @@ export class FieldsController {
 
   /**
    * @route POST /fields
-   * @description (Admin) Tạo một sân bóng mới.
-   * @param {CreateFieldDto} createFieldDto - DTO chứa thông tin để tạo sân bóng mới.
-   * @param {AuthenticatedRequest} req - Request đã được xác thực, chứa thông tin admin.
-   * @returns {Promise<Field>} - Sân bóng vừa được tạo.
-   * @throws {NotFoundException} - Nếu không tìm thấy hồ sơ của admin.
+   * @description Tạo một sân bóng mới.
+   * Cho phép Admin hệ thống hoặc Manager của chi nhánh đó.
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin) // Chỉ Admin mới có quyền tạo sân bóng
+  @Roles(Role.Admin, Role.Manager) // Cập nhật: Cho phép cả Manager
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: '(Admin) Tạo một sân bóng mới' })
+  @ApiOperation({ summary: 'Tạo một sân bóng mới (Admin/Manager)' })
   @ApiResponse({
     status: 201,
     description: 'Tạo sân bóng thành công.',
     type: Field,
   })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden resource. (Không phải Admin)',
-  })
+  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async create(
     @Body() createFieldDto: CreateFieldDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<Field> {
-    const adminAccountId = req.user.sub;
-    const adminProfile =
-      await this.usersService.findProfileByAccountId(adminAccountId);
-    if (!adminProfile) {
-      throw new NotFoundException('Không tìm thấy hồ sơ của Admin.');
+    const userId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(userId);
+
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
     }
-    return this.fieldsService.create(createFieldDto, adminProfile);
+
+    // Logic kiểm tra quyền chi tiết (Branch ownership) nằm trong Service
+    return this.fieldsService.create(createFieldDto, userProfile);
   }
 
-  /**
-   * @route POST /fields/geocode
-   * @description (Admin) Lấy tọa độ gợi ý từ địa chỉ.
-   * @param {GeocodeAddressDto} geocodeAddressDto - DTO chứa thông tin địa chỉ.
-   * @returns {Promise<{latitude: number, longitude: number}>} - Tọa độ tìm được.
-   */
-  @Post('geocode')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: '(Admin) Lấy tọa độ gợi ý từ địa chỉ' })
-  @ApiResponse({
-    status: 200,
-    description: 'Tìm thấy tọa độ thành công.',
-    schema: {
-      example: { latitude: 10.8507, longitude: 106.7719 },
-    },
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Không thể tìm thấy tọa độ từ địa chỉ được cung cấp.',
-  })
-  @HttpCode(HttpStatus.OK)
-  previewCoordinates(@Body() geocodeAddressDto: GeocodeAddressDto) {
-    return this.fieldsService.getCoordinatesFromAddress(geocodeAddressDto);
-  }
+  // --- ĐÃ XÓA ROUTE /geocode VÌ LOGIC ĐÃ CHUYỂN SANG BRANCH SERVICE ---
 
   /**
    * @route GET /fields
-   * @description Lấy danh sách tất cả các sân bóng. Endpoint này công khai cho mọi người dùng.
+   * @description Lấy danh sách tất cả các sân bóng (Công khai).
    */
   @Get()
   @SkipThrottle()
-  @ApiOperation({ summary: 'Tìm kiếm sân bóng(Hỗ trợ tìm theo vị trí)' })
+  @ApiOperation({ summary: 'Tìm kiếm sân bóng (Hỗ trợ tìm theo vị trí, tên, chi nhánh)' })
   @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query() filterDto: FilterFieldDto) {
     return this.fieldsService.findAll(filterDto);
@@ -133,10 +97,7 @@ export class FieldsController {
 
   /**
    * @route GET /fields/:id
-   * @description Lấy thông tin chi tiết của một sân bóng dựa vào ID. Endpoint này công khai.
-   * @param {string} id - ID của sân bóng (UUID).
-   * @returns {Promise<Field>} - Thông tin chi tiết của sân bóng.
-   * @throws {NotFoundException} - Nếu không tìm thấy sân bóng với ID tương ứng.
+   * @description Lấy chi tiết sân bóng (Công khai).
    */
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một sân bóng (Công khai)' })
@@ -148,42 +109,34 @@ export class FieldsController {
 
   /**
    * @route PUT /fields/:id
-   * @description (Admin) Cập nhật thông tin của một sân bóng.
-   * @param {string} id - ID của sân bóng cần cập nhật.
-   * @param {UpdateFieldDto} updateFieldDto - DTO chứa thông tin cập nhật.
-   * @returns {Promise<Field>} - Sân bóng sau khi đã được cập nhật.
-   * @throws {NotFoundException} - Nếu không tìm thấy sân bóng.
+   * @description Cập nhật thông tin sân bóng.
    */
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin) // Chỉ Admin mới có quyền cập nhật
+  @Roles(Role.Admin, Role.Manager) // Cho phép Manager cập nhật
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: '(Admin) Cập nhật thông tin sân bóng' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cập nhật thành công.',
-    type: Field,
-  })
+  @ApiOperation({ summary: 'Cập nhật thông tin sân bóng (Admin/Manager)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công.', type: Field })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
   ): Promise<Field> {
+    // Lưu ý: Nếu cần kiểm tra Manager có được sửa sân này không, 
+    // cần truyền thêm UserProfile vào hàm update trong Service tương tự như hàm create.
     return this.fieldsService.update(id, updateFieldDto);
   }
 
   /**
    * @route DELETE /fields/:id
-   * @description (Admin) Xóa một sân bóng (xóa mềm - soft delete).
-   * @param {string} id - ID của sân bóng cần xóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa thành công.
+   * @description Xóa sân bóng (Soft delete).
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin) // Chỉ Admin mới có quyền xóa
+  @Roles(Role.Admin, Role.Manager) // Cho phép Manager xóa
   @ApiBearerAuth('JWT-auth')
-  @HttpCode(HttpStatus.OK) // Thay vì 204 No Content, trả về 200 OK với message
-  @ApiOperation({ summary: '(Admin) Xóa một sân bóng (Xóa mềm)' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xóa một sân bóng (Xóa mềm)' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
@@ -192,17 +145,14 @@ export class FieldsController {
 
   /**
    * @route POST /fields/:id/images
-   * @description (Admin) Tải lên một hoặc nhiều hình ảnh cho một sân bóng cụ thể.
-   * @param {string} fieldId - ID của sân bóng cần thêm ảnh.
-   * @param {Array<Express.Multer.File>} files - Mảng các file ảnh được gửi lên qua form-data với key là 'images'.
-   * @returns {Promise<FieldImage[]>} - Danh sách các đối tượng hình ảnh đã được lưu.
+   * @description Tải ảnh sân bóng.
    */
   @Post(':id/images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.Manager)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: '(Admin) Tải lên hình ảnh cho một sân bóng' })
-  @UseInterceptors(FilesInterceptor('images', 10)) // 'images' là tên field, 10 là số file tối đa
+  @ApiOperation({ summary: 'Tải lên hình ảnh cho một sân bóng' })
+  @UseInterceptors(FilesInterceptor('images', 10))
   @ApiResponse({ status: 201, description: 'Tải ảnh lên thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   uploadImages(

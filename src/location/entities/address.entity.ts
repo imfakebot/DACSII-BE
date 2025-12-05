@@ -4,11 +4,11 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-  OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { City } from './city.entity';
 import { Ward } from './ward.entity';
-import { Field } from '../../field/entities/field.entity';
+import { Branch } from '../../branch/entities/branch.entity'; // Import Branch thay vì Field
 
 @Entity({ name: 'addresses' })
 export class Address {
@@ -25,29 +25,25 @@ export class Address {
   longitude!: number;
 
   /**
-   * Một Địa chỉ (Address) thuộc về một Thành phố (City).
-   * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một thành phố).
-   * ERD: Wards --o{ Addresses và Cities --o{ Wards.
-   * Để truy vấn dễ dàng hơn, ERD của bạn đã thêm cityId trực tiếp vào Addresses.
+   * Một Địa chỉ thuộc về một Thành phố (City).
    */
   @ManyToOne(() => City, (city) => city.addresses)
-  @JoinColumn({ name: 'cityId' })
+  @JoinColumn({ name: 'city_id' }) // TypeORM thường dùng snake_case cho cột trong DB
   city!: City;
 
   /**
-   * Một Địa chỉ (Address) thuộc về một Phường/Xã (Ward).
-   * Quan hệ: Many-to-One (Nhiều địa chỉ có thể thuộc cùng một phường/xã).
-   * ERD: Wards --o{ Addresses
+   * Một Địa chỉ thuộc về một Phường/Xã (Ward).
    */
   @ManyToOne(() => Ward, (ward) => ward.addresses)
   @JoinColumn({ name: 'ward_id' })
   ward!: Ward;
 
   /**
-   * Một Địa chỉ (Address) có thể có nhiều Sân bóng (Field).
-   * Quan hệ: One-to-Many (Một địa chỉ có thể là vị trí của nhiều sân).
-   * ERD: ADDR ||--o{ F : "is located at"
+   * THAY ĐỔI QUAN TRỌNG:
+   * Một Địa chỉ gắn liền với một Chi nhánh (Branch).
+   * Quan hệ: One-to-One (Một chi nhánh có một địa chỉ duy nhất).
+   * Lưu ý: Bên Branch sẽ giữ @JoinColumn.
    */
-  @OneToMany(() => Field, (field) => field.address)
-  fields!: Field[];
+  @OneToOne(() => Branch, (branch) => branch.address)
+  branch!: Branch;
 }

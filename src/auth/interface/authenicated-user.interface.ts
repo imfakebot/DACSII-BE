@@ -17,8 +17,9 @@ import { Role } from '../enums/role.enum';
 export interface AuthenticatedUser {
   userProfile?: UserProfile;
   id: string;
-  sub?: string;
+  sub: string;
   email: string;
   role: Role;
   is_profile_complete?: boolean;
+  branch_id?: string | null;
 }

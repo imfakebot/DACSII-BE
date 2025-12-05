@@ -10,7 +10,6 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,26 +22,21 @@ import {
 import { ReviewService } from './review.service';
 import { UsersService } from '@/user/users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { AuthenticatedRequest } from '@/auth/interface/authenticated-request.interface';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Throttle } from '@nestjs/throttler';
+import { User } from '@/auth/decorator/users.decorator'; // Import decorator User
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Import interface
 
 /**
  * @controller ReviewController
  * @description Xử lý các yêu cầu HTTP liên quan đến đánh giá (reviews).
- * Bao gồm các endpoint để tạo, xem và xóa đánh giá.
  */
 @ApiTags('Reviews (Đánh giá)')
 @Controller('review')
 export class ReviewController {
-  /**
-   * @constructor
-   * @param {ReviewService} reviewService - Service xử lý logic nghiệp vụ cho đánh giá.
-   * @param {UsersService} userService - Service để truy vấn thông tin người dùng.
-   */
   constructor(
     private readonly reviewService: ReviewService,
     private readonly userService: UsersService,
@@ -50,10 +44,7 @@ export class ReviewController {
 
   /**
    * @route POST /review
-   * @description (User) Tạo một bài đánh giá mới cho một lượt đặt sân đã hoàn thành.
-   * @param {CreateReviewDto} createReviewDto - DTO chứa thông tin bài đánh giá.
-   * @param {AuthenticatedRequest} req - Request đã được xác thực, chứa thông tin người dùng.
-   * @returns {Promise<Review>} - Bài đánh giá vừa được tạo.
+   * @description (User) Tạo một bài đánh giá mới.
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -62,31 +53,18 @@ export class ReviewController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: '(User) Tạo một bài đánh giá mới' })
   @ApiResponse({ status: 201, description: 'Tạo đánh giá thành công.' })
-  @ApiResponse({
-    status: 400,
-    description:
-      'Dữ liệu không hợp lệ hoặc không đủ điều kiện đánh giá (VD: đơn chưa hoàn thành, đã đánh giá rồi).',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Người dùng chưa đăng nhập.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Không tìm thấy đơn đặt sân hoặc hồ sơ người dùng.',
-  })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc đã đánh giá trước đó.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân hoặc hồ sơ người dùng.' })
   async create(
     @Body() createReviewDto: CreateReviewDto,
-    @Req() req: AuthenticatedRequest,
+    @User() user: AuthenticatedUser,
   ) {
-    const accountId = req.user.sub;
-    const userProfile =
-      await this.userService.findProfileByAccountId(accountId);
+    const accountId = user.id;
+    const userProfile = await this.userService.findProfileByAccountId(accountId);
 
     if (!userProfile) {
-      throw new NotFoundException(
-        'Không tìm thấy hồ sơ người dùng. Vui lòng cập nhật thông tin.',
-      );
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
     }
 
     return this.reviewService.createReview(createReviewDto, userProfile);
@@ -94,31 +72,15 @@ export class ReviewController {
 
   /**
    * @route GET /review/field/:fieldId
-   * @description Lấy danh sách các bài đánh giá của một sân bóng cụ thể, có phân trang.
-   * @param {string} fieldId - ID của sân bóng.
-   * @param {number} page - Số trang (mặc định là 1).
-   * @param {number} limit - Số lượng kết quả mỗi trang (mặc định là 10).
-   * @returns {Promise<object>} - Danh sách đánh giá và thông tin meta (phân trang, điểm trung bình).
+   * @description Lấy danh sách đánh giá của một sân (Public).
    */
   @Get('field/:fieldId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lấy danh sách đánh giá của một sân bóng' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Số trang',
-    type: Number,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Số lượng mỗi trang',
-    type: Number,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Trả về danh sách đánh giá thành công.',
-  })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Trả về danh sách đánh giá.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   async findByField(
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
     @Query('page') page: number = 1,
@@ -127,26 +89,54 @@ export class ReviewController {
     return this.reviewService.findByField(fieldId, Number(page), Number(limit));
   }
 
+  // ==================== PHẦN BỔ SUNG MỚI ====================
+
+  /**
+   * @route GET /review/management/all
+   * @description Lấy danh sách đánh giá (Dành cho quản lý).
+   * - Admin: Xem tất cả.
+   * - Manager: Chỉ xem đánh giá của chi nhánh mình.
+   */
+  @Get('management/all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin/Manager) Quản lý danh sách đánh giá' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({ status: 200, description: 'Trả về danh sách đánh giá.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
+  async getAllReviews(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @User() user: AuthenticatedUser, // Lấy thông tin user để lọc theo branch
+  ) {
+    return this.reviewService.findAllReviews(Number(page), Number(limit), user);
+  }
+
   /**
    * @route DELETE /review/:id
-   * @description (Admin) Xóa một bài đánh giá.
-   * @param {string} id - ID của bài đánh giá cần xóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xóa thành công.
+   * @description Xóa một bài đánh giá.
+   * - Admin: Xóa bất kỳ.
+   * - Manager: Xóa đánh giá thuộc chi nhánh mình.
+   * - User: Xóa đánh giá của chính mình.
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.Manager, Role.User) // Mở rộng quyền xóa
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Admin) Xóa một bài đánh giá' })
+  @ApiOperation({ summary: 'Xóa một bài đánh giá' })
   @ApiResponse({ status: 200, description: 'Xóa đánh giá thành công.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({
-    status: 403,
-    description: 'Forbidden - Không có quyền Admin.',
-  })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy đánh giá để xóa.' })
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.reviewService.delete(id);
+  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đánh giá.' })
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @User() user: AuthenticatedUser, // Truyền user xuống service để check quyền
+  ) {
+    return this.reviewService.delete(id, user);
   }
 }

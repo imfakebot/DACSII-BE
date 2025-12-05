@@ -70,7 +70,11 @@ export class UpdateUserProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(500, { message: 'Tiểu sử không được vượt quá 500 ký tự.' })
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-  @Transform(({ value }) => sanitizeHtml(value))
+  @Transform(({ value }: { value: unknown }) => {
+    if (typeof value === 'string') {
+      return sanitizeHtml(value);
+    }
+    return undefined; 
+  })
   bio?: string;
 }

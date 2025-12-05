@@ -22,6 +22,7 @@ import { FilterBookingDto } from './dto/filter-booking.dto';
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { UsersService } from '@/user/users.service';
 import { Role } from '@/auth/enums/role.enum';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 
 /**
  * @class BookingService
@@ -350,13 +351,14 @@ export class BookingService {
    * @param filter Đối tượng chứa các tiêu chí lọc và phân trang.
    * @returns {Promise<{ data: Booking[]; meta: { total: number; page: number; limit: number; lastPage: number; } }>} Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
-  async getAllBookings(filter: FilterBookingDto) {
+  async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
     const { status, page = 1, limit = 10 } = filter;
     const skip = (page - 1) * limit;
 
     const query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.field', 'field') // Lấy thông tin sân
+      .leftJoinAndSelect('field.branch', 'branch')
       .leftJoinAndSelect('field.images', 'images') // Lấy ảnh sân (nếu cần)
       .leftJoin('booking.userProfile', 'userProfile')
       .leftJoin('userProfile.account', 'account')
@@ -366,6 +368,10 @@ export class BookingService {
 
     if (status) {
       query.andWhere('booking.status = :status', { status });
+    }
+
+    if (user.branch_id) {
+      query.andWhere('branch.id = :branchId', { branchId: user.branch_id })
     }
 
     const [data, total] = await query.getManyAndCount();
@@ -412,14 +418,27 @@ export class BookingService {
     };
   }
 
-  async createBookingByAdmin(dto: AdminCreateBookingDto) {
+  async createBookingByAdmin(dto: AdminCreateBookingDto, user: AuthenticatedUser) {
     // Dùng Transaction để an toàn dữ liệu
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 1. Check giá & Slot
+      // 1. Kiểm tra Sân thuộc chi nhánh nào
+      const field = await this.fieldRepository.findOne({
+        where: { id: dto.fieldId },
+        relations: ['branch']
+      });
+      if (!field) {
+        throw new NotFoundException('Sân không tồn tại.');
+      }
+
+      // 2. LOGIC BẢO MẬT: Kiểm tra quyền của nhân viên
+      if (user.branch_id && field.branch.id !== user.branch_id) {
+        throw new ForbiddenException('Bạn không thể tạo đơn cho sân thuộc chi nhánh khác.');
+      }
+      // 3.check giá và sân
       const pricingResult = await this.pricingService.checkPriceAndAvailability(
         {
           fieldId: dto.fieldId,
@@ -428,7 +447,7 @@ export class BookingService {
         },
       );
 
-      // 2. Tìm User
+      // 4. Tìm User
       let userProfile: UserProfile | null = null;
       if (dto.customerPhone) {
         userProfile = await this.userService.findProfileByPhoneNumber(
@@ -439,7 +458,7 @@ export class BookingService {
       const start = new Date(dto.startTime);
       const end = new Date(start.getTime() + dto.durationMinutes * 60000);
 
-      // 3. Tạo Booking (Dùng queryRunner.manager)
+      // 5. Tạo Booking (Dùng queryRunner.manager)
       const newBooking = queryRunner.manager.create(Booking, {
         start_time: start,
         end_time: end,
@@ -455,7 +474,7 @@ export class BookingService {
       });
       const savedBooking = await queryRunner.manager.save(Booking, newBooking);
 
-      // 4. Tạo Payment (CASH - Completed)
+      // 6. Tạo Payment (CASH - Completed)
       const newPayment = queryRunner.manager.create(Payment, {
         amount: pricingResult.pricing.total_price,
         finalAmount: pricingResult.pricing.total_price,

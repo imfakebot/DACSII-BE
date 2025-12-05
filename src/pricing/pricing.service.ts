@@ -12,6 +12,7 @@ import { Field } from '../field/entities/field.entity';
 import { CheckPriceDto } from './dto/check-price.dto';
 import { BookingStatus } from '../booking/enums/booking-status.enum';
 import moment from 'moment-timezone';
+import { Branch } from '@/branch/entities/branch.entity';
 
 /**
  * @class PricingService
@@ -20,8 +21,6 @@ import moment from 'moment-timezone';
  */
 @Injectable()
 export class PricingService {
-  private readonly OPEN_HOUR = process.env.OPEN_HOUR;
-  private readonly CLOSE_HOUR = process.env.CLOSE_HOUR;
 
   constructor(
     /**
@@ -36,7 +35,7 @@ export class PricingService {
     private readonly bookingRepository: Repository<Booking>,
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
-  ) {}
+  ) { }
 
   /**
    * Kiểm tra tính khả dụng của sân và tính toán giá tiền cho một yêu cầu đặt sân cụ thể.
@@ -66,12 +65,10 @@ export class PricingService {
 
     const end = new Date(start.getTime() + durationMinutes * 60000);
 
-    this.validateOperatingHour(start, end);
-
     // 2. Kiểm tra Sân bóng có tồn tại và đang hoạt động không
     const field = await this.fieldRepository.findOne({
       where: { id: fieldId },
-      relations: ['fieldType'], // Cần lấy loại sân để tra giá
+      relations: ['fieldType', 'branch'], // Cần lấy loại sân để tra giá
     });
 
     if (!field) {
@@ -80,6 +77,9 @@ export class PricingService {
     if (!field.status) {
       throw new BadRequestException('Sân bóng này đang tạm ngưng hoạt động.');
     }
+
+    // Di chuyển xuống đây và truyền `field.branch` vào
+    this.validateOperatingHour(start, end, field.branch);
 
     // 3. LOGIC KIỂM TRA TRÙNG GIỜ (Overlap Check)
     // Query tìm xem có bất kỳ booking nào đã tồn tại mà khoảng thời gian bị đè lên nhau không.
@@ -150,36 +150,32 @@ export class PricingService {
     };
   }
 
-  /**
-   * @private
-   * @method validateOperatingHour
-   * @description Xác thực xem khoảng thời gian (bắt đầu, kết thúc) có nằm trong giờ hoạt động cho phép của sân bóng không.
-   * @param {Date} start - Thời gian bắt đầu dự kiến.
-   * @param {Date} end - Thời gian kết thúc dự kiến.
-   * @throws {BadRequestException} Nếu thời gian bắt đầu hoặc kết thúc nằm ngoài giờ hoạt động.
-   */
-  private validateOperatingHour(start: Date, end: Date) {
+
+  private validateOperatingHour(start: Date, end: Date, branch: Branch) {
+    // 1. Parse giờ mở/đóng cửa của Branch (Lưu dạng '05:00:00')
+    const [openH, openM] = branch.open_time.split(':').map(Number);
+    const [closeH, closeM] = branch.close_time.split(':').map(Number);
+
     const startHCM = moment(start).tz('Asia/Ho_Chi_Minh');
     const endHCM = moment(end).tz('Asia/Ho_Chi_Minh');
 
-    const startH = Number(startHCM.hour());
-    const endH = Number(endHCM.hour());
-    const endM = Number(endHCM.minute());
+    // Convert thời gian đặt sang phút trong ngày để so sánh dễ hơn
+    const requestStartMinutes = startHCM.hour() * 60 + startHCM.minute();
+    const requestEndMinutes = endHCM.hour() * 60 + endHCM.minute();
 
-    // 1. Check giờ bắt đầu: Phải từ 7h trở đi và trước 21h
-    if (startH < Number(this.OPEN_HOUR) || startH > Number(this.CLOSE_HOUR)) {
+    const branchOpenMinutes = openH * 60 + openM;
+    const branchCloseMinutes = closeH * 60 + closeM;
+
+    // 2. Logic kiểm tra
+    if (requestStartMinutes < branchOpenMinutes) {
       throw new BadRequestException(
-        `Sân chỉ hoạt động từ ${this.OPEN_HOUR}h đến ${this.CLOSE_HOUR}h.`,
+        `Chi nhánh này chỉ mở cửa từ ${branch.open_time}.`
       );
     }
 
-    // 2. Check giờ kết thúc: Không được vượt quá 23:00
-    if (
-      endH > Number(this.CLOSE_HOUR) ||
-      (endH === Number(this.CLOSE_HOUR) && endM > 0)
-    ) {
+    if (requestEndMinutes > branchCloseMinutes) {
       throw new BadRequestException(
-        `Sân đóng cửa lúc ${this.CLOSE_HOUR}h. Vui lòng chọn giờ kết thúc sớm hơn.`,
+        `Chi nhánh này đóng cửa lúc ${branch.close_time}. Vui lòng chọn giờ kết thúc sớm hơn.`
       );
     }
   }

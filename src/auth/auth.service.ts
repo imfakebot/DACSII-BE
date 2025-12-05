@@ -80,6 +80,7 @@ export class AuthService {
         // (Cho phép ghi đè nếu SĐT thuộc về chính tài khoản email đang đăng ký lại).
         (!existingAccount || profileWithPhone.account.id !== existingAccount.id))
     ) {
+      console.log(profileWithPhone.account.is_verified);
       throw new ConflictException(
         'Số điện thoại này đã được sử dụng.',
       );
@@ -177,6 +178,7 @@ export class AuthService {
     const account = await this.userService.findAccountByEmail(email, [
       'role',
       'userProfile',
+      'userProfile.branch',
     ]);
 
     // Chỉ cho phép tài khoản đã xác thực đăng nhập
@@ -209,7 +211,10 @@ export class AuthService {
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình JWT.
    */
   async login(user: AuthenticatedUser | Account) {
-    const payload: JwtPayload = {
+    const userProfile = (user as Account).userProfile;
+    const bracnhId = userProfile?.branch?.id;
+
+    const payload: JwtPayload & { branch_id?: string } = {
       email: user.email,
       sub: user.id,
       // Sửa lỗi: Kiểm tra nếu role là object thì lấy name, ngược lại dùng chính nó
@@ -217,6 +222,7 @@ export class AuthService {
         typeof user.role === 'object' && user.role !== null
           ? user.role.name
           : String(user.role),
+      branch_id: bracnhId,
     };
 
     const accessTokenSecret =
@@ -275,6 +281,7 @@ export class AuthService {
             ? ((user.userProfile as { is_profile_complete?: boolean })
               .is_profile_complete ?? false)
             : false,
+        branch_id: bracnhId,
       },
     };
   }
@@ -331,7 +338,7 @@ export class AuthService {
    */
   async refreshTokens(userID: string): Promise<{ accessToken: string }> {
     // Tải tài khoản cùng với vai trò để tạo token
-    const account = await this.userService.findAccountById(userID, ['role']);
+    const account = await this.userService.findAccountById(userID, ['role', 'userProfile', 'userProfile.branch']);
     if (!account || account.status !== AccountStatus.ACTIVE) {
       throw new ForbiddenException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
@@ -383,11 +390,15 @@ export class AuthService {
    * @returns {Promise<string>} - Một chuỗi access token mới.
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình Access Token.
    */
-  async createAccessToken(user: AuthenticatedUser): Promise<string> {
+  async createAccessToken(user: AuthenticatedUser | Account): Promise<string> {
+    const userProfile = (user as Account).userProfile;
+    const branchId = userProfile?.branch?.id || null;
+
     const payload = {
       email: user.email,
       sub: user.id,
       role: user.role,
+      branch_id: branchId,
     };
 
     const accessTokenSecret =
@@ -559,6 +570,7 @@ export class AuthService {
     const account = await this.userService.findAccountByEmail(email, [
       'userProfile',
       'role',
+      'userProfile.branch',
     ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
       throw new UnauthorizedException(

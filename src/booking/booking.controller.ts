@@ -27,10 +27,12 @@ import { UsersService } from '../user/users.service'; // Check lại đường d
 import { Role } from '@/auth/enums/role.enum';
 import { BookingResponse } from './dto/booking-response.dto';
 import { FilterBookingDto } from './dto/filter-booking.dto';
-import { BookingStatus } from './enums/booking-status.enum';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Throttle } from '@nestjs/throttler';
+import { User } from '@/auth/decorator/users.decorator';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
+import { AdminCreateBookingDto } from './dto/admin-create-booking';
 
 /**
  * @controller BookingsController
@@ -117,10 +119,10 @@ export class BookingController {
    * @description Hủy một yêu cầu đặt sân đã tồn tại.
    */
   @Patch(':id/cancel')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '(User/Admin) Hủy yêu cầu đặt sân & Hoàn Voucher (nếu có)',
+    summary: '(User/Admin/Manager) Hủy yêu cầu đặt sân & Hoàn Voucher (nếu có)',
   })
   @ApiResponse({ status: 200, description: 'Hủy thành công.' })
   @ApiResponse({
@@ -165,27 +167,37 @@ export class BookingController {
   }
 
   /**
-   * @route GET /bookings/admin/all
-   * @description (Admin) Lấy toàn bộ lịch sử đặt sân trên hệ thống, có hỗ trợ lọc và phân trang.
-   * @param {number} [page=1] - Số trang hiện tại.
-   * @param {number} [limit=10] - Số lượng kết quả trên mỗi trang.
-   * @param {BookingStatus} [status] - (Tùy chọn) Lọc các đơn đặt sân theo một trạng thái cụ thể.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách các đơn đặt sân và thông tin phân trang.
-   */
-  @Get('admin/all')
+  * @route GET /bookings/management/all
+  * @description Lấy danh sách booking.
+  * - Admin: Xem tất cả.
+  * - Manager/Staff: Chỉ xem booking thuộc chi nhánh của mình.
+  */
+  @Get('management/all') // Đổi tên route cho phù hợp ngữ cảnh quản lý chung
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.Manager, Role.Staff) // <--- Cho phép cả 3 role
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Admin) Lấy tất cả lịch sử đặt sân' })
-  @ApiResponse({
-    status: 200,
-    description: 'Trả về danh sách tất cả đơn đặt sân.',
-  })
+  @ApiOperation({ summary: '(Admin/Manager/Staff) Lấy danh sách booking' })
   async getAllBooking(
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
-    @Query('status') status?: BookingStatus,
+    @Query() filter: FilterBookingDto, // Dùng DTO Filter thay vì liệt kê từng param
+    @User() user: AuthenticatedUser,   // <--- Truyền User vào để lấy branch_id
   ) {
-    return this.bookingService.findAll(Number(page), Number(limit), status);
+    // Gọi hàm getAllBookings (số nhiều) bên Service mà ta đã sửa ở bước trước
+    return this.bookingService.getAllBookings(filter, user);
+  }
+
+  /**
+   * @route POST /bookings/management/create
+   * @description Nhân viên/Admin tạo đơn trực tiếp tại quầy (Không cần thanh toán online).
+   */
+  @Post('management/create')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.Manager, Role.Staff) // <--- Cho phép nhân viên tạo
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin/Staff) Tạo đơn đặt sân tại quầy' })
+  async createBookingByAdmin(
+    @Body() dto: AdminCreateBookingDto,
+    @User() user: AuthenticatedUser, // <--- Truyền User để check xem có tạo đúng chi nhánh không
+  ) {
+    return this.bookingService.createBookingByAdmin(dto, user);
   }
 }

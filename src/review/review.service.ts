@@ -1,6 +1,7 @@
 import { BookingService } from '@/booking/booking.service';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,8 @@ import { Review } from './entities/review.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
+import { Role } from '@/auth/enums/role.enum';
 
 /**
  * @class ReviewService
@@ -27,7 +30,7 @@ export class ReviewService {
     private readonly reviewRepository: Repository<Review>,
 
     private readonly bookingService: BookingService,
-  ) {}
+  ) { }
 
   /**
    * Tạo một bài đánh giá mới cho một lượt đặt sân.
@@ -129,17 +132,76 @@ export class ReviewService {
     };
   }
 
+
   /**
-   * Xóa một bài đánh giá dựa trên ID.
-   * @param {string} id - ID của bài đánh giá cần xóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa thành công.
-   * @throws {NotFoundException} Nếu không tìm thấy bài đánh giá.
+   * @method findAllReviews
+   * @description Lấy danh sách review dùng cho trang quản lý.
+   * - Admin: Lấy hết.
+   * - Manager: Chỉ lấy review thuộc chi nhánh mình quản lý.
    */
-  async delete(id: string) {
-    const result = await this.reviewRepository.delete(id);
-    if (result.affected === 0) {
+  async findAllReviews(page: number, limit: number, user: AuthenticatedUser) {
+    const skip = (page - 1) * limit;
+
+    const query = this.reviewRepository.createQueryBuilder('review')
+      .leftJoinAndSelect('review.userProfile', 'userProfile') // Người review
+      .leftJoinAndSelect('review.field', 'field')             // Sân được review
+      .leftJoinAndSelect('field.branch', 'branch')            // Chi nhánh của sân
+      .orderBy('review.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    // LOGIC PHÂN QUYỀN:
+    // Nếu là Manager, thêm điều kiện lọc theo branch_id
+    if (user.role === Role.Manager && user.branch_id) {
+      query.andWhere('branch.id = :branchId', { branchId: user.branch_id });
+    }
+
+    const [data, total] = await query.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * @method delete
+   * @description Xóa review. Kiểm tra quyền hạn kỹ càng.
+   */
+  async delete(id: string, user: AuthenticatedUser) {
+    // 1. Tìm review kèm thông tin chi nhánh
+    const review = await this.reviewRepository.findOne({
+      where: { id },
+      relations: ['field', 'field.branch', 'userProfile', 'userProfile.account'],
+    });
+
+    if (!review) {
       throw new NotFoundException('Không tìm thấy đánh giá');
     }
+
+    // 2. Logic kiểm tra quyền
+    if (user.role === Role.Admin) {
+      // Admin được quyền xóa tất cả -> Pass
+    } else if (user.role === Role.Manager) {
+      // Manager chỉ được xóa review của chi nhánh mình
+      if (review.field.branch.id !== user.branch_id) {
+        throw new ForbiddenException('Bạn không có quyền xóa đánh giá của chi nhánh khác.');
+      }
+    } else {
+      // User thường chỉ được xóa review của chính mình
+      // (user.sub hoặc user.id tùy vào JWT payload bạn cấu hình, thường là user.id khớp với account id)
+      if (review.userProfile.account.id !== user.id) {
+        throw new ForbiddenException('Bạn không có quyền xóa đánh giá này.');
+      }
+    }
+
+    // 3. Xóa
+    await this.reviewRepository.delete(id);
     return { message: 'Xóa đánh giá thành công.' };
   }
 }

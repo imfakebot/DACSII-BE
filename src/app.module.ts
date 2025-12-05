@@ -23,6 +23,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
 import { Response } from 'express';
+import { BranchModule } from './branch/branch.module';
 
 /**
  * @module AppModule
@@ -137,6 +138,8 @@ import { Response } from 'express';
 
     // Module quản lý các phản hồi từ người dùng.
     FeedbacksModule,
+
+    BranchModule,
 
     /**
      * @description

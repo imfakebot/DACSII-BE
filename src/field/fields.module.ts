@@ -12,6 +12,7 @@ import { FieldImage } from './entities/field-image.entity';
 import { Ward } from '@/location/entities/ward.entity';
 import { City } from '@/location/entities/city.entity';
 import { Utility } from './entities/utility.entity';
+import { Branch } from '@/branch/entities/branch.entity';
 
 /**
  * @module FieldsModule
@@ -30,6 +31,7 @@ import { Utility } from './entities/utility.entity';
       Utility,
       Ward,
       City,
+      Branch,
     ]),
     // Import HttpModule để có thể inject HttpService
     HttpModule,

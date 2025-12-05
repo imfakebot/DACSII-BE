@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -9,11 +11,13 @@ import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
 import { Account } from './entities/account.entity';
 import { Role } from './entities/role.entity';
-import {  UserProfile } from './entities/users-profile.entity';
+import { UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
 import { AuthProvider } from './enum/auth-provider.enum';
 import { Gender } from './enum/gender.enum';
+import { Branch } from '@/branch/entities/branch.entity';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -236,7 +240,7 @@ export class UsersService {
   async findProfileByAccountId(accountId: string): Promise<UserProfile | null> {
     return this.userProfileRepository.findOne({
       where: { account: { id: accountId } },
-      relations: ['account', 'account.role'],
+      relations: ['account', 'account.role', 'branch'],
     });
   }
   /**
@@ -355,7 +359,7 @@ export class UsersService {
    */
   async findAllUser(page: number, limit: number) {
     const [user, total] = await this.accountRepository.findAndCount({
-      relations: ['userProfile', 'role'],
+      relations: ['userProfile', 'role', 'userProfile.branch'],
       skip: (page - 1) * limit,
       take: limit,
       order: { created_at: 'DESC' },
@@ -485,6 +489,111 @@ export class UsersService {
         account: { is_verified: true }, // Chỉ tìm các tài khoản đã xác thực
       },
       relations: ['account'], // Tải kèm thông tin tài khoản để kiểm tra
+    });
+  }
+
+  /**
+   * Tạo tài khoản nhân viên (Staff hoặc Branch Manager).
+   * - Nếu Admin gọi: Tạo Branch Manager (yêu cầu branchId).
+   * - Nếu Manager gọi: Tạo Staff (tự động lấy branchId của Manager).
+   */
+  async createEmployee(requesterId: string, data: CreateEmployeeDto): Promise<Account> {
+    // 1. Lấy thông tin người đang thực hiện request (kèm Role và Branch)
+    const requester = await this.accountRepository.findOne({
+      where: { id: requesterId },
+      relations: ['role', 'userProfile', 'userProfile.branch'],
+    });
+
+    if (!requester) {
+      throw new NotFoundException('Người thực hiện không tồn tại.');
+    }
+
+    const requesterRole = requester.role.name;
+    let targetRoleName = '';
+    let targetBranchId = '';
+
+    // 2. Phân quyền và Logic xác định Role/Branch cho tài khoản mới
+    if (requesterRole === 'super_admin') {
+      // Admin tạo Manager
+      targetRoleName = 'branch_manager';
+
+      if (!data.branchId) {
+        throw new BadRequestException('Admin phải cung cấp branchId khi tạo Manager.');
+      }
+      targetBranchId = data.branchId;
+
+    } else if (requesterRole === 'branch_manager') {
+      // Manager tạo Staff
+      targetRoleName = 'staff';
+
+      // Kiểm tra xem Manager này có thuộc chi nhánh nào không
+      if (!requester.userProfile.branch) {
+        throw new ForbiddenException('Tài khoản quản lý này chưa được gán vào chi nhánh nào.');
+      }
+      // Staff sẽ thuộc cùng chi nhánh với Manager
+      targetBranchId = requester.userProfile.branch.id;
+
+    } else {
+      // User thường hoặc Staff không được phép tạo account
+      throw new ForbiddenException('Bạn không có quyền tạo tài khoản nhân viên.');
+    }
+
+    // 3. Kiểm tra Email đã tồn tại chưa
+    const existingUser = await this.accountRepository.findOneBy({ email: data.email });
+    if (existingUser) {
+      throw new ConflictException('Email đã được sử dụng.');
+    }
+
+    // 4. Kiểm tra số điện thoại
+    const existingPhone = await this.userProfileRepository.findOneBy({ phone_number: data.phoneNumber });
+    if (existingPhone) {
+      throw new ConflictException('Số điện thoại đã được sử dụng.');
+    }
+
+    // 5. Hash mật khẩu
+    const hashedPassword = await this.hashPassword(data.password);
+
+    // 6. Thực hiện Transaction lưu DB
+    return this.accountRepository.manager.transaction(async (manager) => {
+      // 6.1 Lấy Role từ DB
+      const targetRole = await manager.findOne(Role, { where: { name: targetRoleName } });
+      if (!targetRole) throw new NotFoundException(`Role ${targetRoleName} không tồn tại.`);
+
+      // 6.2 Lấy Branch từ DB
+      const branch = await manager.findOne(Branch, { where: { id: targetBranchId } });
+      if (!branch) throw new NotFoundException('Chi nhánh không tồn tại.');
+
+      // 6.3 Tạo UserProfile
+      const newProfile = manager.create(UserProfile, {
+        full_name: data.fullName,
+        phone_number: data.phoneNumber,
+        gender: data.gender || null,
+        bio: data.bio || null,
+        is_profile_complete: true, // Nhân viên thì coi như profile đã xong
+        branch: branch, // Gán quan hệ Branch vào đây (Quan trọng!)
+      });
+      await manager.save(newProfile);
+
+      // 6.4 Tạo Account
+      const newAccount = manager.create(Account, {
+        email: data.email,
+        password_hash: hashedPassword,
+        is_verified: true, // Tài khoản nội bộ được xác thực luôn
+        status: AccountStatus.ACTIVE,
+        userProfile: newProfile,
+        role: targetRole,
+      });
+
+      const savedAccount = await manager.save(newAccount);
+
+      // (Tùy chọn) Nếu tạo Manager, cập nhật lại bảng Branch để set người này làm manager_id
+      // Nếu logic của bạn là 1 branch chỉ có 1 manager chính thức
+      if (targetRoleName === 'branch_manager') {
+        // Lưu ý: Logic này sẽ ghi đè manager cũ nếu có
+        await manager.update(Branch, targetBranchId, { manager_id: newProfile.id });
+      }
+
+      return savedAccount;
     });
   }
 }

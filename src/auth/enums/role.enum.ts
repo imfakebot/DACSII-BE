@@ -5,6 +5,8 @@
  * - `Admin`: Vai trò quản trị viên, có quyền hạn cao hơn.
  */
 export enum Role {
-  User = 'User',
-  Admin = 'Admin',
+  User = 'user',
+  Admin = 'super_admin',
+  Staff = 'staff',
+  Manager = 'branch_manager'
 }

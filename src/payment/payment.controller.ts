@@ -11,18 +11,20 @@ import {
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { PaymentService } from './payment.service';
 import { Request, Response } from 'express';
 import { BookingService } from '@/booking/booking.service';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
-import { VnpayReturnDto } from './dto/vnpay-return.dto';
+import { User } from '@/auth/decorator/users.decorator';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { PaymentService } from './payment.service';
 import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
-import { ApiOperation, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { SkipThrottle } from '@nestjs/throttler';
+import { VnpayReturnDto } from './dto/vnpay-return.dto';
 
 /**
  * @controller PaymentController
@@ -184,28 +186,52 @@ export class PaymentController {
    * @param {string} [endDate] - Ngày kết thúc để lọc (định dạng YYYY-MM-DD).
    * @returns {Promise<object>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
    */
-  @Get('admin/stats')
+  @Get('stats/overview')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu và giao dịch' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Ngày bắt đầu (YYYY-MM-DD)', type: String })
+  @ApiQuery({ name: 'endDate', required: false, description: 'Ngày kết thúc (YYYY-MM-DD)', type: String })
+  @ApiQuery({ name: 'branchId', required: false, description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể' })
+  @ApiResponse({ status: 200, description: 'Trả về dữ liệu thống kê thành công.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async getAdminStats(
+    @User() user: AuthenticatedUser,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('branchId') branchId?: string,
   ) {
-    return this.paymentService.getStats(startDate, endDate);
+    const userBranchId = user.branch_id || undefined;
+    // Nếu là Manager, chỉ được xem chi nhánh của mình và không được dùng filter branchId
+    if (user.role === Role.Manager) {
+      return this.paymentService.getStats(startDate, endDate, userBranchId);
+    }
+    // Admin có thể xem tất cả hoặc lọc theo chi nhánh
+    return this.paymentService.getStats(startDate, endDate, branchId);
   }
 
   /**
-   * @route GET /payment/admin/chart
+   * @route GET /payment/chart
    * @description (Admin) Lấy dữ liệu doanh thu hàng tháng để vẽ biểu đồ.
    * @param {number} [year=current_year] - Năm cần lấy dữ liệu. Mặc định là năm hiện tại.
    * @returns {Promise<Array<object>>} - Một mảng các đối tượng, mỗi đối tượng chứa thông tin doanh thu của một tháng.
    */
-  @Get('admin/chart')
+  @Get('chart')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(Admin/Manager) Lấy dữ liệu doanh thu hàng tháng cho biểu đồ' })
+  @ApiQuery({ name: 'year', required: false, description: 'Năm cần xem (mặc định là năm hiện tại)', type: Number })
+  @ApiQuery({ name: 'branchId', required: false, description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể' })
   async getRevenueChart(
+    @User() user: AuthenticatedUser,
     @Query('year') year: number = new Date().getFullYear(),
+    @Query('branchId') branchId?: string,
   ) {
-    return this.paymentService.getRevenueChart(year);
+    const userBranchId = user.branch_id || undefined;
+    const targetBranchId = user.role  === Role.Manager ? userBranchId : branchId;
+    return this.paymentService.getRevenueChart(year, targetBranchId);
   }
 }

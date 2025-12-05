@@ -11,7 +11,8 @@ import {
   UseInterceptors,
   UploadedFile,
   HttpStatus,
-  BadRequestException
+  BadRequestException,
+  Post
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -30,6 +31,7 @@ import { RolesGuard } from '@/auth/guards/role.guard';
 import { Role } from '../auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
 
 /**
  * @controller UsersController
@@ -189,5 +191,31 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
   async unbanUser(@Param('id') id: string) {
     return await this.usersService.unbanUser(id);
+  }
+
+  /**
+   * @route POST /users/create-employee
+   * @description Tạo tài khoản nhân viên mới.
+   * - Admin -> Tạo Manager (Bắt buộc nhập branchId).
+   * - Manager -> Tạo Staff (Tự động lấy branchId của Manager).
+   */
+  @Post('create-employee')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.Manager) // Chỉ Admin và Manager được phép
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tạo tài khoản Manager (bởi Admin) hoặc Staff (bởi Manager)' })
+  @ApiResponse({ status: 201, description: 'Tạo nhân viên thành công.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền tạo.' })
+  async createEmployee(
+    @User() user: AuthenticatedUser,
+    @Body() createEmployeeDto: CreateEmployeeDto
+  ) {
+    const newAccount = await this.usersService.createEmployee(user.id, createEmployeeDto);
+    if (newAccount) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password_hash, ...result } = newAccount;
+      return result;
+    }
+    return newAccount;
   }
 }

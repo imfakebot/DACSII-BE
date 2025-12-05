@@ -1,5 +1,8 @@
-import { Global, Module } from '@nestjs/common';
+import { forwardRef, Global, Module } from '@nestjs/common';
 import { EventGateway } from './event.gateway';
+import { JwtModule } from '@nestjs/jwt';
+import { UsersModule } from '@/user/users.module'; // <--- Import UsersModule
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 /**
  * @module EventModule
@@ -12,7 +15,21 @@ import { EventGateway } from './event.gateway';
  */
 @Global()
 @Module({
+  imports: [
+    // Sử dụng forwardRef để phá vỡ các chuỗi phụ thuộc vòng tiềm ẩn
+    // do EventModule là global và import một module khác.
+    forwardRef(() => UsersModule),
+    // Đăng ký JwtModule để dùng trong Gateway
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '1d' },
+      }),
+    }),
+  ],
   providers: [EventGateway],
   exports: [EventGateway],
 })
-export class EventModule {}
+export class EventModule { }

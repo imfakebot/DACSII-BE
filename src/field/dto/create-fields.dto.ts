@@ -3,42 +3,42 @@ import {
   IsString,
   IsNotEmpty,
   IsUUID,
-  IsNumber,
   IsOptional,
-  Max,
-  Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import sanitizeHtml from 'sanitize-html';
 
 /**
  * @class CreateFieldDto
- * @description Data Transfer Object (DTO) để tạo một sân bóng mới.
- * Chứa tất cả các thông tin cần thiết mà client phải cung cấp.
+ * @description DTO để tạo sân bóng mới trong một Chi nhánh.
+ * Địa chỉ sẽ được kế thừa từ Chi nhánh, không cần nhập lại.
  */
 export class CreateFieldDto {
   /**
-   * @property {string} name - Tên của sân bóng.
-   * @description Bắt buộc, không được để trống.
+   * @property {string} name
    */
   @ApiProperty({
-    description: 'Tên của sân bóng',
-    example: 'Sân bóng mini Cỏ Nhân Tạo',
+    description: 'Tên của sân bóng (VD: Sân 5 - A, Sân 7 - B)',
+    example: 'Sân 5 số 1',
   })
   @IsString()
   @IsNotEmpty()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  @Transform(({ value }) => sanitizeHtml(value)) // Tiện tay chống XSS luôn
   name!: string;
 
   /**
-   * @property {string} description - Mô tả chi tiết về sân bóng.
-   * @description Không bắt buộc.
+   * @property {string} description
    */
   @ApiProperty({ required: false, description: 'Mô tả chi tiết về sân' })
   @IsString()
   @IsOptional()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  @Transform(({ value }) => sanitizeHtml(value)) // Tiện tay chống XSS luôn
   description?: string;
 
   /**
-   * @property {string} fieldTypeId - ID của loại sân (ví dụ: sân 5 người, sân 7 người).
-   * @description Bắt buộc, phải là một UUID hợp lệ.
+   * @property {string} fieldTypeId
    */
   @ApiProperty({
     description: 'ID của loại sân (e.g., sân 5, sân 7)',
@@ -49,57 +49,15 @@ export class CreateFieldDto {
   fieldTypeId!: string;
 
   /**
-   * @property {string} street - Địa chỉ cụ thể của sân (số nhà, tên đường).
-   * @description Bắt buộc, không được để trống.
-   */
-  @ApiProperty({ description: 'Số nhà, tên đường', example: '123 Võ Văn Ngân' })
-  @IsString()
-  @IsNotEmpty()
-  street!: string;
-
-  /**
-   * @property {number} wardId - ID của Phường/Xã nơi sân bóng tọa lạc.
-   * @description Bắt buộc, phải là một số.
-   */
-  @ApiProperty({ description: 'ID của Phường/Xã' })
-  @IsNumber()
-  @IsNotEmpty()
-  wardId!: number;
-
-  /**
-   * @property {number} cityId - ID của Tỉnh/Thành phố nơi sân bóng tọa lạc.
-   * @description Bắt buộc, phải là một số.
-   */
-  @ApiProperty({ description: 'ID của Tỉnh/Thành phố' })
-  @IsNumber()
-  @IsNotEmpty()
-  cityId!: number;
-
-  /**
-   * @property {number} latitude - Vĩ độ của sân bóng.
-   * @description Bắt buộc. Dùng để xác định vị trí trên bản đồ.
+   * @property {string} branchId - THÊM MỚI
+   * @description ID của Chi nhánh mà sân này thuộc về.
    */
   @ApiProperty({
-    description: 'Vĩ độ của sân bóng',
-    example: 10.8507,
+    description: 'ID của Chi nhánh quản lý sân này',
+    format: 'uuid',
+    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851'
   })
-  @IsNumber()
-  @Min(-90)
-  @Max(90)
+  @IsUUID()
   @IsNotEmpty()
-  latitude!: number;
-
-  /**
-   * @property {number} longitude - Kinh độ của sân bóng.
-   * @description Bắt buộc. Dùng để xác định vị trí trên bản đồ.
-   */
-  @ApiProperty({
-    description: 'Kinh độ của sân bóng',
-    example: 106.7719,
-  })
-  @IsNumber()
-  @Min(-180)
-  @Max(180)
-  @IsNotEmpty()
-  longitude!: number;
+  branchId!: string;
 }
