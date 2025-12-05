@@ -47,7 +47,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /fields
@@ -89,7 +89,9 @@ export class FieldsController {
    */
   @Get()
   @SkipThrottle()
-  @ApiOperation({ summary: 'Tìm kiếm sân bóng (Hỗ trợ tìm theo vị trí, tên, chi nhánh)' })
+  @ApiOperation({
+    summary: 'Tìm kiếm sân bóng (Hỗ trợ tìm theo vị trí, tên, chi nhánh)',
+  })
   @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query() filterDto: FilterFieldDto) {
     return this.fieldsService.findAll(filterDto);
@@ -116,13 +118,17 @@ export class FieldsController {
   @Roles(Role.Admin, Role.Manager) // Cho phép Manager cập nhật
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật thông tin sân bóng (Admin/Manager)' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công.', type: Field })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật thành công.',
+    type: Field,
+  })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
   ): Promise<Field> {
-    // Lưu ý: Nếu cần kiểm tra Manager có được sửa sân này không, 
+    // Lưu ý: Nếu cần kiểm tra Manager có được sửa sân này không,
     // cần truyền thêm UserProfile vào hàm update trong Service tương tự như hàm create.
     return this.fieldsService.update(id, updateFieldDto);
   }

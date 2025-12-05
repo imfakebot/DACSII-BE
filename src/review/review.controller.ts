@@ -40,7 +40,7 @@ export class ReviewController {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly userService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /review
@@ -53,15 +53,22 @@ export class ReviewController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: '(User) Tạo một bài đánh giá mới' })
   @ApiResponse({ status: 201, description: 'Tạo đánh giá thành công.' })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc đã đánh giá trước đó.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Dữ liệu không hợp lệ hoặc đã đánh giá trước đó.',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân hoặc hồ sơ người dùng.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy đơn đặt sân hoặc hồ sơ người dùng.',
+  })
   async create(
     @Body() createReviewDto: CreateReviewDto,
     @User() user: AuthenticatedUser,
   ) {
     const accountId = user.id;
-    const userProfile = await this.userService.findProfileByAccountId(accountId);
+    const userProfile =
+      await this.userService.findProfileByAccountId(accountId);
 
     if (!userProfile) {
       throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');

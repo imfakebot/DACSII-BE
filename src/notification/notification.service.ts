@@ -13,7 +13,7 @@ export class NotificationService {
     private readonly notificationRepository: Repository<Notification>,
     // Inject EventGateway để bắn socket real-time
     private readonly eventGateway: EventGateway,
-  ) { }
+  ) {}
 
   async createNotification(dto: CreateNotificationDto) {
     // 1. Lưu vào Database
@@ -24,11 +24,15 @@ export class NotificationService {
       isRead: false,
     });
 
-    const savedNotification = await this.notificationRepository.save(notification);
+    const savedNotification =
+      await this.notificationRepository.save(notification);
 
     // 2. Bắn Socket Real-time xuống cho User ngay lập tức
     // Hàm này bạn cần định nghĩa trong EventGateway (ví dụ: emit tới room userId)
-    this.eventGateway.sendNotificationToUser(dto.recipientId, savedNotification);
+    this.eventGateway.sendNotificationToUser(
+      dto.recipientId,
+      savedNotification,
+    );
 
     return savedNotification;
   }
@@ -103,11 +107,13 @@ export class NotificationService {
   async delete(id: string, userProfileId: string) {
     const result = await this.notificationRepository.delete({
       id,
-      recipient: { id: userProfileId } // Chỉ xóa được thông báo của chính mình
+      recipient: { id: userProfileId }, // Chỉ xóa được thông báo của chính mình
     });
 
     if (result.affected === 0) {
-      throw new NotFoundException('Thông báo không tồn tại hoặc bạn không có quyền xóa.');
+      throw new NotFoundException(
+        'Thông báo không tồn tại hoặc bạn không có quyền xóa.',
+      );
     }
 
     return { message: 'Xóa thông báo thành công.' };

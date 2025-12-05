@@ -72,7 +72,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) { }
+  ) {}
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -190,7 +190,11 @@ export class UsersService {
             relations: ['userProfile'],
           });
           if (account && account.userProfile) {
-            await transactionalEntityManager.update(UserProfile, account.userProfile.id, profile_data);
+            await transactionalEntityManager.update(
+              UserProfile,
+              account.userProfile.id,
+              profile_data,
+            );
           }
         }
         // Cập nhật Account
@@ -421,7 +425,7 @@ export class UsersService {
     avatarPath: string,
   ): Promise<UserProfile> {
     if (!avatarPath) {
-      throw new Error("Thiếu đường dẫn");
+      throw new Error('Thiếu đường dẫn');
     }
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
@@ -482,7 +486,9 @@ export class UsersService {
    * @param phone Số điện thoại cần tìm.
    * @returns Promise giải quyết thành đối tượng `UserProfile` nếu tìm thấy, ngược lại là `null`.
    */
-  async findVerifiedProfileByPhoneNumber(phone: string): Promise<UserProfile | null> {
+  async findVerifiedProfileByPhoneNumber(
+    phone: string,
+  ): Promise<UserProfile | null> {
     return this.userProfileRepository.findOne({
       where: {
         phone_number: phone,
@@ -497,7 +503,10 @@ export class UsersService {
    * - Nếu Admin gọi: Tạo Branch Manager (yêu cầu branchId).
    * - Nếu Manager gọi: Tạo Staff (tự động lấy branchId của Manager).
    */
-  async createEmployee(requesterId: string, data: CreateEmployeeDto): Promise<Account> {
+  async createEmployee(
+    requesterId: string,
+    data: CreateEmployeeDto,
+  ): Promise<Account> {
     // 1. Lấy thông tin người đang thực hiện request (kèm Role và Branch)
     const requester = await this.accountRepository.findOne({
       where: { id: requesterId },
@@ -518,34 +527,42 @@ export class UsersService {
       targetRoleName = 'branch_manager';
 
       if (!data.branchId) {
-        throw new BadRequestException('Admin phải cung cấp branchId khi tạo Manager.');
+        throw new BadRequestException(
+          'Admin phải cung cấp branchId khi tạo Manager.',
+        );
       }
       targetBranchId = data.branchId;
-
     } else if (requesterRole === 'branch_manager') {
       // Manager tạo Staff
       targetRoleName = 'staff';
 
       // Kiểm tra xem Manager này có thuộc chi nhánh nào không
       if (!requester.userProfile.branch) {
-        throw new ForbiddenException('Tài khoản quản lý này chưa được gán vào chi nhánh nào.');
+        throw new ForbiddenException(
+          'Tài khoản quản lý này chưa được gán vào chi nhánh nào.',
+        );
       }
       // Staff sẽ thuộc cùng chi nhánh với Manager
       targetBranchId = requester.userProfile.branch.id;
-
     } else {
       // User thường hoặc Staff không được phép tạo account
-      throw new ForbiddenException('Bạn không có quyền tạo tài khoản nhân viên.');
+      throw new ForbiddenException(
+        'Bạn không có quyền tạo tài khoản nhân viên.',
+      );
     }
 
     // 3. Kiểm tra Email đã tồn tại chưa
-    const existingUser = await this.accountRepository.findOneBy({ email: data.email });
+    const existingUser = await this.accountRepository.findOneBy({
+      email: data.email,
+    });
     if (existingUser) {
       throw new ConflictException('Email đã được sử dụng.');
     }
 
     // 4. Kiểm tra số điện thoại
-    const existingPhone = await this.userProfileRepository.findOneBy({ phone_number: data.phoneNumber });
+    const existingPhone = await this.userProfileRepository.findOneBy({
+      phone_number: data.phoneNumber,
+    });
     if (existingPhone) {
       throw new ConflictException('Số điện thoại đã được sử dụng.');
     }
@@ -556,11 +573,16 @@ export class UsersService {
     // 6. Thực hiện Transaction lưu DB
     return this.accountRepository.manager.transaction(async (manager) => {
       // 6.1 Lấy Role từ DB
-      const targetRole = await manager.findOne(Role, { where: { name: targetRoleName } });
-      if (!targetRole) throw new NotFoundException(`Role ${targetRoleName} không tồn tại.`);
+      const targetRole = await manager.findOne(Role, {
+        where: { name: targetRoleName },
+      });
+      if (!targetRole)
+        throw new NotFoundException(`Role ${targetRoleName} không tồn tại.`);
 
       // 6.2 Lấy Branch từ DB
-      const branch = await manager.findOne(Branch, { where: { id: targetBranchId } });
+      const branch = await manager.findOne(Branch, {
+        where: { id: targetBranchId },
+      });
       if (!branch) throw new NotFoundException('Chi nhánh không tồn tại.');
 
       // 6.3 Tạo UserProfile
@@ -590,7 +612,9 @@ export class UsersService {
       // Nếu logic của bạn là 1 branch chỉ có 1 manager chính thức
       if (targetRoleName === 'branch_manager') {
         // Lưu ý: Logic này sẽ ghi đè manager cũ nếu có
-        await manager.update(Branch, targetBranchId, { manager_id: newProfile.id });
+        await manager.update(Branch, targetBranchId, {
+          manager_id: newProfile.id,
+        });
       }
 
       return savedAccount;

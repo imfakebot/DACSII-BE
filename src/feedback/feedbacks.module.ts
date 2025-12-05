@@ -16,4 +16,4 @@ import { UsersModule } from '@/user/users.module';
   providers: [FeedbackService],
   controllers: [FeedbackController],
 })
-export class FeedbacksModule { }
+export class FeedbacksModule {}

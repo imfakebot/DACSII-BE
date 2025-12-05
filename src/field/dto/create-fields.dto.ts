@@ -1,10 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsString,
-  IsNotEmpty,
-  IsUUID,
-  IsOptional,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 import sanitizeHtml from 'sanitize-html';
 
@@ -55,7 +50,7 @@ export class CreateFieldDto {
   @ApiProperty({
     description: 'ID của Chi nhánh quản lý sân này',
     format: 'uuid',
-    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851'
+    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
   })
   @IsUUID()
   @IsNotEmpty()

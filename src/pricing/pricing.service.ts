@@ -21,7 +21,6 @@ import { Branch } from '@/branch/entities/branch.entity';
  */
 @Injectable()
 export class PricingService {
-
   constructor(
     /**
      * @constructor
@@ -35,7 +34,7 @@ export class PricingService {
     private readonly bookingRepository: Repository<Booking>,
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
-  ) { }
+  ) {}
 
   /**
    * Kiểm tra tính khả dụng của sân và tính toán giá tiền cho một yêu cầu đặt sân cụ thể.
@@ -150,7 +149,6 @@ export class PricingService {
     };
   }
 
-
   private validateOperatingHour(start: Date, end: Date, branch: Branch) {
     // 1. Parse giờ mở/đóng cửa của Branch (Lưu dạng '05:00:00')
     const [openH, openM] = branch.open_time.split(':').map(Number);
@@ -169,13 +167,13 @@ export class PricingService {
     // 2. Logic kiểm tra
     if (requestStartMinutes < branchOpenMinutes) {
       throw new BadRequestException(
-        `Chi nhánh này chỉ mở cửa từ ${branch.open_time}.`
+        `Chi nhánh này chỉ mở cửa từ ${branch.open_time}.`,
       );
     }
 
     if (requestEndMinutes > branchCloseMinutes) {
       throw new BadRequestException(
-        `Chi nhánh này đóng cửa lúc ${branch.close_time}. Vui lòng chọn giờ kết thúc sớm hơn.`
+        `Chi nhánh này đóng cửa lúc ${branch.close_time}. Vui lòng chọn giờ kết thúc sớm hơn.`,
       );
     }
   }

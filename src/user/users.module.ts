@@ -38,14 +38,18 @@ import { BranchModule } from '@/branch/branch.module'; // Giả định BranchMo
 
         fileFilter: (req, file, callback) => {
           if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/)) {
-            return callback(new BadRequestException('Chỉ cho phép tải lên file ảnh!'), false);
+            return callback(
+              new BadRequestException('Chỉ cho phép tải lên file ảnh!'),
+              false,
+            );
           }
           callback(null, true);
         },
       }),
-    })],
+    }),
+  ],
   providers: [UsersService],
   exports: [UsersService],
   controllers: [UsersController],
 })
-export class UsersModule { }
+export class UsersModule {}

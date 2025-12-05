@@ -16,7 +16,14 @@ import { BookingService } from '@/booking/booking.service';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { User } from '@/auth/decorator/users.decorator';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -42,7 +49,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly bookingService: BookingService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /payment/create_payment_url
@@ -190,11 +197,30 @@ export class PaymentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu và giao dịch' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Ngày bắt đầu (YYYY-MM-DD)', type: String })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Ngày kết thúc (YYYY-MM-DD)', type: String })
-  @ApiQuery({ name: 'branchId', required: false, description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể' })
-  @ApiResponse({ status: 200, description: 'Trả về dữ liệu thống kê thành công.' })
+  @ApiOperation({
+    summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu và giao dịch',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Ngày bắt đầu (YYYY-MM-DD)',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Ngày kết thúc (YYYY-MM-DD)',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về dữ liệu thống kê thành công.',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async getAdminStats(
@@ -222,16 +248,27 @@ export class PaymentController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Admin/Manager) Lấy dữ liệu doanh thu hàng tháng cho biểu đồ' })
-  @ApiQuery({ name: 'year', required: false, description: 'Năm cần xem (mặc định là năm hiện tại)', type: Number })
-  @ApiQuery({ name: 'branchId', required: false, description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể' })
+  @ApiOperation({
+    summary: '(Admin/Manager) Lấy dữ liệu doanh thu hàng tháng cho biểu đồ',
+  })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    description: 'Năm cần xem (mặc định là năm hiện tại)',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'branchId',
+    required: false,
+    description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể',
+  })
   async getRevenueChart(
     @User() user: AuthenticatedUser,
     @Query('year') year: number = new Date().getFullYear(),
     @Query('branchId') branchId?: string,
   ) {
     const userBranchId = user.branch_id || undefined;
-    const targetBranchId = user.role  === Role.Manager ? userBranchId : branchId;
+    const targetBranchId = user.role === Role.Manager ? userBranchId : branchId;
     return this.paymentService.getRevenueChart(year, targetBranchId);
   }
 }

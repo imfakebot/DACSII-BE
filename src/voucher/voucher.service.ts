@@ -18,7 +18,7 @@ export class VoucherService {
   constructor(
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
-  ) { }
+  ) {}
 
   /**
    * (Admin) Tạo một mã giảm giá mới.
@@ -119,4 +119,3 @@ export class VoucherService {
     return { message: 'Xóa voucher thành công.' };
   }
 }
-

@@ -74,7 +74,7 @@ export class UpdateUserProfileDto {
     if (typeof value === 'string') {
       return sanitizeHtml(value);
     }
-    return undefined; 
+    return undefined;
   })
   bio?: string;
 }

@@ -44,7 +44,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * Tạo một đơn đặt sân mới.
@@ -56,7 +56,10 @@ export class BookingService {
    * @throws {NotFoundException} Nếu mã giảm giá không tồn tại.
    * @throws {BadRequestException} Nếu mã giảm giá không hợp lệ hoặc không đáp ứng điều kiện.
    */
-  async createBooking(createBookingDto: CreateBookingDto, userProfile: UserProfile) {
+  async createBooking(
+    createBookingDto: CreateBookingDto,
+    userProfile: UserProfile,
+  ) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -64,7 +67,9 @@ export class BookingService {
     try {
       // --- 1. TÍNH TOÁN THỜI GIAN ---
       const start = new Date(createBookingDto.startTime);
-      const end = new Date(start.getTime() + createBookingDto.durationMinutes * 60000);
+      const end = new Date(
+        start.getTime() + createBookingDto.durationMinutes * 60000,
+      );
 
       // --- 2. [FIX RACE CONDITION 1] KIỂM TRA SÂN & KHÓA DÒNG DỮ LIỆU ---
       // Thay vì tin tưởng pricingService, ta tự kiểm tra lại trong Transaction với khóa 'pessimistic_write'
@@ -82,16 +87,20 @@ export class BookingService {
       });
 
       if (overlappingBooking) {
-        throw new ConflictException('Sân đã bị người khác đặt trong khung giờ này (hoặc đang thanh toán)!');
+        throw new ConflictException(
+          'Sân đã bị người khác đặt trong khung giờ này (hoặc đang thanh toán)!',
+        );
       }
 
       // --- 3. GỌI SERVICE TÍNH GIÁ ---
       // Lúc này sân đã an toàn, ta gọi service để lấy giá tiền chuẩn
-      const pricingResult = await this.pricingService.checkPriceAndAvailability({
-        fieldId: createBookingDto.fieldId,
-        startTime: createBookingDto.startTime,
-        durationMinutes: createBookingDto.durationMinutes,
-      });
+      const pricingResult = await this.pricingService.checkPriceAndAvailability(
+        {
+          fieldId: createBookingDto.fieldId,
+          startTime: createBookingDto.startTime,
+          durationMinutes: createBookingDto.durationMinutes,
+        },
+      );
 
       const originalPrice = pricingResult.pricing.total_price;
       let finalPrice = originalPrice;
@@ -106,13 +115,18 @@ export class BookingService {
 
         // Validate Voucher
         if (!voucher) throw new NotFoundException('Mã giảm giá không tồn tại');
-        if (voucher.quantity <= 0) throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
+        if (voucher.quantity <= 0)
+          throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
 
         const now = new Date();
-        if (now > voucher.validTo) throw new BadRequestException('Mã giảm giá đã hết hạn');
-        if (now < voucher.validFrom) throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
+        if (now > voucher.validTo)
+          throw new BadRequestException('Mã giảm giá đã hết hạn');
+        if (now < voucher.validFrom)
+          throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
         if (originalPrice < Number(voucher.minOrderValue)) {
-          throw new BadRequestException(`Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ`);
+          throw new BadRequestException(
+            `Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ`,
+          );
         }
 
         // Tính toán giảm giá
@@ -121,7 +135,10 @@ export class BookingService {
           discountAmount = Number(voucher.discountAmount);
         } else if (voucher.discountPercentage) {
           discountAmount = originalPrice * (voucher.discountPercentage / 100);
-          if (voucher.maxDiscountAmount && discountAmount > Number(voucher.maxDiscountAmount)) {
+          if (
+            voucher.maxDiscountAmount &&
+            discountAmount > Number(voucher.maxDiscountAmount)
+          ) {
             discountAmount = Number(voucher.maxDiscountAmount);
           }
         }
@@ -130,7 +147,12 @@ export class BookingService {
         appliedVoucher = voucher;
 
         // Trừ số lượng (Vì đã lock nên đoạn này an toàn tuyệt đối)
-        await queryRunner.manager.decrement(Voucher, { id: voucher.id }, 'quantity', 1);
+        await queryRunner.manager.decrement(
+          Voucher,
+          { id: voucher.id },
+          'quantity',
+          1,
+        );
       }
 
       // --- 5. LƯU BOOKING & PAYMENT ---
@@ -174,7 +196,6 @@ export class BookingService {
         finalAmount: finalPrice,
         message: 'Đặt sân thành công, vui lòng thanh toán.',
       };
-
     } catch (error) {
       // Rollback nếu có bất kỳ lỗi nào (kể cả lỗi Conflict ở bước 2)
       await queryRunner.rollbackTransaction();
@@ -371,7 +392,7 @@ export class BookingService {
     }
 
     if (user.branch_id) {
-      query.andWhere('branch.id = :branchId', { branchId: user.branch_id })
+      query.andWhere('branch.id = :branchId', { branchId: user.branch_id });
     }
 
     const [data, total] = await query.getManyAndCount();
@@ -418,7 +439,10 @@ export class BookingService {
     };
   }
 
-  async createBookingByAdmin(dto: AdminCreateBookingDto, user: AuthenticatedUser) {
+  async createBookingByAdmin(
+    dto: AdminCreateBookingDto,
+    user: AuthenticatedUser,
+  ) {
     // Dùng Transaction để an toàn dữ liệu
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -428,7 +452,7 @@ export class BookingService {
       // 1. Kiểm tra Sân thuộc chi nhánh nào
       const field = await this.fieldRepository.findOne({
         where: { id: dto.fieldId },
-        relations: ['branch']
+        relations: ['branch'],
       });
       if (!field) {
         throw new NotFoundException('Sân không tồn tại.');
@@ -436,7 +460,9 @@ export class BookingService {
 
       // 2. LOGIC BẢO MẬT: Kiểm tra quyền của nhân viên
       if (user.branch_id && field.branch.id !== user.branch_id) {
-        throw new ForbiddenException('Bạn không thể tạo đơn cho sân thuộc chi nhánh khác.');
+        throw new ForbiddenException(
+          'Bạn không thể tạo đơn cho sân thuộc chi nhánh khác.',
+        );
       }
       // 3.check giá và sân
       const pricingResult = await this.pricingService.checkPriceAndAvailability(

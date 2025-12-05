@@ -8,5 +8,5 @@ export enum Role {
   User = 'user',
   Admin = 'super_admin',
   Staff = 'staff',
-  Manager = 'branch_manager'
+  Manager = 'branch_manager',
 }

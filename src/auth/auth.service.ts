@@ -46,7 +46,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method initiateRegistration
@@ -78,12 +78,11 @@ export class AuthService {
       (profileWithPhone.account.is_verified === true ||
         // TH2: SĐT thuộc về một tài khoản chưa xác thực KHÁC.
         // (Cho phép ghi đè nếu SĐT thuộc về chính tài khoản email đang đăng ký lại).
-        (!existingAccount || profileWithPhone.account.id !== existingAccount.id))
+        !existingAccount ||
+        profileWithPhone.account.id !== existingAccount.id)
     ) {
       console.log(profileWithPhone.account.is_verified);
-      throw new ConflictException(
-        'Số điện thoại này đã được sử dụng.',
-      );
+      throw new ConflictException('Số điện thoại này đã được sử dụng.');
     }
 
     // 3. Nếu tất cả kiểm tra đều qua, tiến hành tạo/cập nhật
@@ -276,10 +275,10 @@ export class AuthService {
             : String(user.role),
         is_profile_complete:
           user.userProfile &&
-            typeof user.userProfile === 'object' &&
-            'is_profile_complete' in user.userProfile
+          typeof user.userProfile === 'object' &&
+          'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-              .is_profile_complete ?? false)
+                .is_profile_complete ?? false)
             : false,
         branch_id: bracnhId,
       },
@@ -338,7 +337,11 @@ export class AuthService {
    */
   async refreshTokens(userID: string): Promise<{ accessToken: string }> {
     // Tải tài khoản cùng với vai trò để tạo token
-    const account = await this.userService.findAccountById(userID, ['role', 'userProfile', 'userProfile.branch']);
+    const account = await this.userService.findAccountById(userID, [
+      'role',
+      'userProfile',
+      'userProfile.branch',
+    ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
       throw new ForbiddenException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',

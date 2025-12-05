@@ -16,7 +16,7 @@ export class RolesGuard implements CanActivate {
    * @param {Reflector} reflector - Một helper class của NestJS để truy xuất metadata
    * được đính kèm vào các class hoặc handler (ví dụ: các vai trò được định nghĩa bởi `@Roles`).
    */
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   /**
    * @method canActivate
@@ -35,7 +35,9 @@ export class RolesGuard implements CanActivate {
       return true;
     }
     // Lấy thông tin người dùng đã được xác thực từ request (được gắn bởi một Guard khác như JwtAuthGuard).
-    const { user } = context.switchToHttp().getRequest<{ user: AuthenticatedUser }>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user: AuthenticatedUser }>();
 
     if (!user || !user.role) {
       return false;
@@ -43,9 +45,7 @@ export class RolesGuard implements CanActivate {
 
     // Lấy tên vai trò. Payload của JWT có thể chứa object role hoặc chỉ là string.
     const userRoleName =
-      typeof user.role === 'object' &&
-        user.role !== null &&
-        'name' in user.role
+      typeof user.role === 'object' && user.role !== null && 'name' in user.role
         ? (user.role as { name: string }).name // Nếu là object { id, name }
         : user.role; // Nếu chỉ là string
 

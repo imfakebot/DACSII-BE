@@ -15,4 +15,4 @@ import { UsersModule } from '@/user/users.module';
   providers: [NotificationService],
   exports: [NotificationService],
 })
-export class NotificationsModule { }
+export class NotificationsModule {}

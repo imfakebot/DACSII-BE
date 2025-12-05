@@ -30,7 +30,7 @@ export class ReviewService {
     private readonly reviewRepository: Repository<Review>,
 
     private readonly bookingService: BookingService,
-  ) { }
+  ) {}
 
   /**
    * Tạo một bài đánh giá mới cho một lượt đặt sân.
@@ -132,7 +132,6 @@ export class ReviewService {
     };
   }
 
-
   /**
    * @method findAllReviews
    * @description Lấy danh sách review dùng cho trang quản lý.
@@ -142,10 +141,11 @@ export class ReviewService {
   async findAllReviews(page: number, limit: number, user: AuthenticatedUser) {
     const skip = (page - 1) * limit;
 
-    const query = this.reviewRepository.createQueryBuilder('review')
+    const query = this.reviewRepository
+      .createQueryBuilder('review')
       .leftJoinAndSelect('review.userProfile', 'userProfile') // Người review
-      .leftJoinAndSelect('review.field', 'field')             // Sân được review
-      .leftJoinAndSelect('field.branch', 'branch')            // Chi nhánh của sân
+      .leftJoinAndSelect('review.field', 'field') // Sân được review
+      .leftJoinAndSelect('field.branch', 'branch') // Chi nhánh của sân
       .orderBy('review.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
@@ -177,7 +177,12 @@ export class ReviewService {
     // 1. Tìm review kèm thông tin chi nhánh
     const review = await this.reviewRepository.findOne({
       where: { id },
-      relations: ['field', 'field.branch', 'userProfile', 'userProfile.account'],
+      relations: [
+        'field',
+        'field.branch',
+        'userProfile',
+        'userProfile.account',
+      ],
     });
 
     if (!review) {
@@ -190,7 +195,9 @@ export class ReviewService {
     } else if (user.role === Role.Manager) {
       // Manager chỉ được xóa review của chi nhánh mình
       if (review.field.branch.id !== user.branch_id) {
-        throw new ForbiddenException('Bạn không có quyền xóa đánh giá của chi nhánh khác.');
+        throw new ForbiddenException(
+          'Bạn không có quyền xóa đánh giá của chi nhánh khác.',
+        );
       }
     } else {
       // User thường chỉ được xóa review của chính mình

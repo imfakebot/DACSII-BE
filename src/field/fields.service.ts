@@ -29,31 +29,40 @@ export class FieldsService {
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method create
    * @description Tạo sân bóng mới thuộc về một Chi nhánh cụ thể.
    */
-  async create(createFieldDto: CreateFieldDto, userProfile: UserProfile): Promise<Field> {
+  async create(
+    createFieldDto: CreateFieldDto,
+    userProfile: UserProfile,
+  ): Promise<Field> {
     const { branchId, fieldTypeId, ...fieldData } = createFieldDto;
 
     // 1. Kiểm tra Chi nhánh có tồn tại không
     const branch: Branch | null = await this.branchRepository.findOne({
       where: {
-       
-        id: branchId
+        id: branchId,
       },
       relations: ['manager'],
     });
 
     if (!branch) {
-      throw new NotFoundException('Chi nhánh hoặc người quản lý của chi nhánh không tồn tại.');
+      throw new NotFoundException(
+        'Chi nhánh hoặc người quản lý của chi nhánh không tồn tại.',
+      );
     }
 
     // 2. (Optional) Kiểm tra quyền: Chỉ Manager của chi nhánh này (hoặc Admin) mới được thêm sân
-    if (branch.manager.id !== userProfile.id && userProfile.role !== 'super_admin') {
-      throw new ForbiddenException('Bạn không có quyền thêm sân vào chi nhánh này');
+    if (
+      branch.manager.id !== userProfile.id &&
+      userProfile.role !== 'super_admin'
+    ) {
+      throw new ForbiddenException(
+        'Bạn không có quyền thêm sân vào chi nhánh này',
+      );
     }
 
     // 3. Tạo sân mới
@@ -71,7 +80,8 @@ export class FieldsService {
    * @description Tìm kiếm sân bóng (Hỗ trợ lọc theo Chi nhánh, Vị trí).
    */
   async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
-    const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } = filterDto;
+    const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } =
+      filterDto;
 
     const query = this.fieldRepository.createQueryBuilder('field');
 
@@ -145,9 +155,9 @@ export class FieldsService {
         'fieldType',
         'images',
         'utilities',
-        'branch',           // Lấy thông tin chi nhánh
-        'branch.address',   // Lấy địa chỉ chi nhánh
-        'branch.manager',   // Lấy người quản lý
+        'branch', // Lấy thông tin chi nhánh
+        'branch.address', // Lấy địa chỉ chi nhánh
+        'branch.manager', // Lấy người quản lý
       ],
     });
 
@@ -170,9 +180,9 @@ export class FieldsService {
     // Cập nhật chi nhánh (Chuyển sân sang cơ sở khác)
     if (branchId) {
       const branch: Branch | null = await this.branchRepository.findOneBy({
-        id: branchId
+        id: branchId,
       });
-      if (!branch) throw new BadRequestException("Chi nhánh mới không tồn tại");
+      if (!branch) throw new BadRequestException('Chi nhánh mới không tồn tại');
       field.branch = branch; // Safe assignment: branch is guaranteed to be a Branch object here.
     }
 
@@ -187,17 +197,21 @@ export class FieldsService {
     return { message: 'Đã xóa sân bóng thành công' };
   }
 
-  async addImagesToField(fieldID: string, files: Array<Express.Multer.File>): Promise<FieldImage[]> {
+  async addImagesToField(
+    fieldID: string,
+    files: Array<Express.Multer.File>,
+  ): Promise<FieldImage[]> {
     const field = await this.fieldRepository.findOneBy({ id: fieldID });
     if (!field) throw new NotFoundException(`Sân bóng không tồn tại`);
 
     const baseUrl = this.configService.get<string>('BASE_URL');
 
-    const images = files.map(file => this.fieldImageRepository.create({
-
-      image_url: `${baseUrl}/uploads/${file.filename}`,
-      field: field
-    }));
+    const images = files.map((file) =>
+      this.fieldImageRepository.create({
+        image_url: `${baseUrl}/uploads/${file.filename}`,
+        field: field,
+      }),
+    );
 
     return this.fieldImageRepository.save(images);
   }

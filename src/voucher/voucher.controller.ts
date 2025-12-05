@@ -9,7 +9,7 @@ import {
   ParseFloatPipe,
   HttpStatus,
   Param,
-  ParseUUIDPipe
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -32,7 +32,7 @@ import { Role } from '@/auth/enums/role.enum';
 @ApiTags('Vouchers (Mã giảm giá)')
 @Controller('voucher')
 export class VoucherController {
-  constructor(private readonly voucherService: VoucherService) { }
+  constructor(private readonly voucherService: VoucherService) {}
 
   /**
    * (Admin) Endpoint để tạo một voucher mới.

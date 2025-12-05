@@ -34,7 +34,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService, // <--- Inject UsersService
-  ) { }
+  ) {}
 
   /**
    * 1. XỬ LÝ KẾT NỐI (AUTHENTICATION)
@@ -49,7 +49,9 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.handshake.headers?.authorization?.split(' ')[1];
 
       if (!token) {
-        this.logger.warn(`Client ${client.id} no token provided. Disconnecting...`);
+        this.logger.warn(
+          `Client ${client.id} no token provided. Disconnecting...`,
+        );
         client.disconnect();
         return;
       }
@@ -71,24 +73,29 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // --- LOGIC JOIN PHÒNG CÁ NHÂN ---
       // Lấy userProfileId từ accountId (payload.sub) để join phòng thông báo cá nhân
-      const userProfile = await this.usersService.findProfileByAccountId(payload.sub);
+      const userProfile = await this.usersService.findProfileByAccountId(
+        payload.sub,
+      );
       if (userProfile) {
         const userRoom = `user_${userProfile.id}`;
         await client.join(userRoom);
-        this.logger.log(`User ${payload.email} joined personal room ${userRoom}`);
+        this.logger.log(
+          `User ${payload.email} joined personal room ${userRoom}`,
+        );
       } else {
-        this.logger.warn(`Could not find user profile for account ${payload.sub}. Cannot join personal room.`);
+        this.logger.warn(
+          `Could not find user profile for account ${payload.sub}. Cannot join personal room.`,
+        );
       }
 
       // --- LOGIC PHÂN QUYỀN TỰ ĐỘNG ---
       // Nếu là Admin/Manager/Staff -> Tự động cho vào phòng nhận thông báo hệ thống
       if (['super_admin', 'branch_manager', 'staff'].includes(payload.role)) {
         await client.join('admin_notifications');
-        this.logger.log(`User ${payload.email} joined admin_notifications room`);
+        this.logger.log(
+          `User ${payload.email} joined admin_notifications room`,
+        );
       }
-
-
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       this.logger.error(`Connection unauthorized: ${errorMessage}`);

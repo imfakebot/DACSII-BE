@@ -63,7 +63,7 @@ export class Voucher {
   updatedAt!: Date;
 
   @DeleteDateColumn({ name: 'deleted_at' })
-  deleteAt!: Date
+  deleteAt!: Date;
 
   @OneToMany(() => Payment, (payment) => payment.voucher)
   payments!: Payment[];

@@ -32,4 +32,4 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   providers: [EventGateway],
   exports: [EventGateway],
 })
-export class EventModule { }
+export class EventModule {}

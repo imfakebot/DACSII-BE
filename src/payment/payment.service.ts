@@ -32,7 +32,7 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
-  ) { }
+  ) {}
 
   createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
     const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
@@ -152,7 +152,9 @@ export class PaymentService {
     const rspCode = String(vnp_Params['vnp_ResponseCode'] ?? '');
     const vnp_Amount = parseInt(String(vnp_Params['vnp_Amount'] ?? '0')) / 100;
 
-    const transactionNo = vnp_Params['vnp_TransactionNo'] || (vnp_Params['vnp_BankTranNo'] as string);
+    const transactionNo =
+      vnp_Params['vnp_TransactionNo'] ||
+      (vnp_Params['vnp_BankTranNo'] as string);
     const bankCode = vnp_Params['vnp_BankCode'] as string;
     const payDate = vnp_Params['vnp_PayDate'] as string;
 
@@ -166,8 +168,8 @@ export class PaymentService {
           'booking.userProfile',
           'booking.userProfile.account',
           'booking.field',
-          'booking.field.branch',             // Thêm branch
-          'booking.field.branch.address',     // Lấy address từ branch
+          'booking.field.branch', // Thêm branch
+          'booking.field.branch.address', // Lấy address từ branch
           'booking.field.branch.address.ward',
           'booking.field.branch.address.city',
         ],
@@ -179,7 +181,9 @@ export class PaymentService {
       }
 
       if (Number(payment.finalAmount) !== vnp_Amount) {
-        this.logger.warn(`Số tiền không hợp lệ. DB: ${payment.finalAmount}, VNPAY: ${vnp_Amount}`);
+        this.logger.warn(
+          `Số tiền không hợp lệ. DB: ${payment.finalAmount}, VNPAY: ${vnp_Amount}`,
+        );
         return { RspCode: '04', Message: 'Số tiền không khớp' };
       }
 
@@ -191,19 +195,35 @@ export class PaymentService {
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
         ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${branchAddressObj.city?.name || ''}`
-          .replace(/,\s*,/g, ',')
-          .trim()
-          .replace(/,\s*$/, '')
+            .replace(/,\s*,/g, ',')
+            .trim()
+            .replace(/,\s*$/, '')
         : 'Đang cập nhật';
 
-      const startTime = moment(payment.booking.start_time).format('HH:mm [ngày] DD/MM/YYYY');
-      const endTime = moment(payment.booking.end_time).format('HH:mm [ngày] DD/MM/YYYY');
-      const finalAmountStr = payment.finalAmount.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
+      const startTime = moment(payment.booking.start_time).format(
+        'HH:mm [ngày] DD/MM/YYYY',
+      );
+      const endTime = moment(payment.booking.end_time).format(
+        'HH:mm [ngày] DD/MM/YYYY',
+      );
+      const finalAmountStr = payment.finalAmount.toLocaleString('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+      });
 
       if (rspCode == '00') {
         // --- THÀNH CÔNG ---
-        await this.bookingService.updateStatus(bookingId, BookingStatus.COMPLETED);
-        await this.updatePayment(payment, PaymentStatus.COMPLETED, transactionNo, bankCode, payDate);
+        await this.bookingService.updateStatus(
+          bookingId,
+          BookingStatus.COMPLETED,
+        );
+        await this.updatePayment(
+          payment,
+          PaymentStatus.COMPLETED,
+          transactionNo,
+          bankCode,
+          payDate,
+        );
 
         await this.notificationService.createNotification({
           title: 'Thanh toán thành công',
@@ -223,7 +243,10 @@ export class PaymentService {
             endTime: endTime,
             finalAmount: finalAmountStr,
             bookingId: bookingId,
-            frontendUrl: this.vnpayConfiguration.returnUrl?.split('/payment/vnpay_return')[0] ?? '',
+            frontendUrl:
+              this.vnpayConfiguration.returnUrl?.split(
+                '/payment/vnpay_return',
+              )[0] ?? '',
             currentYear: new Date().getFullYear(),
           },
         });
@@ -238,8 +261,17 @@ export class PaymentService {
         this.logger.log(`Booking ${bookingId} đã được xác nhận`);
       } else {
         // --- THẤT BẠI ---
-        await this.bookingService.updateStatus(bookingId, BookingStatus.CANCELLED);
-        await this.updatePayment(payment, PaymentStatus.FAILED, transactionNo, bankCode, payDate);
+        await this.bookingService.updateStatus(
+          bookingId,
+          BookingStatus.CANCELLED,
+        );
+        await this.updatePayment(
+          payment,
+          PaymentStatus.FAILED,
+          transactionNo,
+          bankCode,
+          payDate,
+        );
 
         await this.notificationService.createNotification({
           title: 'Thanh toán thất bại',
@@ -248,7 +280,11 @@ export class PaymentService {
         });
 
         if (payment.voucher) {
-          await this.voucherRepository.increment({ id: payment.voucher.id }, 'quantity', 1);
+          await this.voucherRepository.increment(
+            { id: payment.voucher.id },
+            'quantity',
+            1,
+          );
           this.logger.log(`Voucher ${payment.voucher.code} đã được hoàn lại`);
         }
 
@@ -276,12 +312,15 @@ export class PaymentService {
     }
   }
 
-  private sortObject(obj: Record<string, string | number | undefined | null>): Record<string, string> {
+  private sortObject(
+    obj: Record<string, string | number | undefined | null>,
+  ): Record<string, string> {
     const sorted: Record<string, any> = {};
     const keys = Object.keys(obj).sort();
     keys.forEach((key) => {
       const value = obj[key];
-      const valueString = value === null || value === undefined ? '' : String(value);
+      const valueString =
+        value === null || value === undefined ? '' : String(value);
       sorted[key] = encodeURIComponent(valueString).replace(/%20/g, '+');
     });
     return sorted;
@@ -314,7 +353,12 @@ export class PaymentService {
     });
   }
 
-  private async sendEmailSafely(mailOptions: { to: string; subject: string; template: string; context: object; }) {
+  private async sendEmailSafely(mailOptions: {
+    to: string;
+    subject: string;
+    template: string;
+    context: object;
+  }) {
     try {
       await this.mailerService.sendMail(mailOptions);
     } catch (error) {
@@ -323,13 +367,17 @@ export class PaymentService {
   }
 
   async getStats(startDate?: string, endDate?: string, branchId?: string) {
-    const query = this.paymentRepository.createQueryBuilder('payment')
+    const query = this.paymentRepository
+      .createQueryBuilder('payment')
       .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.field', 'field')
       .leftJoin('field.branch', 'branch'); // Join chuẩn theo schema mới
 
     if (startDate && endDate) {
-      query.where('payment.createdAt BETWEEN :start AND :end', { start: startDate, end: endDate });
+      query.where('payment.createdAt BETWEEN :start AND :end', {
+        start: startDate,
+        end: endDate,
+      });
     }
 
     if (branchId) {
@@ -337,22 +385,27 @@ export class PaymentService {
     }
 
     // 1. Tổng doanh thu (Chỉ tính đơn COMPLETED)
-    const revenue = await query.clone()
+    const revenue = await query
+      .clone()
       .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
       .select('SUM(payment.finalAmount)', 'total')
       .getRawOne<{ total: string | null }>();
 
     // 2. Số lượng đơn theo trạng thái
-    const statusCounts = await query.clone()
+    const statusCounts = await query
+      .clone()
       .select('payment.status', 'status')
       .addSelect('COUNT(payment.id)', 'count')
       .groupBy('payment.status')
       .getRawMany<{ status: string; count: string }>();
 
-    const transaction = statusCounts.reduce((acc, curr) => {
-      acc[curr.status] = Number(curr.count);
-      return acc;
-    }, {} as Record<string, number>);
+    const transaction = statusCounts.reduce(
+      (acc, curr) => {
+        acc[curr.status] = Number(curr.count);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       revenue: Number(revenue?.total || 0),
@@ -361,7 +414,8 @@ export class PaymentService {
   }
 
   async getRevenueChart(year: number, branchId?: string) {
-    const query = this.paymentRepository.createQueryBuilder('payment')
+    const query = this.paymentRepository
+      .createQueryBuilder('payment')
       .select('MONTH(payment.createdAt)', 'month') // Lưu ý: Hàm MONTH() này dành cho MySQL. Nếu dùng Postgres thì sửa thành EXTRACT(MONTH FROM ...)
       .addSelect('SUM(payment.finalAmount)', 'revenue')
       .leftJoin('payment.booking', 'booking')
@@ -376,9 +430,12 @@ export class PaymentService {
 
     query.groupBy('month').orderBy('month', 'ASC');
 
-    const result = await query.getRawMany<{ month: string | number; revenue: string | number }>();
+    const result = await query.getRawMany<{
+      month: string | number;
+      revenue: string | number;
+    }>();
 
-    return result.map(row => ({
+    return result.map((row) => ({
       month: Number(row.month),
       revenue: Number(row.revenue),
     }));

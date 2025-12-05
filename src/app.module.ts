@@ -74,8 +74,6 @@ import { BranchModule } from './branch/branch.module';
       inject: [ConfigService],
     }),
 
-
-
     /**
      * @description
      * Cấu hình ServeStaticModule để phục vụ các tệp tĩnh từ thư mục 'uploads'.
@@ -178,4 +176,4 @@ import { BranchModule } from './branch/branch.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

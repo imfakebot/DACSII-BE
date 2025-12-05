@@ -50,7 +50,7 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /bookings
@@ -61,7 +61,7 @@ export class BookingController {
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Throttle({ default: { limit: 5, ttl: 60000 } },)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({
     summary: 'Tạo yêu cầu đặt sân mới (Kèm xử lý Voucher & VNPay)',
   })
@@ -167,11 +167,11 @@ export class BookingController {
   }
 
   /**
-  * @route GET /bookings/management/all
-  * @description Lấy danh sách booking.
-  * - Admin: Xem tất cả.
-  * - Manager/Staff: Chỉ xem booking thuộc chi nhánh của mình.
-  */
+   * @route GET /bookings/management/all
+   * @description Lấy danh sách booking.
+   * - Admin: Xem tất cả.
+   * - Manager/Staff: Chỉ xem booking thuộc chi nhánh của mình.
+   */
   @Get('management/all') // Đổi tên route cho phù hợp ngữ cảnh quản lý chung
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager, Role.Staff) // <--- Cho phép cả 3 role
@@ -179,7 +179,7 @@ export class BookingController {
   @ApiOperation({ summary: '(Admin/Manager/Staff) Lấy danh sách booking' })
   async getAllBooking(
     @Query() filter: FilterBookingDto, // Dùng DTO Filter thay vì liệt kê từng param
-    @User() user: AuthenticatedUser,   // <--- Truyền User vào để lấy branch_id
+    @User() user: AuthenticatedUser, // <--- Truyền User vào để lấy branch_id
   ) {
     // Gọi hàm getAllBookings (số nhiều) bên Service mà ta đã sửa ở bước trước
     return this.bookingService.getAllBookings(filter, user);

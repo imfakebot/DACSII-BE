@@ -12,7 +12,7 @@ import {
   UploadedFile,
   HttpStatus,
   BadRequestException,
-  Post
+  Post,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -44,7 +44,7 @@ export class UsersController {
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
    */
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   /**
    * @route GET /users/me
@@ -203,14 +203,19 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager) // Chỉ Admin và Manager được phép
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo tài khoản Manager (bởi Admin) hoặc Staff (bởi Manager)' })
+  @ApiOperation({
+    summary: 'Tạo tài khoản Manager (bởi Admin) hoặc Staff (bởi Manager)',
+  })
   @ApiResponse({ status: 201, description: 'Tạo nhân viên thành công.' })
   @ApiResponse({ status: 403, description: 'Không có quyền tạo.' })
   async createEmployee(
     @User() user: AuthenticatedUser,
-    @Body() createEmployeeDto: CreateEmployeeDto
+    @Body() createEmployeeDto: CreateEmployeeDto,
   ) {
-    const newAccount = await this.usersService.createEmployee(user.id, createEmployeeDto);
+    const newAccount = await this.usersService.createEmployee(
+      user.id,
+      createEmployeeDto,
+    );
     if (newAccount) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password_hash, ...result } = newAccount;
