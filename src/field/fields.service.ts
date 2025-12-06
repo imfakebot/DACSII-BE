@@ -76,7 +76,7 @@ export class FieldsService {
 
     // Permission check: User must be an Admin or the designated manager of this branch.
     const isManagerOfBranch = branch.manager_id === userProfile.id;
-    const isAdmin = userProfile.account.role === Role.Admin ;
+    const isAdmin = userProfile.account.role === Role.Admin;
 
     if (!isManagerOfBranch && !isAdmin) {
       this.logger.error(
@@ -120,7 +120,7 @@ export class FieldsService {
       .leftJoinAndSelect('field.branch', 'branch')
       .leftJoinAndSelect('branch.address', 'address')
       .leftJoinAndSelect('address.ward', 'ward')
-      .leftJoinAndSelect('address.city', 'city');
+      .leftJoinAndSelect('branch.city', 'city');
 
     if (branchId) {
       query.andWhere('branch.id = :branchId', { branchId });
