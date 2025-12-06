@@ -24,6 +24,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
 import { Response } from 'express';
 import { BranchModule } from './branch/branch.module';
+import { UtilityModule } from './utility/utility.module';
 
 /**
  * @module AppModule
@@ -138,6 +139,8 @@ import { BranchModule } from './branch/branch.module';
     FeedbacksModule,
 
     BranchModule,
+
+    UtilityModule,
 
     /**
      * @description

@@ -90,7 +90,6 @@ export class FieldsController {
     return this.fieldsService.create(createFieldDto, userProfile);
   }
 
-  // --- ĐÃ XÓA ROUTE /geocode VÌ LOGIC ĐÃ CHUYỂN SANG BRANCH SERVICE ---
 
   /**
    * @route GET /fields
@@ -126,7 +125,7 @@ export class FieldsController {
    */
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cho phép Manager cập nhật
+  @Roles(Role.Admin, Role.Manager)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật thông tin sân bóng (Admin/Manager)' })
   @ApiResponse({

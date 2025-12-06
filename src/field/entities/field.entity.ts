@@ -13,7 +13,7 @@ import {
 } from 'typeorm';
 import { FieldType } from './field-types.entity';
 import { FieldImage } from './field-image.entity';
-import { Utility } from './utility.entity';
+import { Utility } from '../../utility/entities/utility.entity';
 import { Booking } from '@/booking/entities/booking.entity';
 import { Review } from '@/review/entities/review.entity';
 import { Branch } from '@/branch/entities/branch.entity';

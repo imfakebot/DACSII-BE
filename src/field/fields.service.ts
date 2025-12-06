@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Field } from './entities/field.entity';
 import { CreateFieldDto } from './dto/create-fields.dto'; // Nhớ cập nhật DTO này
 import { UpdateFieldDto } from './dto/update-fields.dto';
@@ -17,6 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { Branch } from '@/branch/entities/branch.entity';
 import { UserProfile } from '../user/entities/users-profile.entity';
 import { Role } from '@/auth/enums/role.enum';
+import { Utility } from '../utility/entities/utility.entity';
 
 /**
  * @class FieldsService
@@ -32,6 +33,7 @@ export class FieldsService {
    * @param {Repository<FieldImage>} fieldImageRepository - Repository cho thực thể FieldImage.
    * @param {Repository<Branch>} branchRepository - Repository cho thực thể Branch.
    * @param {ConfigService} configService - Service để truy cập biến môi trường.
+   * @param {Repository<Utility>} utilityRepository - Repository cho thực thể Utility.
    */
   constructor(
     @InjectRepository(Field)
@@ -40,6 +42,8 @@ export class FieldsService {
     private readonly fieldImageRepository: Repository<FieldImage>,
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
+    @InjectRepository(Utility)
+    private readonly utilityRepository: Repository<Utility>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -59,8 +63,8 @@ export class FieldsService {
         createFieldDto,
       )}`,
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { branchId, fieldTypeId, ...fieldData } = createFieldDto;
+
+    const { fieldTypeId, utilityIds, ...fieldData } = createFieldDto;
 
     // Get branch automatically from the user's profile
     const branch = userProfile.branch;
@@ -93,11 +97,21 @@ export class FieldsService {
       fieldType: { id: fieldTypeId } as FieldType,
     });
 
+    if (utilityIds && utilityIds.length > 0) {
+      const utilities = await this.utilityRepository.findBy({
+        id: In(utilityIds),
+      });
+      if (utilities.length !== utilityIds.length) {
+        throw new BadRequestException('Một hoặc nhiều ID tiện ích không hợp lệ.');
+      }
+      newField.utilities = utilities;
+    }
+
     const savedField = await this.fieldRepository.save(newField);
     this.logger.log(
       `Field ${savedField.id} created successfully in branch ${branch.id}`,
     );
-    return savedField;
+    return this.findOne(savedField.id);
   }
 
   /**
@@ -108,7 +122,9 @@ export class FieldsService {
    * @returns {Promise<Field[]>} - Danh sách các sân bóng phù hợp.
    */
   async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
-    this.logger.log(`Finding all fields with filter: ${JSON.stringify(filterDto)}`);
+    this.logger.log(
+      `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
+    );
     const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } =
       filterDto;
 
@@ -207,12 +223,24 @@ export class FieldsService {
    * @returns {Promise<Field>} - Sân bóng sau khi đã được cập nhật.
    */
   async update(id: string, updateFieldDto: UpdateFieldDto): Promise<Field> {
-    this.logger.log(`Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`);
-    const field = await this.findOne(id);
-    const { branchId, fieldTypeId, ...fieldData } = updateFieldDto;
+    this.logger.log(
+      `Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`,
+    );
+    const field = await this.fieldRepository.findOne({
+      where: { id },
+      relations: ['utilities'], // <-- Load existing utilities
+    });
 
+    if (!field) {
+      throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
+    }
+
+    const { branchId, fieldTypeId, utilityIds, ...fieldData } = updateFieldDto;
+
+    // Merge scalar properties
     this.fieldRepository.merge(field, fieldData);
 
+    // Handle relations
     if (fieldTypeId) {
       field.fieldType = { id: fieldTypeId } as FieldType;
     }
@@ -228,9 +256,28 @@ export class FieldsService {
       field.branch = branch;
     }
 
-    const updatedField = await this.fieldRepository.save(field);
+    // Handle utilities - This logic is better
+    // If utilityIds is in the DTO, we update the relation.
+    // If it's not present (undefined), we don't touch the existing utilities.
+    if (utilityIds !== undefined) {
+      if (utilityIds.length === 0) {
+        field.utilities = [];
+      } else {
+        const utilities = await this.utilityRepository.findBy({
+          id: In(utilityIds),
+        });
+        if (utilities.length !== utilityIds.length) {
+          throw new BadRequestException(
+            'Một hoặc nhiều ID tiện ích không hợp lệ.',
+          );
+        }
+        field.utilities = utilities;
+      }
+    }
+
+    await this.fieldRepository.save(field);
     this.logger.log(`Field ${id} updated successfully`);
-    return updatedField;
+    return this.findOne(id); // Reload to get all relations fresh from DB
   }
 
   /**
