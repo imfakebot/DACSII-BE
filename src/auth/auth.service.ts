@@ -231,11 +231,8 @@ export class AuthService {
     const payload: JwtPayload & { branch_id?: string } = {
       email: user.email,
       sub: user.id,
-      // Sửa lỗi: Kiểm tra nếu role là object thì lấy name, ngược lại dùng chính nó
-      role:
-        typeof user.role === 'object' && user.role !== null
-          ? user.role.name
-          : String(user.role),
+      // Sau khi refactor, user.role luôn là một giá trị từ enum (string)
+      role: user.role,
       branch_id: bracnhId,
     };
 
@@ -286,11 +283,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        // Sửa lỗi: Tương tự như trên, chuẩn hóa cách lấy role name
-        role:
-          typeof user.role === 'object' && user.role !== null
-            ? user.role.name
-            : String(user.role),
+        // Sau khi refactor, user.role luôn là một giá trị từ enum (string)
+        role: user.role,
         is_profile_complete:
           user.userProfile &&
             typeof user.userProfile === 'object' &&

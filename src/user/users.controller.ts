@@ -207,9 +207,10 @@ export class UsersController {
 
   /**
    * @route POST /users/create-employee
-   * @description Tạo tài khoản nhân viên mới.
-   * - Admin -> Tạo Manager (Bắt buộc nhập branchId).
-   * - Manager -> Tạo Staff (Tự động lấy branchId của Manager).
+   * @description Tạo tài khoản nhân viên mới (Manager hoặc Staff).
+   * - Admin có thể tạo Manager.
+   * - Manager có thể tạo Staff.
+   * Chi nhánh của nhân viên mới sẽ được tự động gán theo chi nhánh của người tạo.
    */
   @Post('create-employee')
   @UseGuards(JwtAuthGuard, RolesGuard)

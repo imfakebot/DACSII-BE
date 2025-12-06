@@ -59,29 +59,31 @@ export class FieldsService {
         createFieldDto,
       )}`,
     );
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { branchId, fieldTypeId, ...fieldData } = createFieldDto;
 
-    const branch: Branch | null = await this.branchRepository.findOne({
-      where: { id: branchId },
-      relations: ['manager'],
-    });
+    // Get branch automatically from the user's profile
+    const branch = userProfile.branch;
 
     if (!branch) {
-      this.logger.error(`Branch with ID ${branchId} not found`);
-      throw new NotFoundException(
-        'Chi nhánh hoặc người quản lý của chi nhánh không tồn tại.',
+      this.logger.error(
+        `User ${userProfile.id} is not associated with any branch.`,
+      );
+      throw new ForbiddenException(
+        'Tài khoản của bạn phải được gán vào một chi nhánh để có thể tạo sân bóng.',
       );
     }
 
-    if (
-      branch.manager.id !== userProfile.id &&
-      userProfile.account.role.name !== (Role.Admin as string)
-    ) {
+    // Permission check: User must be an Admin or the designated manager of this branch.
+    const isManagerOfBranch = branch.manager_id === userProfile.id;
+    const isAdmin = userProfile.account.role === Role.Admin ;
+
+    if (!isManagerOfBranch && !isAdmin) {
       this.logger.error(
-        `User ${userProfile.id} does not have permission to add a field to branch ${branchId}`,
+        `User ${userProfile.id} (Role: ${userProfile.account.role}) does not have permission to add a field to branch ${branch.id}`,
       );
       throw new ForbiddenException(
-        'Bạn không có quyền thêm sân vào chi nhánh này',
+        'Bạn không phải là quản lý của chi nhánh này để thêm sân.',
       );
     }
 
@@ -93,7 +95,7 @@ export class FieldsService {
 
     const savedField = await this.fieldRepository.save(newField);
     this.logger.log(
-      `Field ${savedField.id} created successfully in branch ${branchId}`,
+      `Field ${savedField.id} created successfully in branch ${branch.id}`,
     );
     return savedField;
   }

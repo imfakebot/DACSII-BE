@@ -11,7 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt'; // Sửa lại cách import bcrypt để tương thích tốt hơn
 import { Account } from './entities/account.entity';
-import { Role } from './entities/role.entity';
+import { Role } from '../auth/enums/role.enum';
 import { UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
@@ -71,7 +71,6 @@ export class UsersService {
    */
   constructor(
     @InjectRepository(Account) private accountRepository: Repository<Account>,
-    @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
   ) { }
@@ -111,23 +110,13 @@ export class UsersService {
 
         await transactionalEntityManager.save(newProfile);
 
-        const defaultRole = await transactionalEntityManager.findOneBy(Role, {
-          name: 'User',
-        });
-        if (!defaultRole) {
-          this.logger.error('Default role "User" not found');
-          throw new Error(
-            'Default role "User" not found. Please seed the database.',
-          );
-        }
-
         const newAccount = transactionalEntityManager.create(Account, {
           email: data.email,
           password_hash: data.passwordHash,
           verification_code: data.verificationCode,
           verification_code_expires_at: data.expiresAt,
           userProfile: newProfile,
-          role: defaultRole,
+          role: Role.User, // Gán vai trò trực tiếp từ enum
         });
 
         return transactionalEntityManager.save(newAccount);
@@ -150,23 +139,13 @@ export class UsersService {
         });
         await transactionalEntityManager.save(newProfile);
 
-        const defaultRole = await transactionalEntityManager.findOneBy(Role, {
-          name: 'User',
-        });
-        if (!defaultRole) {
-          this.logger.error('Default role "User" not found');
-          throw new Error(
-            'Default role "User" not found. Please seed the database.',
-          );
-        }
-
         const newAccount = transactionalEntityManager.create(Account, {
           email: data.email,
           provider: data.provider,
           is_verified: true, // Tài khoản OAuth được coi là đã xác thực
           password_hash: null,
           userProfile: newProfile,
-          role: defaultRole,
+          role: Role.User, // Gán vai trò trực tiếp từ enum
         });
 
         return transactionalEntityManager.save(newAccount);
@@ -551,39 +530,27 @@ export class UsersService {
       throw new NotFoundException('Người thực hiện không tồn tại.');
     }
 
-    const requesterRole = requester.role.name;
+    const requesterRole = requester.role;
     let targetRoleName = '';
-    let targetBranchId = '';
 
-    // 2. Phân quyền và Logic xác định Role/Branch cho tài khoản mới
-    if (requesterRole === 'super_admin') {
-      // Admin tạo Manager
-      targetRoleName = 'branch_manager';
-
-      if (!data.branchId) {
-        throw new BadRequestException(
-          'Admin phải cung cấp branchId khi tạo Manager.',
-        );
-      }
-      targetBranchId = data.branchId;
-    } else if (requesterRole === 'branch_manager') {
-      // Manager tạo Staff
-      targetRoleName = 'staff';
-
-      // Kiểm tra xem Manager này có thuộc chi nhánh nào không
-      if (!requester.userProfile.branch) {
-        throw new ForbiddenException(
-          'Tài khoản quản lý này chưa được gán vào chi nhánh nào.',
-        );
-      }
-      // Staff sẽ thuộc cùng chi nhánh với Manager
-      targetBranchId = requester.userProfile.branch.id;
+    // 2. Phân quyền và xác định vai trò của nhân viên mới
+    if (requesterRole === Role.Admin) {
+      targetRoleName = Role.Manager;
+    } else if (requesterRole === Role.Manager) {
+      targetRoleName = Role.Staff;
     } else {
-      // User thường hoặc Staff không được phép tạo account
       throw new ForbiddenException(
         'Bạn không có quyền tạo tài khoản nhân viên.',
       );
     }
+
+    // 3. Logic mới: Lấy Branch ID tự động từ người tạo (requester)
+    if (!requester.userProfile?.branch?.id) {
+      throw new ForbiddenException(
+        'Tài khoản của bạn phải được gán vào một chi nhánh để thực hiện hành động này.',
+      );
+    }
+    const targetBranchId = requester.userProfile.branch.id;
 
     // 3. Kiểm tra Email đã tồn tại chưa
     const existingUser = await this.accountRepository.findOneBy({
@@ -606,13 +573,6 @@ export class UsersService {
 
     // 6. Thực hiện Transaction lưu DB
     return this.accountRepository.manager.transaction(async (manager) => {
-      // 6.1 Lấy Role từ DB
-      const targetRole = await manager.findOne(Role, {
-        where: { name: targetRoleName },
-      });
-      if (!targetRole)
-        throw new NotFoundException(`Role ${targetRoleName} không tồn tại.`);
-
       // 6.2 Lấy Branch từ DB
       const branch = await manager.findOne(Branch, {
         where: { id: targetBranchId },
@@ -637,7 +597,7 @@ export class UsersService {
         is_verified: true, // Tài khoản nội bộ được xác thực luôn
         status: AccountStatus.ACTIVE,
         userProfile: newProfile,
-        role: targetRole,
+        role: targetRoleName as Role, // Gán vai trò trực tiếp
       });
 
       const savedAccount = await manager.save(newAccount);

@@ -49,10 +49,10 @@ export class CreateEmployeeDto {
   @IsOptional()
   bio?: string;
 
-  // Chỉ bắt buộc nếu người tạo là Admin (để chỉ định chi nhánh cho Manager)
+  // Trường này không còn được sử dụng và sẽ bị bỏ qua. Branch ID được lấy tự động từ người tạo.
   @ApiPropertyOptional({
     description:
-      'ID của chi nhánh (Bắt buộc khi Admin tạo Manager, tự động lấy khi Manager tạo Staff)',
+      '[DEPRECATED] Trường này không còn được sử dụng. ID chi nhánh được lấy tự động từ người tạo.',
     format: 'uuid',
   })
   @IsString()

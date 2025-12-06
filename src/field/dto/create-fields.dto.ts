@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsUUID, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 import sanitizeHtml from 'sanitize-html';
@@ -47,12 +47,11 @@ export class CreateFieldDto {
    * @property {string} branchId - THÊM MỚI
    * @description ID của Chi nhánh mà sân này thuộc về.
    */
-  @ApiProperty({
-    description: 'ID của Chi nhánh quản lý sân này',
+  @ApiPropertyOptional({
+    description: '[DEPRECATED] Không cần cung cấp. ID chi nhánh sẽ được lấy tự động từ tài khoản của bạn.',
     format: 'uuid',
-    example: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
   })
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  branchId!: string;
+  branchId?: string;
 }

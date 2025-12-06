@@ -2,7 +2,6 @@ import {
   Entity,
   PrimaryColumn,
   Column,
-  ManyToOne,
   JoinColumn,
   OneToOne,
   BeforeInsert,
@@ -10,14 +9,15 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { Role } from './role.entity';
 import { UserProfile } from './users-profile.entity';
 import { Exclude } from 'class-transformer';
 import { AccountStatus } from '../enum/account-status.enum';
 import { AuthProvider } from '../enum/auth-provider.enum';
 import { ApiProperty } from '@nestjs/swagger';
+import { Role } from '@/auth/enums/role.enum';
 
 /**
+ * @enum Roles
  * @class Account
  * @description Đại diện cho bảng `accounts` trong cơ sở dữ liệu.
  * Lưu trữ thông tin xác thực và trạng thái cốt lõi của người dùng.
@@ -160,11 +160,16 @@ export class Account {
   updated_at!: Date;
 
   /**
-   * Mối quan hệ nhiều-một với Role, xác định vai trò của tài khoản.
+   * Vai trò của tài khoản trong hệ thống.
+   * Sử dụng enum để đảm bảo tính nhất quán của dữ liệu.
    */
-  @ApiProperty({ type: () => Role })
-  @ManyToOne(() => Role, (role) => role.accounts)
-  @JoinColumn({ name: 'role_id' })
+  @ApiProperty({ enum: Role, example: Role.User })
+  @Column({
+    type: 'enum',
+    enum: Role,
+    name: 'role',
+    default: Role.User,
+  })
   role!: Role;
 
   /**
