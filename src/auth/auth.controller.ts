@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Res,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -43,6 +44,7 @@ import { AuthenticatedUser } from './interface/authenicated-user.interface';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
   constructor(
     private readonly authService: AuthService,
     /**
@@ -50,7 +52,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -72,6 +74,7 @@ export class AuthController {
   @ApiBody({ type: RegisterUserDto })
   @HttpCode(HttpStatus.OK)
   initiateRegistration(@Body() registerDto: RegisterUserDto) {
+    this.logger.log(`Registration initiated for ${registerDto.email}`);
     return this.authService.initiateRegistration(registerDto);
   }
 
@@ -91,6 +94,7 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Mã không hợp lệ hoặc đã hết hạn.' })
   @HttpCode(HttpStatus.OK)
   completeRegistration(@Body() verifyEmailDto: VerifyEmailDto) {
+    this.logger.log(`Completing registration for ${verifyEmailDto.email}`);
     return this.authService.completeRegistration(
       verifyEmailDto.email,
       verifyEmailDto.verificationCode,
@@ -111,7 +115,8 @@ export class AuthController {
     description: 'Chuyển hướng đến trang đăng nhập của Google.',
   })
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async googleAuth(@Req() _req: Request) {
+  googleAuth(@Req() _req: Request) {
+    this.logger.log('Initiating Google authentication');
     // Guard sẽ tự động chuyển hướng, không cần code trong hàm này.
   }
 
@@ -143,6 +148,7 @@ export class AuthController {
     @User() user: AuthenticatedUser,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.logger.log(`Google callback successful for user ${user.email}`);
     const loginData = await this.authService.login(user);
 
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
@@ -163,9 +169,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })},'${frontendURL}');
       window.close();
     </script>
     `;
@@ -196,6 +202,7 @@ export class AuthController {
   })
   refreshTokens(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub;
+    this.logger.log(`Refreshing tokens for user ${userId}`);
     return this.authService.refreshTokens(userId);
   }
 
@@ -221,6 +228,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const userId = req.user.sub;
+    this.logger.log(`User ${userId} logging out`);
     await this.authService.logout(userId);
     res.clearCookie('refresh_token', { path: '/' });
     return { message: 'Đăng xuất thành công' };
@@ -239,6 +247,9 @@ export class AuthController {
     description: 'Luôn trả về thông báo thành công để tránh dò email.',
   })
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    this.logger.log(
+      `Forgot password requested for email ${forgotPasswordDto.email}`,
+    );
     return this.authService.forgotPassword(forgotPasswordDto.email);
   }
 
@@ -260,6 +271,7 @@ export class AuthController {
     description: 'Token không hợp lệ hoặc đã hết hạn.',
   })
   resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    this.logger.log('Resetting password');
     return this.authService.resetPassword(
       resetPasswordDto.token,
       resetPasswordDto.newPassword,
@@ -285,6 +297,7 @@ export class AuthController {
   @ApiResponse({ status: 404, description: 'Tài khoản không tồn tại.' })
   @ApiBody({ type: LoginUserDto })
   loginInitiate(@Body() loginUserDto: LoginUserDto) {
+    this.logger.log(`Login initiated for ${loginUserDto.email}`);
     return this.authService.loginInitiate(
       loginUserDto.email,
       loginUserDto.password,
@@ -318,6 +331,7 @@ export class AuthController {
     @Body() loginCompleteDto: LoginCompleteDto,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.logger.log(`Completing login for ${loginCompleteDto.email}`);
     const loginData = await this.authService.loginComplete(
       loginCompleteDto.email,
       loginCompleteDto.verificationCode,

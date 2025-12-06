@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +36,7 @@ import { Role } from '@/auth/enums/role.enum';
 @Controller('feedbacks')
 @UseGuards(JwtAuthGuard)
 export class FeedbackController {
+  private readonly logger = new Logger(FeedbackController.name);
   /**
    * @constructor
    * @param {FeedbackService} feedbacksService - Service xử lý logic nghiệp vụ cho feedback.
@@ -54,6 +56,11 @@ export class FeedbackController {
   @ApiResponse({ status: 201, description: 'Tạo ticket thành công.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   create(@Body() createDto: CreateFeedbackDto, @User() account: Account) {
+    this.logger.log(
+      `User ${account.id} creating feedback with DTO: ${JSON.stringify(
+        createDto,
+      )}`,
+    );
     return this.feedbacksService.create(createDto, account);
   }
 
@@ -71,6 +78,7 @@ export class FeedbackController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   findMine(@User() account: Account) {
+    this.logger.log(`Fetching feedbacks for user ${account.id}`);
     return this.feedbacksService.findMyFeedbacks(account);
   }
 
@@ -86,6 +94,7 @@ export class FeedbackController {
   @ApiResponse({ status: 200, description: 'Trả về tất cả các ticket.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   findAll() {
+    this.logger.log('Fetching all feedbacks');
     return this.feedbacksService.findAll();
   }
 
@@ -100,6 +109,7 @@ export class FeedbackController {
   @ApiResponse({ status: 200, description: 'Trả về chi tiết ticket.' })
   @ApiResponse({ status: 404, description: 'Ticket not found.' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`Fetching feedback with id ${id}`);
     return this.feedbacksService.findOne(id);
   }
 
@@ -122,6 +132,11 @@ export class FeedbackController {
     @Body() dto: ReplyFeedbackDto,
     @User() account: Account, // 👈 Lấy account trực tiếp
   ) {
+    this.logger.log(
+      `User ${account.id} replying to feedback ${id} with DTO: ${JSON.stringify(
+        dto,
+      )}`,
+    );
     return this.feedbacksService.reply(id, dto, account);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Feedback } from './entities/feedback.entity';
@@ -14,6 +14,7 @@ import { EventGateway } from '@/event/event.gateway';
  */
 @Injectable()
 export class FeedbackService {
+  private readonly logger = new Logger(FeedbackService.name);
   /**
    * @constructor
    * @param {Repository<Feedback>} feedbackRepo - Repository cho thực thể Feedback.
@@ -37,7 +38,15 @@ export class FeedbackService {
    * @param {Account} account - Tài khoản của người dùng tạo feedback.
    * @returns {Promise<Feedback>} - Ticket feedback vừa được tạo.
    */
-  async create(createDto: CreateFeedbackDto, account: Account): Promise<Feedback> {
+  async create(
+    createDto: CreateFeedbackDto,
+    account: Account,
+  ): Promise<Feedback> {
+    this.logger.log(
+      `User ${account.id} creating feedback with DTO: ${JSON.stringify(
+        createDto,
+      )}`,
+    );
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -63,10 +72,12 @@ export class FeedbackService {
       await queryRunner.manager.save(firstResponse);
 
       await queryRunner.commitTransaction();
+      this.logger.log(`Feedback ${savedFeedback.id} created successfully`);
       // Thông báo cho admin về ticket mới
       this.eventGateway.notifyAdminsNewFeedback(savedFeedback);
       return savedFeedback;
     } catch (err) {
+      this.logger.error(`Error creating feedback: ${err}`);
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
@@ -81,6 +92,7 @@ export class FeedbackService {
    * @returns {Promise<Feedback[]>} - Danh sách các ticket.
    */
   async findMyFeedbacks(account: Account): Promise<Feedback[]> {
+    this.logger.log(`Finding feedbacks for user ${account.id}`);
     return this.feedbackRepo.find({
       where: { submitter: { id: account.userProfile.id } },
       order: { created_at: 'DESC' },
@@ -94,6 +106,7 @@ export class FeedbackService {
    * @returns {Promise<Feedback[]>} - Danh sách tất cả các ticket.
    */
   async findAll(): Promise<Feedback[]> {
+    this.logger.log('Finding all feedbacks');
     return this.feedbackRepo.find({
       order: { created_at: 'DESC' },
       relations: ['submitter'], // Load thông tin người gửi
@@ -108,6 +121,7 @@ export class FeedbackService {
    * @throws {NotFoundException} Nếu không tìm thấy ticket.
    */
   async findOne(id: string): Promise<Feedback> {
+    this.logger.log(`Finding feedback with id ${id}`);
     const feedback = await this.feedbackRepo.findOne({
       where: { id },
       relations: ['responses', 'responses.responder', 'submitter'],
@@ -115,7 +129,10 @@ export class FeedbackService {
         responses: { created_at: 'ASC' },
       },
     });
-    if (!feedback) throw new NotFoundException('Không tìm thấy ticket feedback.');
+    if (!feedback) {
+      this.logger.error(`Feedback with id ${id} not found`);
+      throw new NotFoundException('Không tìm thấy ticket feedback.');
+    }
     return feedback;
   }
 
@@ -128,13 +145,25 @@ export class FeedbackService {
    * @param {Account} account - Tài khoản của người gửi trả lời.
    * @returns {Promise<FeedbackResponse>} - Tin nhắn trả lời vừa được lưu.
    */
-  async reply(feedbackId: string, dto: ReplyFeedbackDto, account: Account): Promise<FeedbackResponse> {
+  async reply(
+    feedbackId: string,
+    dto: ReplyFeedbackDto,
+    account: Account,
+  ): Promise<FeedbackResponse> {
+    this.logger.log(
+      `User ${
+        account.id
+      } replying to feedback ${feedbackId} with DTO: ${JSON.stringify(dto)}`,
+    );
     const feedback = await this.findOne(feedbackId);
     const userProfile = account.userProfile;
     const roleName = account.role?.name || 'user';
 
     // Nếu admin/manager trả lời, cập nhật trạng thái ticket
     if (roleName !== 'user' && feedback.status === 'open') {
+      this.logger.log(
+        `Updating feedback ${feedbackId} status to in_progress`,
+      );
       await this.feedbackRepo.update(feedbackId, { status: 'in_progress' });
     }
 

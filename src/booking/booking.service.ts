@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, MoreThan, Not, Repository } from 'typeorm';
@@ -31,6 +32,7 @@ import moment from 'moment';
  */
 @Injectable()
 export class BookingService {
+  private readonly logger = new Logger(BookingService.name);
   constructor(
     @InjectRepository(Booking)
     private readonly bookingRepository: Repository<Booking>,
@@ -61,6 +63,11 @@ export class BookingService {
     createBookingDto: CreateBookingDto,
     userProfile: UserProfile,
   ) {
+    this.logger.log(
+      `Creating booking for user ${userProfile.id} with DTO: ${JSON.stringify(
+        createBookingDto,
+      )}`,
+    );
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -88,6 +95,9 @@ export class BookingService {
       });
 
       if (overlappingBooking) {
+        this.logger.warn(
+          `Overlapping booking found for field ${createBookingDto.fieldId} at time ${createBookingDto.startTime}`,
+        );
         throw new ConflictException(
           'Sân đã bị người khác đặt trong khung giờ này (hoặc đang thanh toán)!',
         );
@@ -109,6 +119,9 @@ export class BookingService {
 
       // --- 4. [FIX RACE CONDITION 2] XỬ LÝ VOUCHER ---
       if (createBookingDto.voucherCode) {
+        this.logger.log(
+          `Applying voucher ${createBookingDto.voucherCode} for booking`,
+        );
         const voucher = await queryRunner.manager.findOne(Voucher, {
           where: { code: createBookingDto.voucherCode },
           lock: { mode: 'pessimistic_write' }, //  QUAN TRỌNG: Khóa Voucher để tránh 2 người cùng dùng cái cuối cùng
@@ -126,7 +139,9 @@ export class BookingService {
           throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
         if (originalPrice < Number(voucher.minOrderValue)) {
           throw new BadRequestException(
-            `Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ`,
+            `Đơn hàng phải tối thiểu ${Number(
+              voucher.minOrderValue,
+            ).toLocaleString()}đ`,
           );
         }
 
@@ -185,6 +200,9 @@ export class BookingService {
       // --- 6. COMMIT ---
       await queryRunner.commitTransaction();
 
+      this.logger.log(
+        `Booking ${savedBooking.id} created successfully for user ${userProfile.id}`,
+      );
       // Tạo URL thanh toán (Làm ngoài transaction cho nhanh cũng được, hoặc trong cũng ok)
       const paymentUrl = this.paymentService.createVnPayUrl(
         finalPrice,
@@ -200,6 +218,8 @@ export class BookingService {
       };
     } catch (error) {
       // Rollback nếu có bất kỳ lỗi nào (kể cả lỗi Conflict ở bước 2)
+      this.logger.error(
+        `Error creating booking for user ${userProfile.id}:`, error);
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -220,6 +240,9 @@ export class BookingService {
    * @returns Một đối tượng chứa thông báo xác nhận hủy thành công.
    */
   async cancelBooking(bookingId: string, accountId: string, userRole: Role) {
+    this.logger.log(
+      `Attempting to cancel booking ${bookingId} by user ${accountId} with role ${userRole}`,
+    );
     // 1. Tìm booking kèm thông tin người đặt để kiểm tra quyền
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
@@ -227,6 +250,7 @@ export class BookingService {
     });
 
     if (!booking) {
+      this.logger.warn(`Booking ${bookingId} not found for cancellation`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
@@ -240,10 +264,14 @@ export class BookingService {
     // 2. Kiểm tra quyền
     // Only allow the owner of the booking or an admin to cancel
     if (bookingAccountId !== accountId && userRole !== Role.Admin) {
+      this.logger.error(
+        `User ${accountId} does not have permission to cancel booking ${bookingId}`,
+      );
       throw new ForbiddenException('Bạn không có quyền hủy đơn này.');
     }
 
     if (booking.status === BookingStatus.CANCELLED) {
+      this.logger.warn(`Booking ${bookingId} is already cancelled`);
       throw new BadRequestException('Đơn đặt sân đã được hủy trước đó.');
     }
 
@@ -251,6 +279,9 @@ export class BookingService {
     const timeDiff = booking.start_time.getTime() - new Date().getTime();
     if (timeDiff < 60 * 60 * 1000) {
       // 60 phút
+      this.logger.warn(
+        `Booking ${bookingId} cannot be cancelled due to time limit`,
+      );
       throw new BadRequestException('Chỉ có thể hủy trước giờ đá 60 phút.');
     }
 
@@ -262,6 +293,7 @@ export class BookingService {
       // 5. Cập nhật trạng thái booking -> Cancelled
       booking.status = BookingStatus.CANCELLED;
       await queryRunner.manager.save(Booking, booking);
+      this.logger.log(`Booking ${bookingId} status updated to CANCELLED`);
 
       //6. Xử lý payment và voucher
       const payment = await queryRunner.manager.findOne(Payment, {
@@ -272,6 +304,9 @@ export class BookingService {
       if (payment) {
         payment.status = PaymentStatus.FAILED;
         await queryRunner.manager.save(Payment, payment);
+        this.logger.log(
+          `Payment for booking ${bookingId} status updated to FAILED`,
+        );
 
         //7. Hoàn voucher (Nếu có dùng)
         if (payment.voucher) {
@@ -281,15 +316,20 @@ export class BookingService {
             'quantity',
             1,
           );
+          this.logger.log(
+            `Voucher for booking ${bookingId} has been refunded`,
+          );
         }
 
         await queryRunner.commitTransaction();
+        this.logger.log(`Booking ${bookingId} cancelled successfully`);
         return {
           message:
             'Hủy đơn đặt sân thành công. Mã giảm giá (nếu có) đã được hoàn lại.',
         };
       }
-  } catch (error) {
+    } catch (error) {
+      this.logger.error(`Error cancelling booking ${bookingId}:`, error);
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
@@ -303,6 +343,7 @@ export class BookingService {
    * @returns Promise giải quyết về thực thể `Booking` nếu tìm thấy, ngược lại là `null`.
    */
   findOne(id: string) {
+    this.logger.log(`Finding booking with id ${id}`);
     return this.bookingRepository.findOne({
       where: { id },
       relations: ['userProfile', 'userProfile.account', 'field'],
@@ -319,16 +360,18 @@ export class BookingService {
    * @throws {NotFoundException} - Ném ra nếu không tìm thấy đơn đặt sân với ID đã cho.
    */
   async updateStatus(bookingId: string, status: BookingStatus) {
+    this.logger.log(`Updating booking ${bookingId} to status ${status}`);
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
     });
     if (!booking) {
-      console.error(`Không tìm thấy đơn đặt sân với ID: ${bookingId}`);
+      this.logger.error(`Booking with ID: ${bookingId} not found`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
     booking.status = status;
     await this.bookingRepository.save(booking);
+    this.logger.log(`Booking ${bookingId} status updated to ${status}`);
   }
 
   /**
@@ -338,6 +381,11 @@ export class BookingService {
    * @returns {Promise<{ data: Booking[]; meta: { total: number; page: number; limit: number; lastPage: number; } }>} Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
   async getUserBooking(accountId: string, filter: FilterBookingDto) {
+    this.logger.log(
+      `Getting user bookings for account ${accountId} with filter: ${JSON.stringify(
+        filter,
+      )}`,
+    );
     const { status, page = 1, limit = 10 } = filter;
     const skip = (page - 1) * limit;
 
@@ -375,6 +423,10 @@ export class BookingService {
    * @returns {Promise<{ data: Booking[]; meta: { total: number; page: number; limit: number; lastPage: number; } }>} Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
   async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
+    this.logger.log(
+      `Getting all bookings for user ${user.id
+      } with filter: ${JSON.stringify(filter)}`,
+    );
     const { status, page = 1, limit = 10 } = filter;
     const skip = (page - 1) * limit;
 
@@ -419,6 +471,9 @@ export class BookingService {
    * @returns {Promise<{ data: Booking[]; total: number; page: number; lastPage: number; }>} - Một đối tượng chứa danh sách các đơn đặt sân, tổng số lượng, trang hiện tại và trang cuối cùng.
    */
   async findAll(page: number, limit: number, status?: BookingStatus) {
+    this.logger.log(
+      `Finding all bookings with page: ${page}, limit: ${limit}, status: ${status}`,
+    );
     const query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.userProfile', 'user')
@@ -445,6 +500,11 @@ export class BookingService {
     dto: AdminCreateBookingDto,
     user: AuthenticatedUser,
   ) {
+    this.logger.log(
+      `User ${user.id} creating booking by admin with DTO: ${JSON.stringify(
+        dto,
+      )}`,
+    );
     // Dùng Transaction để an toàn dữ liệu
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -467,13 +527,12 @@ export class BookingService {
         );
       }
       // 3.check giá và sân
-      const pricingResult = await this.pricingService.checkPriceAndAvailability(
-        {
+      const pricingResult =
+        await this.pricingService.checkPriceAndAvailability({
           fieldId: dto.fieldId,
           startTime: dto.startTime,
           durationMinutes: dto.durationMinutes,
-        },
-      );
+        });
 
       // 4. Tìm User
       let userProfile: UserProfile | null = null;
@@ -515,6 +574,9 @@ export class BookingService {
       await queryRunner.manager.save(Payment, newPayment);
 
       await queryRunner.commitTransaction();
+      this.logger.log(
+        `Booking ${savedBooking.id} created successfully by admin ${user.id}`,
+      );
       return savedBooking;
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -532,24 +594,37 @@ export class BookingService {
    * @throws {BadRequestException} Nếu đơn đặt sân không ở trạng thái 'COMPLETED' hoặc đã được check-in.
    */
   async checkInCustomer(bookingId: string): Promise<Booking> {
+    this.logger.log(`Checking in customer for booking ${bookingId}`);
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
     });
 
     if (!booking) {
-      throw new NotFoundException(`Không tìm thấy đơn đặt sân với mã: ${bookingId}`);
+      this.logger.warn(`Booking ${bookingId} not found for check-in`);
+      throw new NotFoundException(
+        `Không tìm thấy đơn đặt sân với mã: ${bookingId}`,
+      );
     }
 
     if (booking.status === BookingStatus.CHECKED_IN) {
-      throw new BadRequestException('Đơn đặt sân này đã được check-in trước đó.');
+      this.logger.warn(`Booking ${bookingId} is already checked in`);
+      throw new BadRequestException(
+        'Đơn đặt sân này đã được check-in trước đó.',
+      );
     }
 
     if (booking.status !== BookingStatus.COMPLETED) {
-      throw new BadRequestException(`Không thể check-in cho đơn ở trạng thái "${booking.status}". Đơn phải được thanh toán thành công.`);
+      this.logger.warn(
+        `Booking ${bookingId} is not in COMPLETED state for check-in`,
+      );
+      throw new BadRequestException(
+        `Không thể check-in cho đơn ở trạng thái "${booking.status}". Đơn phải được thanh toán thành công.`,
+      );
     }
 
     booking.status = BookingStatus.CHECKED_IN;
     booking.check_in_at = new Date();
+    this.logger.log(`Booking ${bookingId} checked in successfully`);
     return this.bookingRepository.save(booking);
   }
 

@@ -28,10 +28,6 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 255 })
   full_name!: string;
 
-  @ApiProperty({ example: 'user' })
-  @Column({ type: 'varchar', default: 'user' })
-  role!: string;
-
   @Exclude()
   @Column({ type: 'date', nullable: true })
   date_of_birth!: Date;

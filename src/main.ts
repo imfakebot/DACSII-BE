@@ -1,6 +1,10 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -11,7 +15,10 @@ import { AllExceptionsFilter } from './common/http-exception.filter';
  * @function bootstrap - Hàm khởi tạo và cấu hình ứng dụng NestJS.
  */
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule, {
+    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+  });
   app.useGlobalFilters(new AllExceptionsFilter());
   app.use(helmet());
   app.useGlobalPipes(
@@ -59,6 +66,9 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port, '0.0.0.0');
+  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Swagger is running on: http://localhost:${port}/api-doc`);
 }
 void bootstrap();

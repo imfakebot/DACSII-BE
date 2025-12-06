@@ -16,6 +16,7 @@ import {
   UseInterceptors,
   Query,
   ClassSerializerInterceptor,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -44,10 +45,11 @@ import { SkipThrottle } from '@nestjs/throttler';
 @ApiTags('Fields (Sân bóng)')
 @Controller('fields')
 export class FieldsController {
+  private readonly logger = new Logger(FieldsController.name);
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /fields
@@ -71,7 +73,14 @@ export class FieldsController {
     @Req() req: AuthenticatedRequest,
   ): Promise<Field> {
     const userId = req.user.sub;
-    const userProfile = await this.usersService.findProfileByAccountId(userId);
+    this.logger.log(
+      `User ${userId} creating field with DTO: ${JSON.stringify(
+        createFieldDto,
+      )}`,
+    );
+    const userProfile = await this.usersService.findProfileByAccountId(userId, [
+      'account.role',
+    ]);
 
     if (!userProfile) {
       throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
@@ -94,6 +103,7 @@ export class FieldsController {
   })
   @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query() filterDto: FilterFieldDto) {
+    this.logger.log(`Finding all fields with filter: ${JSON.stringify(filterDto)}`);
     return this.fieldsService.findAll(filterDto);
   }
 
@@ -106,6 +116,7 @@ export class FieldsController {
   @ApiResponse({ status: 200, description: 'Thành công.', type: Field })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Field> {
+    this.logger.log(`Finding field with id: ${id}`);
     return this.fieldsService.findOne(id);
   }
 
@@ -128,6 +139,9 @@ export class FieldsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
   ): Promise<Field> {
+    this.logger.log(
+      `Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`,
+    );
     // Lưu ý: Nếu cần kiểm tra Manager có được sửa sân này không,
     // cần truyền thêm UserProfile vào hàm update trong Service tương tự như hàm create.
     return this.fieldsService.update(id, updateFieldDto);
@@ -146,6 +160,7 @@ export class FieldsController {
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
+    this.logger.log(`Removing field with id: ${id}`);
     return this.fieldsService.remove(id);
   }
 
@@ -165,6 +180,7 @@ export class FieldsController {
     @Param('id') fieldId: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
+    this.logger.log(`Uploading ${files.length} images for field ${fieldId}`);
     return this.fieldsService.addImagesToField(fieldId, files);
   }
 }

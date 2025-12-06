@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -61,6 +62,7 @@ type UpdateUnverifiedAccountPayload = Partial<Account> & {
  */
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   /**
    * @param accountRepository Repository để tương tác với bảng 'accounts'.
    * @param roleRepository Repository để tương tác với bảng 'roles'.
@@ -72,7 +74,7 @@ export class UsersService {
     @InjectRepository(Role) private roleRepository: Repository<Role>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -83,6 +85,7 @@ export class UsersService {
     email: string,
     relations: string[] = [],
   ): Promise<Account | null> {
+    this.logger.log(`Finding account by email: ${email}`);
     return this.accountRepository.findOne({ where: { email }, relations });
   }
 
@@ -96,6 +99,7 @@ export class UsersService {
    * @throws {Error} Nếu vai trò 'User' mặc định không được tìm thấy trong cơ sở dữ liệu.
    */
   async createUnverifiedUser(data: CreateUnverifiedUserDto): Promise<Account> {
+    this.logger.log(`Creating unverified user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
         const newProfile = transactionalEntityManager.create(UserProfile, {
@@ -111,6 +115,7 @@ export class UsersService {
           name: 'User',
         });
         if (!defaultRole) {
+          this.logger.error('Default role "User" not found');
           throw new Error(
             'Default role "User" not found. Please seed the database.',
           );
@@ -137,6 +142,7 @@ export class UsersService {
    * @throws {Error} Nếu vai trò 'user' mặc định không được tìm thấy.
    */
   async createOAuthUser(data: CreateOAuthUserPayload): Promise<Account> {
+    this.logger.log(`Creating OAuth user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
         const newProfile = transactionalEntityManager.create(UserProfile, {
@@ -148,6 +154,7 @@ export class UsersService {
           name: 'User',
         });
         if (!defaultRole) {
+          this.logger.error('Default role "User" not found');
           throw new Error(
             'Default role "User" not found. Please seed the database.',
           );
@@ -179,6 +186,7 @@ export class UsersService {
     id: string,
     data: UpdateUnverifiedAccountPayload,
   ): Promise<void> {
+    this.logger.log(`Updating unverified account for id: ${id}`);
     const { profile_data, ...accountData } = data;
 
     await this.accountRepository.manager.transaction(
@@ -209,6 +217,7 @@ export class UsersService {
    * @param id ID của tài khoản cần xác thực.
    */
   async verifyAccount(id: string): Promise<void> {
+    this.logger.log(`Verifying account for id: ${id}`);
     await this.accountRepository.update(id, {
       is_verified: true,
       verification_code: null,
@@ -241,10 +250,14 @@ export class UsersService {
    * @param accountId ID của tài khoản liên quan.
    * @returns Promise giải quyết thành đối tượng `UserProfile` nếu tìm thấy, ngược lại là `null`.
    */
-  async findProfileByAccountId(accountId: string): Promise<UserProfile | null> {
+  async findProfileByAccountId(
+    accountId: string,
+    relations: string[] = [],
+  ): Promise<UserProfile | null> {
+    this.logger.log(`Finding profile by account id: ${accountId}`);
     return this.userProfileRepository.findOne({
       where: { account: { id: accountId } },
-      relations: ['account', 'account.role', 'branch'],
+      relations: [...new Set(['account', 'branch', ...relations])],
     });
   }
   /**
@@ -256,6 +269,7 @@ export class UsersService {
     id: string,
     relations: string[] = [],
   ): Promise<Account | null> {
+    this.logger.log(`Finding account by id: ${id}`);
     if (!id) {
       throw new NotFoundException('ID người dùng không hợp lệ.');
     }
@@ -269,6 +283,7 @@ export class UsersService {
    * @returns {Promise<void>}
    */
   async updateAccount(id: string, data: Partial<Account>) {
+    this.logger.log(`Updating account for id: ${id}`);
     await this.accountRepository.update(id, data);
   }
 
@@ -284,6 +299,11 @@ export class UsersService {
     accountId: string,
     data: UpdateUserProfileDto,
   ): Promise<{ message: string }> {
+    this.logger.log(
+      `Updating profile for account id: ${accountId} with data: ${JSON.stringify(
+        data,
+      )}`,
+    );
     // 1. Tìm tài khoản và userProfile liên quan
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
@@ -337,6 +357,7 @@ export class UsersService {
    * @param token Token thuần nhận được từ client.
    */
   async findAccountByValidResetToken(token: string): Promise<Account | null> {
+    this.logger.log('Finding account by valid reset token');
     return this.accountRepository.findOne({
       where: {
         password_reset_token: token, // So sánh token thuần
@@ -350,6 +371,7 @@ export class UsersService {
    * @param accountId ID của tài khoản vừa đăng nhập thành công.
    */
   async updateLastLogin(accountId: string): Promise<void> {
+    this.logger.log(`Updating last login for account id: ${accountId}`);
     await this.accountRepository.update(accountId, {
       last_login: new Date(),
     });
@@ -362,6 +384,7 @@ export class UsersService {
    * @returns Promise giải quyết thành một đối tượng chứa dữ liệu người dùng và tổng số lượng.
    */
   async findAllUser(page: number, limit: number) {
+    this.logger.log(`Finding all users for page: ${page}, limit: ${limit}`);
     const [user, total] = await this.accountRepository.findAndCount({
       relations: ['userProfile', 'role', 'userProfile.branch'],
       skip: (page - 1) * limit,
@@ -380,6 +403,7 @@ export class UsersService {
    * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
    */
   async banUser(id: string) {
+    this.logger.log(`Banning user with id: ${id}`);
     await this.accountRepository.update(id, {
       status: AccountStatus.SUSPENDED,
     });
@@ -393,6 +417,7 @@ export class UsersService {
    * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
    */
   async unbanUser(id: string) {
+    this.logger.log(`Unbanning user with id: ${id}`);
     const account = await this.accountRepository.findOneBy({ id });
     if (!account) {
       throw new NotFoundException('Không tìm thấy tài khoản.');
@@ -405,6 +430,7 @@ export class UsersService {
   }
 
   async findProfileByPhoneNumber(phone: string): Promise<UserProfile | null> {
+    this.logger.log(`Finding profile by phone number: ${phone}`);
     return this.userProfileRepository.findOne({
       where: {
         phone_number: phone,
@@ -424,6 +450,7 @@ export class UsersService {
     accountId: string,
     avatarPath: string,
   ): Promise<UserProfile> {
+    this.logger.log(`Updating avatar for account id: ${accountId}`);
     if (!avatarPath) {
       throw new Error('Thiếu đường dẫn');
     }
@@ -458,6 +485,7 @@ export class UsersService {
     oldPassword: string,
     newPassword: string,
   ): Promise<{ message: string }> {
+    this.logger.log(`Changing password for account id: ${accountId}`);
     const account = await this.findAccountById(accountId);
     if (!account) {
       throw new NotFoundException('Không tìm thấy tài khoản.');
@@ -489,6 +517,7 @@ export class UsersService {
   async findVerifiedProfileByPhoneNumber(
     phone: string,
   ): Promise<UserProfile | null> {
+    this.logger.log(`Finding verified profile by phone number: ${phone}`);
     return this.userProfileRepository.findOne({
       where: {
         phone_number: phone,
@@ -507,6 +536,11 @@ export class UsersService {
     requesterId: string,
     data: CreateEmployeeDto,
   ): Promise<Account> {
+    this.logger.log(
+      `Creating employee with requester id: ${requesterId} and data: ${JSON.stringify(
+        data,
+      )}`,
+    );
     // 1. Lấy thông tin người đang thực hiện request (kèm Role và Branch)
     const requester = await this.accountRepository.findOne({
       where: { id: requesterId },

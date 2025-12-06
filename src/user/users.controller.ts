@@ -13,6 +13,7 @@ import {
   HttpStatus,
   BadRequestException,
   Post,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -40,6 +41,7 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
   /**
    * @constructor
    * @param {UsersService} usersService - Service xử lý logic nghiệp vụ liên quan đến người dùng.
@@ -59,6 +61,7 @@ export class UsersController {
     summary: 'Lấy thông tin hồ sơ của người dùng đang đăng nhập',
   })
   getProfile(@User('sub') accountID: string) {
+    this.logger.log(`Fetching profile for user ${accountID}`);
     return this.usersService.findAccountById(accountID, [
       'userProfile',
       'role',
@@ -83,6 +86,11 @@ export class UsersController {
     @User() user: AuthenticatedUser,
     @Body() updateUserProfileDto: UpdateUserProfileDto,
   ) {
+    this.logger.log(
+      `Updating profile for user ${user.id} with DTO: ${JSON.stringify(
+        updateUserProfileDto,
+      )}`,
+    );
     return await this.usersService.updateProfile(user.id, updateUserProfileDto);
   }
 
@@ -103,7 +111,7 @@ export class UsersController {
     @User('id') accountId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    console.log(file);
+    this.logger.log(`Uploading avatar for user ${accountId}`);
     if (!file) {
       throw new BadRequestException('Bạn phải cung cấp một file ảnh.');
     }
@@ -133,6 +141,7 @@ export class UsersController {
     @User() user: AuthenticatedUser,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
+    this.logger.log(`Changing password for user ${user.id}`);
     if (changePasswordDto.oldPassword === changePasswordDto.newPassword) {
       throw new Error('Mật khẩu mới không được trùng với mật khẩu cũ.');
     }
@@ -156,6 +165,7 @@ export class UsersController {
   @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
   @ApiResponse({ status: 200, description: 'Trả về danh sách người dùng.' })
   async GetUsers(@Query('page') page = 1) {
+    this.logger.log(`Fetching all users for page ${page}`);
     return await this.usersService.findAllUser(Number(page), 10);
   }
 
@@ -173,6 +183,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Khóa tài khoản thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
   async banUser(@Param('id') id: string) {
+    this.logger.log(`Banning user ${id}`);
     return await this.usersService.banUser(id);
   }
 
@@ -190,6 +201,7 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Mở khóa tài khoản thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
   async unbanUser(@Param('id') id: string) {
+    this.logger.log(`Unbanning user ${id}`);
     return await this.usersService.unbanUser(id);
   }
 
@@ -212,6 +224,11 @@ export class UsersController {
     @User() user: AuthenticatedUser,
     @Body() createEmployeeDto: CreateEmployeeDto,
   ) {
+    this.logger.log(
+      `User ${user.id} is creating an employee with DTO: ${JSON.stringify(
+        createEmployeeDto,
+      )}`,
+    );
     const newAccount = await this.usersService.createEmployee(
       user.id,
       createEmployeeDto,

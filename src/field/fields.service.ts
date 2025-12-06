@@ -16,6 +16,7 @@ import { FieldImage } from './entities/field-image.entity';
 import { ConfigService } from '@nestjs/config';
 import { Branch } from '@/branch/entities/branch.entity';
 import { UserProfile } from '../user/entities/users-profile.entity';
+import { Role } from '@/auth/enums/role.enum';
 
 /**
  * @class FieldsService
@@ -40,7 +41,7 @@ export class FieldsService {
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @method create
@@ -53,6 +54,11 @@ export class FieldsService {
     createFieldDto: CreateFieldDto,
     userProfile: UserProfile,
   ): Promise<Field> {
+    this.logger.log(
+      `User ${userProfile.id} is creating a new field with DTO: ${JSON.stringify(
+        createFieldDto,
+      )}`,
+    );
     const { branchId, fieldTypeId, ...fieldData } = createFieldDto;
 
     const branch: Branch | null = await this.branchRepository.findOne({
@@ -61,6 +67,7 @@ export class FieldsService {
     });
 
     if (!branch) {
+      this.logger.error(`Branch with ID ${branchId} not found`);
       throw new NotFoundException(
         'Chi nhánh hoặc người quản lý của chi nhánh không tồn tại.',
       );
@@ -68,8 +75,11 @@ export class FieldsService {
 
     if (
       branch.manager.id !== userProfile.id &&
-      userProfile.role !== 'super_admin'
+      userProfile.account.role.name !== (Role.Admin as string)
     ) {
+      this.logger.error(
+        `User ${userProfile.id} does not have permission to add a field to branch ${branchId}`,
+      );
       throw new ForbiddenException(
         'Bạn không có quyền thêm sân vào chi nhánh này',
       );
@@ -81,7 +91,11 @@ export class FieldsService {
       fieldType: { id: fieldTypeId } as FieldType,
     });
 
-    return this.fieldRepository.save(newField);
+    const savedField = await this.fieldRepository.save(newField);
+    this.logger.log(
+      `Field ${savedField.id} created successfully in branch ${branchId}`,
+    );
+    return savedField;
   }
 
   /**
@@ -92,6 +106,7 @@ export class FieldsService {
    * @returns {Promise<Field[]>} - Danh sách các sân bóng phù hợp.
    */
   async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
+    this.logger.log(`Finding all fields with filter: ${JSON.stringify(filterDto)}`);
     const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } =
       filterDto;
 
@@ -149,7 +164,9 @@ export class FieldsService {
       query.orderBy('field.createdAt', 'DESC');
     }
 
-    return query.getMany();
+    const fields = await query.getMany();
+    this.logger.log(`Found ${fields.length} fields`);
+    return fields;
   }
 
   /**
@@ -160,6 +177,7 @@ export class FieldsService {
    * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
    */
   async findOne(id: string): Promise<Field> {
+    this.logger.log(`Finding field with ID: ${id}`);
     const field = await this.fieldRepository.findOne({
       where: { id },
       relations: [
@@ -172,7 +190,10 @@ export class FieldsService {
       ],
     });
 
-    if (!field) throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
+    if (!field) {
+      this.logger.error(`Field with ID ${id} not found`);
+      throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
+    }
     return field;
   }
 
@@ -184,6 +205,7 @@ export class FieldsService {
    * @returns {Promise<Field>} - Sân bóng sau khi đã được cập nhật.
    */
   async update(id: string, updateFieldDto: UpdateFieldDto): Promise<Field> {
+    this.logger.log(`Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`);
     const field = await this.findOne(id);
     const { branchId, fieldTypeId, ...fieldData } = updateFieldDto;
 
@@ -197,11 +219,16 @@ export class FieldsService {
       const branch: Branch | null = await this.branchRepository.findOneBy({
         id: branchId,
       });
-      if (!branch) throw new BadRequestException('Chi nhánh mới không tồn tại');
+      if (!branch) {
+        this.logger.error(`Branch with ID ${branchId} not found`);
+        throw new BadRequestException('Chi nhánh mới không tồn tại');
+      }
       field.branch = branch;
     }
 
-    return this.fieldRepository.save(field);
+    const updatedField = await this.fieldRepository.save(field);
+    this.logger.log(`Field ${id} updated successfully`);
+    return updatedField;
   }
 
   /**
@@ -212,10 +239,13 @@ export class FieldsService {
    * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
    */
   async remove(id: string): Promise<{ message: string }> {
+    this.logger.log(`Removing field with ID: ${id}`);
     const result = await this.fieldRepository.softDelete(id);
     if (result.affected === 0) {
+      this.logger.error(`Field with ID ${id} not found for removal`);
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
+    this.logger.log(`Field ${id} removed successfully`);
     return { message: 'Đã xóa sân bóng thành công' };
   }
 
@@ -230,8 +260,12 @@ export class FieldsService {
     fieldID: string,
     files: Array<Express.Multer.File>,
   ): Promise<FieldImage[]> {
+    this.logger.log(`Adding ${files.length} images to field ${fieldID}`);
     const field = await this.fieldRepository.findOneBy({ id: fieldID });
-    if (!field) throw new NotFoundException(`Sân bóng không tồn tại`);
+    if (!field) {
+      this.logger.error(`Field with ID ${fieldID} not found for image upload`);
+      throw new NotFoundException(`Sân bóng không tồn tại`);
+    }
 
     const baseUrl = this.configService.get<string>('BASE_URL');
 
@@ -242,6 +276,10 @@ export class FieldsService {
       }),
     );
 
-    return this.fieldImageRepository.save(images);
+    const savedImages = await this.fieldImageRepository.save(images);
+    this.logger.log(
+      `Added ${savedImages.length} images to field ${fieldID} successfully`,
+    );
+    return savedImages;
   }
 }

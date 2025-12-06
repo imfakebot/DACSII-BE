@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
   BadRequestException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { createHash, randomBytes } from 'crypto';
@@ -34,6 +35,7 @@ interface JwtPayload {
  */
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   /**
    * @constructor
    * @param {UsersService} userService - Service để tương tác với dữ liệu người dùng.
@@ -46,7 +48,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @method initiateRegistration
@@ -60,10 +62,12 @@ export class AuthService {
     registerDto: RegisterUserDto,
   ): Promise<{ message: string }> {
     const { email, full_name, password, phone_number, gender } = registerDto;
+    this.logger.log(`Initiating registration for email: ${email}`);
     const existingAccount = await this.userService.findAccountByEmail(email);
 
     // 1. Kiểm tra xem email đã được xác thực chưa
     if (existingAccount && existingAccount.is_verified) {
+      this.logger.warn(`Email ${email} is already verified.`);
       throw new ConflictException('Email này đã được sử dụng.');
     }
 
@@ -81,17 +85,18 @@ export class AuthService {
         !existingAccount ||
         profileWithPhone.account.id !== existingAccount.id)
     ) {
-      console.log(profileWithPhone.account.is_verified);
+      this.logger.warn(`Phone number ${phone_number} is already in use.`);
       throw new ConflictException('Số điện thoại này đã được sử dụng.');
     }
 
     // 3. Nếu tất cả kiểm tra đều qua, tiến hành tạo/cập nhật
     const verificationCode = randomBytes(3).toString('hex').toUpperCase();
-    console.log(verificationCode);
+    this.logger.debug(`Generated verification code for ${email}`);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
     const passwordHash = await this.userService.hashPassword(password);
 
     if (existingAccount) {
+      this.logger.log(`Updating unverified account for ${email}`);
       await this.userService.updateUnverifiedAccount(existingAccount.id, {
         password_hash: passwordHash,
         verification_code: verificationCode,
@@ -104,6 +109,7 @@ export class AuthService {
         },
       });
     } else {
+      this.logger.log(`Creating new unverified user for ${email}`);
       await this.userService.createUnverifiedUser({
         email: email,
         passwordHash,
@@ -116,6 +122,7 @@ export class AuthService {
       });
     }
 
+    this.logger.log(`Sending verification email to ${email}`);
     await this.mailerService.sendMail({
       to: email,
       subject: 'Mã Xác Thực Đăng Ký Tài Khoản',
@@ -144,8 +151,10 @@ export class AuthService {
     email: string,
     code: string,
   ): Promise<{ message: string }> {
+    this.logger.log(`Completing registration for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (!account || account.is_verified) {
+      this.logger.warn(`Invalid registration completion attempt for ${email}`);
       throw new ConflictException('Yêu cầu xác thực không hợp lệ.');
     }
 
@@ -154,10 +163,12 @@ export class AuthService {
       (account.verification_code_expires_at &&
         account.verification_code_expires_at < new Date())
     ) {
+      this.logger.warn(`Invalid or expired verification code for ${email}`);
       throw new ConflictException('Mã xác thực không hợp lệ hoặc đã hết hạn.');
     }
 
     await this.userService.verifyAccount(account.id);
+    this.logger.log(`Account ${email} verified successfully`);
 
     return { message: 'Tài khoản của bạn đã được xác thực thành công.' };
   }
@@ -174,6 +185,7 @@ export class AuthService {
     email: string,
     pass: string,
   ): Promise<Omit<Account, 'password_hash'> | null> {
+    this.logger.log(`Validating user ${email}`);
     const account = await this.userService.findAccountByEmail(email, [
       'role',
       'userProfile',
@@ -194,9 +206,11 @@ export class AuthService {
       if (isMatch) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password_hash, ...result } = account;
+        this.logger.log(`User ${email} validated successfully`);
         return result as unknown as Omit<Account, 'password_hash'>;
       }
     }
+    this.logger.warn(`User ${email} validation failed`);
     return null;
   }
 
@@ -210,6 +224,7 @@ export class AuthService {
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình JWT.
    */
   async login(user: AuthenticatedUser | Account) {
+    this.logger.log(`Logging in user ${user.email}`);
     const userProfile = (user as Account).userProfile;
     const bracnhId = userProfile?.branch?.id;
 
@@ -241,11 +256,13 @@ export class AuthService {
       !refreshTokenSecret ||
       !refreshTokenExpiresIn
     ) {
+      this.logger.error('JWT configuration is missing');
       throw new InternalServerErrorException(
         'Lỗi cấu hình JWT, vui lòng kiểm tra file .env',
       );
     }
 
+    this.logger.debug(`Generating tokens for user ${user.email}`);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: accessTokenSecret,
@@ -262,6 +279,7 @@ export class AuthService {
       this.userService.updateLastLogin(user.id),
     ]);
 
+    this.logger.log(`User ${user.email} logged in successfully`);
     return {
       accessToken,
       refreshToken,
@@ -275,10 +293,10 @@ export class AuthService {
             : String(user.role),
         is_profile_complete:
           user.userProfile &&
-          typeof user.userProfile === 'object' &&
-          'is_profile_complete' in user.userProfile
+            typeof user.userProfile === 'object' &&
+            'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-                .is_profile_complete ?? false)
+              .is_profile_complete ?? false)
             : false,
         branch_id: bracnhId,
       },
@@ -297,6 +315,7 @@ export class AuthService {
     payload: { email: string; firstName?: string; lastName?: string },
     provider: AuthProvider,
   ): Promise<Omit<Account, 'password_hash'>> {
+    this.logger.log(`Validating OAuth login for ${payload.email}`);
     // Tải trước userProfile và role để tránh truy vấn thừa
     const account = await this.userService.findAccountByEmail(payload.email, [
       'userProfile',
@@ -306,15 +325,18 @@ export class AuthService {
     // Nếu tài khoản đã tồn tại
     if (account) {
       if (account.status !== AccountStatus.ACTIVE) {
+        this.logger.warn(`OAuth login attempt for disabled account ${payload.email}`);
         throw new ForbiddenException('Tài khoản của bạn đã bị vô hiệu hóa.');
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password_hash, ...accountDetails } = account;
+      this.logger.log(`Existing OAuth user ${payload.email} found`);
       return accountDetails as unknown as Omit<Account, 'password_hash'>; // userProfile đã được tải cùng với cờ is_profile_complete
     }
 
     // Nếu tài khoản chưa tồn tại, tạo một tài khoản mới
+    this.logger.log(`Creating new OAuth user for ${payload.email}`);
     const newUserAccount = await this.userService.createOAuthUser({
       email: payload.email,
       fullName: [payload.firstName, payload.lastName].filter(Boolean).join(' '),
@@ -336,6 +358,7 @@ export class AuthService {
    * @throws {ForbiddenException} Nếu tài khoản không tồn tại.
    */
   async refreshTokens(userID: string): Promise<{ accessToken: string }> {
+    this.logger.log(`Refreshing tokens for user ${userID}`);
     // Tải tài khoản cùng với vai trò để tạo token
     const account = await this.userService.findAccountById(userID, [
       'role',
@@ -343,6 +366,7 @@ export class AuthService {
       'userProfile.branch',
     ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
+      this.logger.warn(`Token refresh attempt for non-existent or inactive user ${userID}`);
       throw new ForbiddenException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
       );
@@ -352,6 +376,7 @@ export class AuthService {
       account as unknown as AuthenticatedUser,
     );
 
+    this.logger.log(`Tokens refreshed for user ${userID}`);
     return { accessToken };
   }
 
@@ -362,6 +387,7 @@ export class AuthService {
    * @returns {Promise<{ message: string }>} - Một thông báo xác nhận đăng xuất thành công.
    */
   async logout(accountID: string): Promise<{ message: string }> {
+    this.logger.log(`Logging out user ${accountID}`);
     await this.userService.updateAccount(accountID, {
       // Fix: hashed_refresh_token should be undefined to set to NULL
       hashed_refresh_token: null,
@@ -380,6 +406,7 @@ export class AuthService {
     accountId: string,
     refreshToken: string,
   ) {
+    this.logger.debug(`Updating refresh token hash for user ${accountId}`);
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     await this.userService.updateAccount(accountId, {
       hashed_refresh_token: hashedRefreshToken,
@@ -394,6 +421,7 @@ export class AuthService {
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình Access Token.
    */
   async createAccessToken(user: AuthenticatedUser | Account): Promise<string> {
+    this.logger.debug(`Creating new access token for user ${user.id}`);
     const userProfile = (user as Account).userProfile;
     const branchId = userProfile?.branch?.id || null;
 
@@ -411,6 +439,7 @@ export class AuthService {
     );
 
     if (!accessTokenSecret || !accessTokenExpiresIn) {
+      this.logger.error('Access token configuration is missing');
       throw new InternalServerErrorException('Lỗi cấu hình Access Token');
     }
 
@@ -428,12 +457,16 @@ export class AuthService {
    * @returns {Promise<{ message: string }>} - Một thông báo chung để tránh tiết lộ email nào đã được đăng ký (time-safe response).
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
+    this.logger.log(`Forgot password request for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (
       !account ||
       !account.is_verified ||
       account.status !== AccountStatus.ACTIVE
     ) {
+      this.logger.warn(
+        `Forgot password attempt for non-existent, unverified, or inactive account ${email}`,
+      );
       return {
         message:
           'Nếu email này tồn tại, một hướng dẫn đặt lại mật khẩu đã được gửi.',
@@ -448,6 +481,7 @@ export class AuthService {
     const expires = new Date(Date.now() + 15 * 60 * 1000);
 
     // 3. Lưu token và thời gian hết hạn vào CSDL
+    this.logger.debug(`Saving password reset token for ${email}`);
     await this.userService.updateAccount(account.id, {
       password_reset_token: hashedToken,
       password_reset_expires: expires,
@@ -457,6 +491,7 @@ export class AuthService {
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
     const resetUrl = `${frontendURL}/reset-password?token=${resetToken}`;
 
+    this.logger.log(`Sending password reset email to ${email}`);
     await this.mailerService.sendMail({
       to: email,
       subject: 'Yêu cầu Đặt lại Mật khẩu',
@@ -488,6 +523,7 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
+    this.logger.log('Resetting password');
     // 1. Hash token nhận được từ client để so sánh với CSDL
     const hashedToken = createHash('sha256').update(token).digest('hex');
 
@@ -496,10 +532,12 @@ export class AuthService {
       await this.userService.findAccountByValidResetToken(hashedToken);
 
     if (!account) {
+      this.logger.warn('Invalid or expired password reset token');
       throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn.');
     }
 
     // 3. Hash mật khẩu mới và cập nhật
+    this.logger.log(`Updating password for user ${account.id}`);
     const newPasswordHash = await this.userService.hashPassword(newPassword);
 
     await this.userService.updateAccount(account.id, {
@@ -509,6 +547,7 @@ export class AuthService {
       password_reset_expires: null,
     });
 
+    this.logger.log(`Password updated successfully for user ${account.id}`);
     return { message: 'Mật khẩu đã được cập nhật thành công.' };
   }
 
@@ -525,15 +564,17 @@ export class AuthService {
     email: string,
     pass: string,
   ): Promise<{ message: string }> {
+    this.logger.log(`Initiating 2FA login for ${email}`);
     // 1. Dùng lại validateUser để kiểm tra mật khẩu
     const account = await this.validateUser(email, pass);
     if (!account) {
+      this.logger.warn(`Invalid credentials for 2FA login attempt for ${email}`);
       throw new UnauthorizedException('Sai email hoặc mật khẩu.');
     }
 
     // 2. Tạo và lưu mã OTP (tái sử dụng logic của register)
     const verificationCode = randomBytes(3).toString('hex').toUpperCase();
-    console.log(verificationCode);
+    this.logger.debug(`Generated 2FA code for ${email}`);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Mã OTP có hạn 10 phút
 
     await this.userService.updateAccount(account.id, {
@@ -542,6 +583,7 @@ export class AuthService {
     });
 
     // 3. Gửi email
+    this.logger.log(`Sending 2FA email to ${email}`);
     await this.mailerService.sendMail({
       to: email,
       subject: 'Mã Xác thực Đăng nhập',
@@ -570,12 +612,14 @@ export class AuthService {
    * @throws {UnauthorizedException} Nếu tài khoản không tồn tại, mã OTP không hợp lệ hoặc đã hết hạn.
    */
   async loginComplete(email: string, code: string) {
+    this.logger.log(`Completing 2FA login for ${email}`);
     const account = await this.userService.findAccountByEmail(email, [
-      'userProfile',
       'role',
+      'userProfile',
       'userProfile.branch',
     ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
+      this.logger.warn(`2FA login attempt for non-existent or inactive account ${email}`);
       throw new UnauthorizedException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
       );
@@ -587,6 +631,7 @@ export class AuthService {
       account.verification_code_expires_at < new Date() ||
       account.verification_code !== code
     ) {
+      this.logger.warn(`Invalid or expired 2FA code for ${email}`);
       throw new UnauthorizedException('Sai mã xác thực hoặc đã hết hạn.');
     }
 
@@ -595,6 +640,7 @@ export class AuthService {
       verification_code_expires_at: null,
     });
 
+    this.logger.log(`2FA login successful for ${email}`);
     return this.login(account);
   }
 }

@@ -2,6 +2,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import {
   Controller,
   Get,
+  Logger,
   NotFoundException,
   Patch,
   Query,
@@ -29,6 +30,7 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth() // Báo cho Swagger biết các API này cần Bearer Token
 export class NotificationController {
+  private readonly logger = new Logger(NotificationController.name);
   /**
    * @constructor
    * @param {NotificationService} notificationService - Service xử lý logic thông báo.
@@ -73,6 +75,7 @@ export class NotificationController {
     @Query('limit') limit = 10,
   ) {
     const accountId = req.user.sub;
+    this.logger.log(`Finding all notifications for user ${accountId}`);
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
     if (!userProfile) {
@@ -100,6 +103,7 @@ export class NotificationController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy hồ sơ người dùng.' })
   async markAllAsRead(@Req() req: AuthenticatedRequest) {
     const accountId = req.user.sub;
+    this.logger.log(`Marking all notifications as read for user ${accountId}`);
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
 

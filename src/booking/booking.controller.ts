@@ -12,6 +12,7 @@ import {
   Patch,
   Get,
   Query,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -44,6 +45,7 @@ import { Booking } from './entities/booking.entity';
 @ApiTags('Bookings (Đặt sân)')
 @Controller('bookings')
 export class BookingController {
+  private readonly logger = new Logger(BookingController.name);
   /**
    * @constructor
    * @param {BookingService} bookingService - Service xử lý logic nghiệp vụ cho việc đặt sân.
@@ -101,12 +103,16 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
   ) {
     const accountId = req.user.sub;
+    this.logger.log(
+      `User ${accountId} creating booking for field ${createBookingDto.fieldId}`,
+    );
 
     // 1. Lấy profile
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
 
     if (!userProfile) {
+      this.logger.warn(`User profile not found for account ${accountId}`);
       throw new NotFoundException(
         'Không tìm thấy hồ sơ người dùng. Vui lòng cập nhật thông tin cá nhân.',
       );
@@ -142,9 +148,10 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
   ) {
     const accountId = req.user.sub;
-
     const userRole = req.user.role as unknown as Role;
-
+    this.logger.log(
+      `User ${accountId} (Role: ${userRole}) attempting to cancel booking ${bookingId}`,
+    );
     return this.bookingService.cancelBooking(bookingId, accountId, userRole);
   }
 
@@ -165,6 +172,7 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
     @Query() filterDto: FilterBookingDto,
   ) {
+    this.logger.log(`Fetching bookings for user ${req.user.sub}`);
     return await this.bookingService.getUserBooking(req.user.sub, filterDto);
   }
 
@@ -183,6 +191,11 @@ export class BookingController {
     @Query() filter: FilterBookingDto, // Dùng DTO Filter thay vì liệt kê từng param
     @User() user: AuthenticatedUser, // <--- Truyền User vào để lấy branch_id
   ) {
+    this.logger.log(
+      `User ${user.id} fetching all bookings with filter: ${JSON.stringify(
+        filter,
+      )}`,
+    );
     // Gọi hàm getAllBookings (số nhiều) bên Service mà ta đã sửa ở bước trước
     return this.bookingService.getAllBookings(filter, user);
   }
@@ -200,6 +213,9 @@ export class BookingController {
     @Body() dto: AdminCreateBookingDto,
     @User() user: AuthenticatedUser, // <--- Truyền User để check xem có tạo đúng chi nhánh không
   ) {
+    this.logger.log(
+      `User ${user.id} creating booking at counter: ${JSON.stringify(dto)}`,
+    );
     return this.bookingService.createBookingByAdmin(dto, user);
   }
 
@@ -216,13 +232,19 @@ export class BookingController {
   @ApiOperation({ summary: '(Manager/Admin) Check-in cho khách hàng tại sân' })
   @ApiResponse({
     status: 200,
-    description: 'Check-in thành công. Trả về thông tin đơn đặt sân đã cập nhật.',
-    type: Booking, 
+    description:
+      'Check-in thành công. Trả về thông tin đơn đặt sân đã cập nhật.',
+    type: Booking,
   })
-  @ApiResponse({ status: 400, description: 'Đơn không hợp lệ để check-in (sai trạng thái, đã check-in...).' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Đơn không hợp lệ để check-in (sai trạng thái, đã check-in...).',
+  })
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
   checkIn(@Body() checkInDto: CheckInDto) {
+    this.logger.log(`Checking in booking ${checkInDto.bookingId}`);
     return this.bookingService.checkInCustomer(checkInDto.bookingId);
   }
 }
