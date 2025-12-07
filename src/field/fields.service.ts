@@ -136,7 +136,7 @@ export class FieldsService {
       .leftJoinAndSelect('field.branch', 'branch')
       .leftJoinAndSelect('branch.address', 'address')
       .leftJoinAndSelect('address.ward', 'ward')
-      .leftJoinAndSelect('branch.city', 'city');
+      .leftJoinAndSelect('address.city', 'city');
 
     if (branchId) {
       query.andWhere('branch.id = :branchId', { branchId });

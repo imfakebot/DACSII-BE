@@ -247,4 +247,24 @@ export class BookingController {
     this.logger.log(`Checking in booking ${checkInDto.bookingId}`);
     return this.bookingService.checkInCustomer(checkInDto.bookingId);
   }
+
+  /**
+   * @route GET /bookings/field/:fieldId/schedule
+   * @description Lấy danh sách các booking của một sân trong một ngày cụ thể.
+   * Endpoint này giúp hiển thị lịch trực quan (các khung giờ đã đặt).
+   */
+  @Get('field/:fieldId/schedule')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Lấy lịch đặt sân theo ngày' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trả về danh sách các booking trong ngày',
+  })
+  async getFieldSchedule(
+    @Param('fieldId', ParseUUIDPipe) fieldId: string,
+    @Query('date') date: string, // Format: YYYY-MM-DD
+  ) {
+    this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
+    return this.bookingService.getFieldSchedule(fieldId, date);
+  }
 }

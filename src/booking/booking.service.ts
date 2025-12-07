@@ -640,4 +640,43 @@ export class BookingService {
     }
     return `${datePrefix}-${suffix}`; // VD: 251206-AH92
   }
+
+  /**
+   * Lấy danh sách các booking của một sân trong một ngày cụ thể
+   * @param fieldId ID của sân
+   * @param date Ngày cần xem lịch (format: YYYY-MM-DD)
+   * @returns Danh sách các booking trong ngày
+   */
+  async getFieldSchedule(fieldId: string, date: string) {
+    this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
+    
+    // Parse date string to get start and end of day
+    const startOfDay = new Date(`${date}T00:00:00`);
+    const endOfDay = new Date(`${date}T23:59:59`);
+
+    // Find all bookings where:
+    // - Booking starts before end of day AND
+    // - Booking ends after start of day
+    // This catches all bookings that overlap with the selected date
+    const bookings = await this.bookingRepository.find({
+      where: {
+        field: { id: fieldId },
+        status: Not(BookingStatus.CANCELLED), // Chỉ lấy các booking chưa hủy
+        start_time: LessThan(endOfDay),
+        end_time: MoreThan(startOfDay),
+      },
+      select: ['id', 'start_time', 'end_time', 'status'],
+      order: { start_time: 'ASC' },
+    });
+
+    return {
+      date,
+      fieldId,
+      bookings: bookings.map((b) => ({
+        startTime: b.start_time.toISOString(),
+        endTime: b.end_time.toISOString(),
+        status: b.status,
+      })),
+    };
+  }
 }
