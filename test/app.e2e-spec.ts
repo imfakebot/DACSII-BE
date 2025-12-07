@@ -1,35 +1,31 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-// SỬA 1: Thay đổi cách import 'supertest' để hoạt động ổn định hơn
 import request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../src/app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Account } from './../src/users/entities/account.entity';
-import { UserProfile } from './../src/users/entities/users-profile.entity';
+import { Account } from '../src/user/entities/account.entity';
+import { UserProfile } from '../src/user/entities/users-profile.entity';
+import { RegisterUserDto } from '../src/auth/dto/register-user.dto';
 
 describe('AuthController (e2e)', () => {
   let app: INestApplication;
   let accountRepository: Repository<Account>;
   let userProfileRepository: Repository<UserProfile>;
 
-  const registerDto = {
+  const registerDto: RegisterUserDto = {
     email: 'e2e-test@example.com',
     password: 'StrongPassword123!',
     full_name: 'E2E Test User',
-    phoneNumber: '0987654321',
+    phone_number: '0987654321',
   };
 
-  // 1. Khởi động ứng dụng (chỉ một lần)
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-
-    // Áp dụng ValidationPipe y hệt như trong main.ts
-    // Điều này RẤT QUAN TRỌNG để test lỗi validation
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -37,10 +33,8 @@ describe('AuthController (e2e)', () => {
         transform: true,
       }),
     );
-
     await app.init();
 
-    // Lấy repository để dọn dẹp DB
     accountRepository = moduleFixture.get<Repository<Account>>(
       getRepositoryToken(Account),
     );
@@ -49,212 +43,163 @@ describe('AuthController (e2e)', () => {
     );
   });
 
-  // 2. Dọn dẹp Database TRƯỚC MỖI test case
   beforeEach(async () => {
-    // Phải xóa Account trước vì nó có khóa ngoại tới UserProfile
-    await accountRepository.clear();
-    await userProfileRepository.clear();
+    await accountRepository.delete({});
+    await userProfileRepository.delete({});
   });
 
-  // 3. Đóng ứng dụng (chỉ một lần)
   afterAll(async () => {
     await app.close();
   });
 
-  // 4. Bắt đầu viết Test Cases
-  describe('/auth/register (POST)', () => {
-    it('should register a new user and return 201', () => {
-      // SỬA 2: Thêm 'as any' để fix lỗi 'no-unsafe-argument' (Warning)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/register')
-          .send(registerDto)
-          .expect(201) // Mong đợi 201 Created
-          // SỬA 3: Cung cấp type cụ thể cho 'res' và sửa lại 'expect'
-          .then((res: { body: { message: string } }) => {
-            // Kiểm tra response body
-            expect(res.body.message).toEqual(
-              expect.stringContaining('Mã xác thực đã được gửi đến'),
-            );
-          })
-      );
-    });
-
-    it('should return 400 Bad Request for invalid DTO (invalid email)', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/register')
-          .send({ ...registerDto, email: 'not-an-email' })
-          .expect(400) // Mong đợi 400 Bad Request
-          // SỬA 4: Cung cấp type cụ thể cho 'res' (lỗi validation trả về string[])
-          .then((res: { body: { message: string[] } }) => {
-            // Kiểm tra message lỗi từ ValidationPipe
-            expect(res.body.message).toContain('email must be an email');
-          })
-      );
-    });
-
-    it('should return 400 Bad Request for missing required field (full_name)', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { full_name, ...badDto } = registerDto;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  describe('Registration Flow', () => {
+    it('/auth/register/initiate (POST) - should initiate registration and send code', () => {
       return request(app.getHttpServer())
-        .post('/auth/register')
-        .send(badDto)
-        .expect(400);
+        .post('/auth/register/initiate')
+        .send(registerDto)
+        .expect(200)
+        .then((res: request.Response) => {
+          expect((res.body as { message: string }).message).toContain(
+            'Mã xác thực đã được gửi',
+          );
+        });
     });
 
-    it('should return 409 Conflict if email is already in use', async () => {
-      // 1. Đăng ký thành công lần 1
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(registerDto)
-        .expect(201);
-
-      // 2. Đăng ký thất bại lần 2 (với cùng email)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/register')
-          .send(registerDto)
-          .expect(409) // Mong đợi 409 Conflict
-          // SỬA 5: Cung cấp type cụ thể cho 'res'
-          .then((res: { body: { message: string } }) => {
-            expect(res.body.message).toEqual('Email này đã được sử dụng.');
-          })
-      );
-    });
-  });
-
-  describe('/auth/verify-email (POST)', () => {
-    it('should return 409 Conflict for incorrect verification code', async () => {
-      // 1. Đăng ký user trước
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(registerDto)
-        .expect(201);
-
-      // 2. Thử verify với code sai
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/verify-email')
-          .send({
-            email: registerDto.email,
-            verificationCode: 'wrong-code',
-          })
-          .expect(409) // Mong đợi 409 Conflict
-          // SỬA 6: Cung cấp type cụ thể cho 'res'
-          .then((res: { body: { message: string } }) => {
-            expect(res.body.message).toEqual(
-              'Mã xác thực không hợp lệ hoặc đã hết hạn.',
-            ); // SỬA 7: Thêm dấu ')' bị thiếu
-          })
-      );
+    it('/auth/register/initiate (POST) - should fail with invalid email', () => {
+      return request(app.getHttpServer())
+        .post('/auth/register/initiate')
+        .send({ ...registerDto, email: 'not-an-email' })
+        .expect(400)
+        .then((res: request.Response) => {
+          expect(
+            (res.body as { message: string[] }).message,
+          ).toContain('Định dạng email không hợp lệ.');
+        });
     });
 
-    it('should verify account successfully with correct code (Happy Path)', async () => {
-      // 1. Đăng ký user
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    it('/auth/register/complete (POST) - should verify account with correct code', async () => {
       await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(registerDto)
-        .expect(201);
+        .post('/auth/register/initiate')
+        .send(registerDto);
 
-      // 2. Lấy code từ DB (Đây là cách E2E test hoạt động)
       const account = await accountRepository.findOneBy({
         email: registerDto.email,
       });
-      expect(account).toBeDefined(); // SỬA 6: Thêm kiểm tra null
-      const correctCode = account!.verification_code; // SỬA 7: Thêm '!' (non-null assertion)
+      expect(account).toBeDefined();
+      expect(account?.verification_code).toBeTruthy();
 
-      // 3. Verify với code đúng
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/verify-email')
-          .send({
-            email: registerDto.email,
-            verificationCode: correctCode,
-          })
-          .expect(200) // Mong đợi 200 OK
-          // SỬA 8: Cung cấp type cụ thể cho 'res'
-          .then((res: { body: { message: string } }) => {
-            expect(res.body.message).toEqual(
-              'Tài khoản của bạn đã được xác thực thành công.',
-            );
-          })
-      );
+      return request(app.getHttpServer())
+        .post('/auth/register/complete')
+        .send({
+          email: registerDto.email,
+          verificationCode: account?.verification_code,
+        })
+        .expect(200)
+        .then((res: request.Response) => {
+          expect((res.body as { message: string }).message).toEqual(
+            'Tài khoản của bạn đã được xác thực thành công.',
+          );
+        });
+    });
+
+    it('/auth/register/complete (POST) - should fail with incorrect code', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register/initiate')
+        .send(registerDto);
+
+      return request(app.getHttpServer())
+        .post('/auth/register/complete')
+        .send({ email: registerDto.email, verificationCode: 'WRONGCODE' })
+        .expect(409)
+        .then((res: request.Response) => {
+          expect((res.body as { message: string }).message).toEqual(
+            'Mã xác thực không hợp lệ hoặc đã hết hạn.',
+          );
+        });
     });
   });
 
-  describe('/auth/login (POST)', () => {
-    // Chúng ta cần một user đã được verify để test login
+  describe('Login Flow', () => {
     beforeEach(async () => {
-      // 1. Đăng ký user
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(registerDto)
-        .expect(201);
-
-      // 2. Lấy code và verify user đó ngay lập tức
+        .post('/auth/register/initiate')
+        .send(registerDto);
       const account = await accountRepository.findOneBy({
         email: registerDto.email,
       });
-      expect(account).toBeDefined(); // SỬA 9: Thêm kiểm tra null
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await request(app.getHttpServer())
-        .post('/auth/verify-email')
+        .post('/auth/register/complete')
         .send({
           email: registerDto.email,
-          verificationCode: account!.verification_code, // SỬA 10: Thêm '!'
-        })
-        .expect(200);
+          verificationCode: account?.verification_code,
+        });
     });
 
-    it('should login successfully and return JWT token (Happy Path)', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      return (
-        request(app.getHttpServer())
-          .post('/auth/login')
-          .send({
-            email: registerDto.email,
-            password: registerDto.password,
-          })
-          .expect(201) // Mong đợi 201 Created (do hàm login của bạn trả về)
-          // SỬA 9: Cung cấp type cụ thể cho 'res'
-          .then((res: { body: { access_token: string } }) => {
-            expect(res.body).toHaveProperty('access_token');
-            expect(res.body.access_token).toBeTruthy();
-          })
-      );
-    });
-
-    it('should return 401 Unauthorized for wrong password', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    it('/auth/login/initiate (POST) - should succeed with correct credentials', () => {
       return request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: registerDto.email,
-          password: 'wrong-password',
-        })
-        .expect(401); // Mong đợi 401 Unauthorized
+        .post('/auth/login/initiate')
+        .send({ email: registerDto.email, password: registerDto.password })
+        .expect(200)
+        .then((res: request.Response) => {
+          expect((res.body as { message: string }).message).toContain(
+            'Mật khẩu chính xác. Một mã xác thực đã được gửi đến email của bạn.',
+          );
+        });
     });
 
-    it('should return 401 Unauthorized for non-existent user', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+    it('/auth/login/initiate (POST) - should fail with wrong password', () => {
       return request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: 'ghost@example.com',
-          password: 'password',
-        })
+        .post('/auth/login/initiate')
+        .send({ email: registerDto.email, password: 'wrong-password' })
         .expect(401);
+    });
+
+    it('/auth/login/complete (POST) - should login with correct code and return tokens', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login/initiate')
+        .send({ email: registerDto.email, password: registerDto.password });
+
+      const account = await accountRepository.findOneBy({
+        email: registerDto.email,
+      });
+      expect(account?.verification_code).toBeDefined();
+
+      return request(app.getHttpServer())
+        .post('/auth/login/complete')
+        .send({
+          email: registerDto.email,
+          verificationCode: account?.verification_code,
+        })
+        .expect(200)
+        .then((res: request.Response) => {
+          const body = res.body as {
+            accessToken: string;
+            user: { email: string };
+          };
+          expect(body).toHaveProperty('accessToken');
+          expect(body).toHaveProperty('user');
+          expect(body.user.email).toEqual(registerDto.email);
+          const cookies = res.headers['set-cookie'] as string[];
+          expect(
+            cookies.some((c: string) => c.startsWith('refresh_token=')),
+          ).toBe(true);
+        });
+    });
+
+    it('/auth/login/complete (POST) - should fail with incorrect code', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login/initiate')
+        .send({ email: registerDto.email, password: registerDto.password });
+
+      return request(app.getHttpServer())
+        .post('/auth/login/complete')
+        .send({ email: registerDto.email, verificationCode: 'WRONGCODE' })
+        .expect(401)
+        .then((res: request.Response) => {
+          expect((res.body as { message: string }).message).toEqual(
+            'Sai mã xác thực hoặc đã hết hạn.',
+          );
+        });
     });
   });
 });

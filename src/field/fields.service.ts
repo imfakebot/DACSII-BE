@@ -80,11 +80,11 @@ export class FieldsService {
 
     // Permission check: User must be an Admin or the designated manager of this branch.
     const isManagerOfBranch = branch.manager_id === userProfile.id;
-    const isAdmin = userProfile.account.role === Role.Admin;
+    const isAdmin = userProfile.account.role.name === String(Role.Admin);
 
     if (!isManagerOfBranch && !isAdmin) {
       this.logger.error(
-        `User ${userProfile.id} (Role: ${userProfile.account.role}) does not have permission to add a field to branch ${branch.id}`,
+        `User ${userProfile.id} (Role: ${userProfile.account.role.name}) does not have permission to add a field to branch ${branch.id}`,
       );
       throw new ForbiddenException(
         'Bạn không phải là quản lý của chi nhánh này để thêm sân.',

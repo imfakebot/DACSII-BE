@@ -14,7 +14,7 @@ export class Role {
    * Thường là một số nguyên tự tăng.
    */
   @ApiProperty({ description: 'ID duy nhất của vai trò', example: 1 })
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   /**

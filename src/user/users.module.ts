@@ -14,7 +14,7 @@ import { BranchModule } from '@/branch/branch.module'; // Giả định BranchMo
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Account, Role, UserProfile, Address]),
+    TypeOrmModule.forFeature([Account, UserProfile, Address, Role]),
     // Sử dụng forwardRef để phá vỡ circular dependency với NotificationsModule
     // Lý do: NotificationsModule import UsersModule, và UsersModule có thể cần NotificationsModule trong tương lai.
     forwardRef(() => BranchModule), // Thêm forwardRef cho BranchModule để giải quyết các phụ thuộc vòng tiềm ẩn

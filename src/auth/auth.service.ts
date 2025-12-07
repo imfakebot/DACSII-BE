@@ -21,6 +21,7 @@ import { AuthProvider } from '@/user/enum/auth-provider.enum';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
 import { Gender } from '@/user/enum/gender.enum';
 
+
 interface JwtPayload {
   email: string;
   sub: string;
@@ -228,11 +229,13 @@ export class AuthService {
     const userProfile = (user as Account).userProfile;
     const bracnhId = userProfile?.branch?.id;
 
+    const roleName =
+      typeof user.role === 'string' ? user.role : (user.role).name;
+
     const payload: JwtPayload & { branch_id?: string } = {
       email: user.email,
       sub: user.id,
-      // Sau khi refactor, user.role luôn là một giá trị từ enum (string)
-      role: user.role,
+      role: roleName,
       branch_id: bracnhId,
     };
 
@@ -283,14 +286,15 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        // Sau khi refactor, user.role luôn là một giá trị từ enum (string)
-        role: user.role,
+        role: roleName,
         is_profile_complete:
           user.userProfile &&
             typeof user.userProfile === 'object' &&
             'is_profile_complete' in user.userProfile
-            ? ((user.userProfile as { is_profile_complete?: boolean })
-              .is_profile_complete ?? false)
+            ? (
+              (user.userProfile as { is_profile_complete?: boolean })
+                .is_profile_complete ?? false
+            )
             : false,
         branch_id: bracnhId,
       },
@@ -418,11 +422,13 @@ export class AuthService {
     this.logger.debug(`Creating new access token for user ${user.id}`);
     const userProfile = (user as Account).userProfile;
     const branchId = userProfile?.branch?.id || null;
+    const roleName =
+      typeof user.role === 'string' ? user.role : (user.role).name;
 
     const payload = {
       email: user.email,
       sub: user.id,
-      role: user.role,
+      role: roleName,
       branch_id: branchId,
     };
 
