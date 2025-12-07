@@ -157,7 +157,7 @@ export class FeedbackService {
     );
     const feedback = await this.findOne(feedbackId);
     const userProfile = account.userProfile;
-    const roleName = account.role || Role.User;
+    const roleName = account.role.name;
 
     // Nếu admin/manager trả lời, cập nhật trạng thái ticket
     if (roleName !== Role.User && feedback.status === 'open') {
@@ -184,7 +184,7 @@ export class FeedbackService {
         id: account.userProfile.id,
         fullName: account.userProfile.full_name,
         avatarUrl: account.userProfile.avatar_url,
-        role: account.role,
+        role: roleName,
       },
     });
 

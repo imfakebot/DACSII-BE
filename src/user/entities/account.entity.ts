@@ -7,6 +7,7 @@ import {
   BeforeInsert,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
 } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from './users-profile.entity';
@@ -14,7 +15,7 @@ import { Exclude } from 'class-transformer';
 import { AccountStatus } from '../enum/account-status.enum';
 import { AuthProvider } from '../enum/auth-provider.enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '@/auth/enums/role.enum';
+import { Role as RoleEntity } from './role.entity';
 
 /**
  * @enum Roles
@@ -159,18 +160,10 @@ export class Account {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
 
-  /**
-   * Vai trò của tài khoản trong hệ thống.
-   * Sử dụng enum để đảm bảo tính nhất quán của dữ liệu.
-   */
-  @ApiProperty({ enum: Role, example: Role.User })
-  @Column({
-    type: 'enum',
-    enum: Role,
-    name: 'role',
-    default: Role.User,
-  })
-  role!: Role;
+  @ApiProperty({ type: () => RoleEntity })
+  @ManyToOne(() => RoleEntity, (role) => role.accounts)
+  @JoinColumn({ name: 'role_id' })
+  role!: RoleEntity;
 
   /**
    * Mối quan hệ một-một với UserProfile, chứa thông tin hồ sơ chi tiết.

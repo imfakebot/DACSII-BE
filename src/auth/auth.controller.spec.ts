@@ -4,16 +4,27 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { LoginUserDto } from './dto/login-user.dto';
+import { LoginCompleteDto } from './dto/login-complete.dto';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let authService: AuthService;
 
-  // Tạo một đối tượng giả lập cho AuthService
+  // Create a mock for AuthService
   const mockAuthService = {
-    initateRegistration: jest.fn(),
+    initiateRegistration: jest.fn(),
     completeRegistration: jest.fn(),
-    login: jest.fn(),
+    loginInitiate: jest.fn(),
+    loginComplete: jest.fn(),
+  };
+
+  // Create a mock for ConfigService
+  const mockConfigService = {
+    get: jest.fn((key: string) => {
+      if (key === 'NODE_ENV') return 'test';
+      return null;
+    }),
   };
 
   beforeEach(async () => {
@@ -24,13 +35,16 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: mockAuthService,
         },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
-    authService = module.get<AuthService>(AuthService);
 
-    // Xóa các mock trước mỗi test để đảm bảo tính độc lập
+    // Clear mocks before each test
     jest.clearAllMocks();
   });
 
@@ -46,45 +60,73 @@ describe('AuthController', () => {
         full_name: 'Test User',
         phone_number: '0987654321',
       };
-      mockAuthService.initateRegistration.mockResolvedValue({
+      mockAuthService.initiateRegistration.mockResolvedValue({
         message: 'Success',
       });
 
       const result = await controller.initiateRegistration(registerDto);
 
-      expect(mockAuthService.initateRegistration).toHaveBeenCalledWith(
+      expect(mockAuthService.initiateRegistration).toHaveBeenCalledWith(
         registerDto,
       );
       expect(result).toEqual({ message: 'Success' });
     });
   });
 
-  describe('login', () => {
-    it('should call authService.login with the user object', () => {
-      const user = {
-        id: 'some-id',
-        email: 'test@example.com',
-        user_profile_id: 'profile-id',
-        role: {
-          id: 'role-id',
-          name: 'user',
-        },
-        // Add other properties from AuthenticatedUser if necessary for the test
-        // For example, if 'id' is required, add id: 'some-id'
-      };
-      // LoginUserDto không được sử dụng trực tiếp trong logic nhưng vẫn cần cho validation và swagger
+  describe('loginInitiate', () => {
+    it('should call authService.loginInitiate with email and password', async () => {
       const loginDto: LoginUserDto = {
         email: 'test@example.com',
         password: 'password',
       };
-      const token = { access_token: 'jwt-token' };
-      mockAuthService.login.mockReturnValue(token);
+      mockAuthService.loginInitiate.mockResolvedValue({ message: 'OTP sent' });
 
-      const result = controller.login(user, loginDto);
+      const result = await controller.loginInitiate(loginDto);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(authService.login).toHaveBeenCalledWith(user);
-      expect(result).toEqual(token);
+      expect(mockAuthService.loginInitiate).toHaveBeenCalledWith(
+        loginDto.email,
+        loginDto.password,
+      );
+      expect(result).toEqual({ message: 'OTP sent' });
+    });
+  });
+
+  describe('loginComplete', () => {
+    it('should call authService.loginComplete and set a cookie', async () => {
+      const loginCompleteDto: LoginCompleteDto = {
+        email: 'test@example.com',
+        verificationCode: '123456',
+      };
+      const loginData = {
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        user: { id: 'user-id', email: 'test@example.com' },
+      };
+      mockAuthService.loginComplete.mockResolvedValue(loginData);
+
+      // Mock Express Response
+      const mockResponse = {
+        cookie: jest.fn(),
+      } as unknown as Response;
+
+      const result = await controller.loginComplete(
+        loginCompleteDto,
+        mockResponse,
+      );
+
+      expect(mockAuthService.loginComplete).toHaveBeenCalledWith(
+        loginCompleteDto.email,
+        loginCompleteDto.verificationCode,
+      );
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        'refresh_token',
+        loginData.refreshToken,
+        expect.any(Object),
+      );
+      expect(result).toEqual({
+        accessToken: loginData.accessToken,
+        user: loginData.user,
+      });
     });
   });
 
@@ -101,7 +143,7 @@ describe('AuthController', () => {
       const result = await controller.completeRegistration(verifyDto);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(authService.completeRegistration).toHaveBeenCalledWith(
+      expect(mockAuthService.completeRegistration).toHaveBeenCalledWith(
         verifyDto.email,
         verifyDto.verificationCode,
       );
