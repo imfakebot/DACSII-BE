@@ -1,31 +1,39 @@
-import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  ManyToMany,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Field } from '../../field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { UtilityType } from '../enums/utility-type.enum';
+import { UtilitySale } from './utility-sale.entity';
 
 /**
  * @entity Utility
- * @description Đại diện cho một tiện ích mà sân bóng có thể cung cấp (ví dụ: Wi-Fi, bãi đỗ xe, nước uống miễn phí).
+ * @description Đại diện cho một tiện ích (amenity) hoặc sản phẩm (product) mà sân bóng có thể cung cấp.
+ * Ví dụ: Wi-Fi, bãi đỗ xe, nước uống, đồ ăn nhẹ.
  */
 @Entity({ name: 'utilities' })
 export class Utility {
   /**
-   * @property {number} id - ID duy nhất của tiện ích (số tự tăng).
+   * ID duy nhất của tiện ích, dạng số tự tăng.
    */
   @ApiProperty({ description: 'ID duy nhất của tiện ích', example: 1 })
   @PrimaryGeneratedColumn()
   id!: number;
 
   /**
-   * @property {string} name - Tên của tiện ích.
-   * @description Tên này là duy nhất (unique) trong toàn hệ thống.
+   * Tên của tiện ích hoặc sản phẩm. Phải là duy nhất.
+   * @example "Nước tăng lực Sting"
    */
   @ApiProperty({ description: 'Tên của tiện ích', example: 'Wi-Fi miễn phí' })
   @Column({ type: 'varchar', length: 100, unique: true })
   name!: string;
 
   /**
-   * @property {string} iconUrl - URL đến icon đại diện cho tiện ích.
-   * @description Có thể để trống (nullable).
+   * URL đến icon đại diện cho tiện ích. Có thể để trống.
    */
   @ApiProperty({
     description: 'URL đến icon đại diện cho tiện ích',
@@ -36,10 +44,39 @@ export class Utility {
   iconUrl!: string;
 
   /**
-   * @description Mối quan hệ Nhiều-Nhiều với thực thể Field.
-   * Một tiện ích có thể có ở nhiều sân bóng, và một sân bóng có thể có nhiều tiện ích.
-   * Mối quan hệ này được quản lý thông qua bảng trung gian `field_utilities` (được định nghĩa trong `Field` entity).
+   * Giá bán của sản phẩm.
+   * Sẽ là `null` nếu đây là một tiện nghi miễn phí (type = 'amenity').
+   */
+  @ApiProperty({
+    description: 'Giá của tiện ích (nếu có thể bán)',
+    required: false,
+    example: 20000,
+  })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  price!: number;
+
+  /**
+   * Phân loại tiện ích là 'amenity' (tiện nghi có sẵn) hoặc 'product' (sản phẩm để bán).
+   */
+  @ApiProperty({
+    description: 'Loại tiện ích: là tiện nghi hay sản phẩm bán',
+    enum: UtilityType,
+    default: UtilityType.AMENITY,
+  })
+  @Column({ type: 'enum', enum: UtilityType, default: UtilityType.AMENITY })
+  type!: UtilityType;
+
+  /**
+   * Mối quan hệ Nhiều-Nhiều với Field.
+   * Dùng để thể hiện các **tiện nghi** có sẵn tại một sân bóng.
    */
   @ManyToMany(() => Field, (field) => field.utilities)
   fields!: Field[];
+
+  /**
+   * Mối quan hệ Một-Nhiều với UtilitySale.
+   * Liên kết đến tất cả các giao dịch bán của **sản phẩm** này.
+   */
+  @OneToMany(() => UtilitySale, (sale) => sale.utility)
+  sales!: UtilitySale[];
 }

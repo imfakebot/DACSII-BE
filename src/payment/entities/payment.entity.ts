@@ -5,6 +5,7 @@ import {
   ManyToOne,
   OneToOne,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
 } from 'typeorm';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentMethod } from '../enums/payment-method.enum';
@@ -14,18 +15,27 @@ import { ApiProperty } from '@nestjs/swagger';
 
 /**
  * @class Payment
- * @description Đại diện cho một giao dịch thanh toán trong hệ thống.
+ * @description Đại diện cho một giao dịch thanh toán trong hệ thống, liên kết với một đơn đặt sân.
  */
 @Entity({ name: 'payments' })
 export class Payment {
+  /**
+   * ID duy nhất của giao dịch, định dạng UUID.
+   */
   @ApiProperty({ description: 'ID duy nhất của giao dịch', format: 'uuid' })
   @PrimaryGeneratedColumn('uuid')
   id?: string;
 
+  /**
+   * Số tiền gốc của đơn hàng (chưa trừ voucher).
+   */
   @ApiProperty({ description: 'Số tiền gốc của đơn hàng', example: 200000 })
   @Column({ name: 'amount', type: 'decimal', precision: 10, scale: 2 })
   amount!: number;
 
+  /**
+   * Số tiền cuối cùng khách hàng phải trả (đã trừ voucher).
+   */
   @ApiProperty({
     description: 'Số tiền cuối cùng sau khi áp dụng giảm giá',
     example: 180000,
@@ -33,6 +43,9 @@ export class Payment {
   @Column({ name: 'final_amount', type: 'decimal', precision: 10, scale: 2 })
   finalAmount!: number;
 
+  /**
+   * Trạng thái của giao dịch (pending, completed, failed).
+   */
   @ApiProperty({
     description: 'Trạng thái của giao dịch',
     enum: PaymentStatus,
@@ -45,6 +58,9 @@ export class Payment {
   })
   status!: PaymentStatus;
 
+  /**
+   * Phương thức thanh toán được sử dụng (cash, vnpay, momo).
+   */
   @ApiProperty({
     description: 'Phương thức thanh toán',
     enum: PaymentMethod,
@@ -57,6 +73,9 @@ export class Payment {
   })
   paymentMethod!: PaymentMethod;
 
+  /**
+   * Mã giao dịch từ cổng thanh toán (nếu có).
+   */
   @ApiProperty({
     description: 'Mã giao dịch từ cổng thanh toán',
     required: false,
@@ -69,6 +88,9 @@ export class Payment {
   })
   transactionCode!: string;
 
+  /**
+   * Thời điểm giao dịch được xác nhận hoàn thành.
+   */
   @ApiProperty({
     description: 'Thời điểm giao dịch hoàn thành',
     required: false,
@@ -76,18 +98,30 @@ export class Payment {
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt!: Date | null;
 
+  /**
+   * Thời điểm giao dịch được tạo trong hệ thống.
+   */
   @ApiProperty({ description: 'Thời điểm tạo giao dịch' })
-  @Column({ name: 'created_at', type: 'timestamp' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
+  /**
+   * Mã ngân hàng hoặc ví điện tử được sử dụng để thanh toán (nếu có).
+   */
   @ApiProperty({ description: 'Mã ngân hàng (nếu có)', required: false })
   @Column({ name: 'bank_code', nullable: true })
   bankCode!: string;
 
+  /**
+   * Mối quan hệ Một-Một với Booking. Mỗi thanh toán thuộc về một đơn đặt sân duy nhất.
+   */
   @OneToOne(() => Booking, (booking) => booking.payment)
   @JoinColumn({ name: 'booking_id' })
   booking!: Booking;
 
+  /**
+   * Mối quan hệ Nhiều-Một với Voucher. Một thanh toán có thể áp dụng một voucher.
+   */
   @ApiProperty({ type: () => Voucher, required: false })
   @ManyToOne(() => Voucher, { nullable: true }) // Cho phép không có voucher
   @JoinColumn({ name: 'voucher_id' })

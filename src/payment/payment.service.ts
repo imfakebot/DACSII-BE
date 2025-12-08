@@ -17,11 +17,26 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { EventGateway } from '@/event/event.gateway';
 import * as QRCode from 'qrcode';
 
-
+/**
+ * @class PaymentService
+ * @description Chịu trách nhiệm xử lý logic nghiệp vụ liên quan đến thanh toán và thống kê doanh thu.
+ * - Tích hợp với cổng thanh toán VNPAY: tạo URL, xác thực return URL và xử lý IPN.
+ * - Cung cấp các phương thức thống kê doanh thu theo thời gian và chi nhánh.
+ */
 @Injectable()
 export class PaymentService {
   private logger = new Logger(PaymentService.name);
 
+  /**
+   * @constructor
+   * @param vnpayConfiguration - Cấu hình VNPAY được inject.
+   * @param bookingService - Service để tương tác với các đơn đặt sân.
+   * @param paymentRepository - Repository để tương tác với bảng `payments`.
+   * @param voucherRepository - Repository để tương tác với bảng `vouchers`.
+   * @param notificationService - Service để tạo và gửi thông báo.
+   * @param mailerService - Service để gửi email.
+   * @param eventGateWay - Gateway để gửi sự kiện real-time.
+   */
   constructor(
     @Inject(vnpayConfig.KEY)
     private readonly vnpayConfiguration: ConfigType<typeof vnpayConfig>,
@@ -34,8 +49,17 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
-  ) { }
+  ) {}
 
+  /**
+   * @method createVnPayUrl
+   * @description Tạo URL thanh toán VNPAY với các tham số cần thiết.
+   * @param {number} amount - Số tiền cần thanh toán.
+   * @param {string} orderId - ID của đơn hàng (booking ID).
+   * @param {string} ipAddr - Địa chỉ IP của người dùng.
+   * @returns {string} - URL thanh toán VNPAY hoàn chỉnh.
+   * @throws {Error} Nếu thiếu cấu hình VNPAY.
+   */
   createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
     const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
 
@@ -56,7 +80,7 @@ export class PaymentService {
       vnp_TxnRef: orderIdStr,
       vnp_OrderInfo: `Thanh toan don hang ${orderIdStr}`,
       vnp_OrderType: 'other',
-      vnp_Amount: amount * 100,
+      vnp_Amount: amount * 100, // VNPAY yêu cầu số tiền nhân 100
       vnp_ReturnUrl: returnUrl,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: createDate,
@@ -73,6 +97,13 @@ export class PaymentService {
     return `${url}?${qs.stringify(vnp_Params, { encode: false })}`;
   }
 
+  /**
+   * @method verifyReturnUrl
+   * @description Xác thực chữ ký (secure hash) từ VNPAY trả về trên URL phía client.
+   * Chỉ dùng để hiển thị kết quả cho người dùng, không cập nhật CSDL.
+   * @param {Record<string, any>} vnp_Params - Các tham số query từ VNPAY.
+   * @returns {object} - Một đối tượng chứa kết quả xác thực.
+   */
   verifyReturnUrl(vnp_Params: Record<string, any>) {
     const vnp_Params_Data = { ...vnp_Params };
     const secureHash = vnp_Params['vnp_SecureHash'] as string;
@@ -127,6 +158,13 @@ export class PaymentService {
     }
   }
 
+  /**
+   * @method handleIpn
+   * @description Xử lý thông báo IPN (Instant Payment Notification) từ server VNPAY.
+   * Đây là phương thức đáng tin cậy để cập nhật trạng thái cuối cùng của giao dịch.
+   * @param {VnpayIpnDto} dto - DTO chứa dữ liệu IPN từ VNPAY.
+   * @returns {Promise<{ RspCode: string; Message: string }>} - Phản hồi cho server VNPAY.
+   */
   async handleIpn(
     dto: VnpayIpnDto,
   ): Promise<{ RspCode: string; Message: string }> {
@@ -161,7 +199,6 @@ export class PaymentService {
     const payDate = vnp_Params['vnp_PayDate'] as string;
 
     try {
-      // --- CẬP NHẬT QUERY RELATIONS ĐỂ LẤY ĐỊA CHỈ TỪ BRANCH ---
       const payment = await this.paymentRepository.findOne({
         where: { booking: { id: bookingId }, status: PaymentStatus.PENDING },
         relations: [
@@ -170,8 +207,8 @@ export class PaymentService {
           'booking.userProfile',
           'booking.userProfile.account',
           'booking.field',
-          'booking.field.branch', // Thêm branch
-          'booking.field.branch.address', // Lấy address từ branch
+          'booking.field.branch',
+          'booking.field.branch.address',
           'booking.field.branch.address.ward',
           'booking.field.branch.address.city',
         ],
@@ -193,13 +230,14 @@ export class PaymentService {
       const fullName = payment.booking.userProfile.full_name;
       const fieldName = payment.booking.field.name;
 
-      // --- SỬA LOGIC LẤY ĐỊA CHỈ ---
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
-        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${branchAddressObj.city?.name || ''}`
-          .replace(/,\s*,/g, ',')
-          .trim()
-          .replace(/,\s*$/, '')
+        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${
+            branchAddressObj.city?.name || ''
+          }`
+            .replace(/,\s*,/g, ',')
+            .trim()
+            .replace(/,\s*$/, '')
         : 'Đang cập nhật';
 
       const startTime = moment(payment.booking.start_time).format(
@@ -214,7 +252,7 @@ export class PaymentService {
       });
 
       if (rspCode == '00') {
-        // --- THÀNH CÔNG ---
+        // --- GIAO DỊCH THÀNH CÔNG ---
         await this.bookingService.updateStatus(
           bookingId,
           BookingStatus.COMPLETED,
@@ -226,8 +264,6 @@ export class PaymentService {
           bankCode,
           payDate,
         );
-
-
 
         await this.notificationService.createNotification({
           title: 'Thanh toán thành công',
@@ -267,7 +303,7 @@ export class PaymentService {
         });
         this.logger.log(`Booking ${bookingId} đã được xác nhận`);
       } else {
-        // --- THẤT BẠI ---
+        // --- GIAO DỊCH THẤT BẠI ---
         await this.bookingService.updateStatus(
           bookingId,
           BookingStatus.CANCELLED,
@@ -319,40 +355,12 @@ export class PaymentService {
     }
   }
 
-  private sortObject(
-    obj: Record<string, string | number | undefined | null>,
-  ): Record<string, string> {
-    const sorted: Record<string, any> = {};
-    const keys = Object.keys(obj).sort();
-    keys.forEach((key) => {
-      const value = obj[key];
-      const valueString =
-        value === null || value === undefined ? '' : String(value);
-      sorted[key] = encodeURIComponent(valueString).replace(/%20/g, '+');
-    });
-    return sorted;
-  }
-
-  private async updatePayment(
-    payment: Payment,
-    status: PaymentStatus,
-    transactionNo: string,
-    bankCode: string,
-    payDate: string,
-  ): Promise<void> {
-    try {
-      payment.status = status;
-      payment.transactionCode = transactionNo;
-      payment.bankCode = bankCode;
-      if (status === PaymentStatus.COMPLETED && payDate) {
-        payment.completedAt = moment(payDate, 'YYYYMMDDHHmmss').toDate();
-      }
-      await this.paymentRepository.save(payment);
-    } catch (error) {
-      this.logger.error(`Lỗi cập nhật Payment ${payment.id}`, error);
-    }
-  }
-
+  /**
+   * @method findByBookingId
+   * @description Tìm một bản ghi thanh toán dựa trên ID của đơn đặt sân.
+   * @param {string} bookingId - ID của đơn đặt sân.
+   * @returns {Promise<Payment | null>} - Bản ghi thanh toán hoặc null nếu không tìm thấy.
+   */
   async findByBookingId(bookingId: string): Promise<Payment | null> {
     return this.paymentRepository.findOne({
       where: { booking: { id: bookingId } },
@@ -360,25 +368,20 @@ export class PaymentService {
     });
   }
 
-  private async sendEmailSafely(mailOptions: {
-    to: string;
-    subject: string;
-    template: string;
-    context: object;
-  }) {
-    try {
-      await this.mailerService.sendMail(mailOptions);
-    } catch (error) {
-      this.logger.error(`Gửi email thất bại đến ${mailOptions.to}:`, error);
-    }
-  }
-
+  /**
+   * @method getStats
+   * @description Lấy thống kê tổng quan về doanh thu và số lượng giao dịch đặt sân.
+   * @param {string} [startDate] - Ngày bắt đầu lọc (YYYY-MM-DD).
+   * @param {string} [endDate] - Ngày kết thúc lọc (YYYY-MM-DD).
+   * @param {string} [branchId] - ID của chi nhánh cần lọc.
+   * @returns {Promise<object>} - Đối tượng chứa `revenue` (tổng doanh thu) và `transactions` (số lượng theo trạng thái).
+   */
   async getStats(startDate?: string, endDate?: string, branchId?: string) {
     const query = this.paymentRepository
       .createQueryBuilder('payment')
       .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.field', 'field')
-      .leftJoin('field.branch', 'branch'); // Join chuẩn theo schema mới
+      .leftJoin('field.branch', 'branch');
 
     if (startDate && endDate) {
       query.where('payment.createdAt BETWEEN :start AND :end', {
@@ -420,10 +423,17 @@ export class PaymentService {
     };
   }
 
+  /**
+   * @method getRevenueChart
+   * @description Lấy dữ liệu doanh thu đặt sân theo từng tháng trong một năm để vẽ biểu đồ.
+   * @param {number} year - Năm cần lấy dữ liệu.
+   * @param {string} [branchId] - ID của chi nhánh cần lọc.
+   * @returns {Promise<Array<{ month: number; revenue: number }>>} - Mảng dữ liệu doanh thu.
+   */
   async getRevenueChart(year: number, branchId?: string) {
     const query = this.paymentRepository
       .createQueryBuilder('payment')
-      .select('MONTH(payment.createdAt)', 'month') // Lưu ý: Hàm MONTH() này dành cho MySQL. Nếu dùng Postgres thì sửa thành EXTRACT(MONTH FROM ...)
+      .select('MONTH(payment.createdAt)', 'month')
       .addSelect('SUM(payment.finalAmount)', 'revenue')
       .leftJoin('payment.booking', 'booking')
       .leftJoin('booking.field', 'field')
@@ -448,9 +458,79 @@ export class PaymentService {
     }));
   }
 
+  /**
+   * @private
+   * @method sortObject
+   * @description Sắp xếp các thuộc tính của một object theo thứ tự alphabet.
+   * @param {object} obj - Object cần sắp xếp.
+   * @returns {object} - Object đã được sắp xếp.
+   */
+  private sortObject(
+    obj: Record<string, string | number | undefined | null>,
+  ): Record<string, string> {
+    const sorted: Record<string, any> = {};
+    const keys = Object.keys(obj).sort();
+    keys.forEach((key) => {
+      const value = obj[key];
+      const valueString =
+        value === null || value === undefined ? '' : String(value);
+      sorted[key] = encodeURIComponent(valueString).replace(/%20/g, '+');
+    });
+    return sorted;
+  }
+
+  /**
+   * @private
+   * @method updatePayment
+   * @description Cập nhật trạng thái và thông tin giao dịch cho một bản ghi thanh toán.
+   */
+  private async updatePayment(
+    payment: Payment,
+    status: PaymentStatus,
+    transactionNo: string,
+    bankCode: string,
+    payDate: string,
+  ): Promise<void> {
+    try {
+      payment.status = status;
+      payment.transactionCode = transactionNo;
+      payment.bankCode = bankCode;
+      if (status === PaymentStatus.COMPLETED && payDate) {
+        payment.completedAt = moment(payDate, 'YYYYMMDDHHmmss').toDate();
+      }
+      await this.paymentRepository.save(payment);
+    } catch (error) {
+      this.logger.error(`Lỗi cập nhật Payment ${payment.id}`, error);
+    }
+  }
+
+  /**
+   * @private
+   * @method sendEmailSafely
+   * @description Gửi email một cách an toàn, bắt lỗi nếu có sự cố.
+   */
+  private async sendEmailSafely(mailOptions: {
+    to: string;
+    subject: string;
+    template: string;
+    context: object;
+  }) {
+    try {
+      await this.mailerService.sendMail(mailOptions);
+    } catch (error) {
+      this.logger.error(`Gửi email thất bại đến ${mailOptions.to}:`, error);
+    }
+  }
+
+  /**
+   * @private
+   * @method generateQRCode
+   * @description Tạo mã QR code từ một chuỗi dữ liệu và trả về dưới dạng Data URL.
+   * @param {string} data - Dữ liệu cần mã hóa.
+   * @returns {Promise<string>} - Chuỗi Data URL của ảnh QR code.
+   */
   private async generateQRCode(data: string): Promise<string> {
     try {
-
       return await QRCode.toDataURL(data);
     } catch (err) {
       this.logger.error('Lỗi tạo QR Code', err);

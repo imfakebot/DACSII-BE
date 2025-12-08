@@ -24,7 +24,7 @@ import { BookingService } from './booking.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedRequest } from '../auth/interface/authenticated-request.interface';
-import { UsersService } from '../user/users.service'; // Check lại đường dẫn này
+import { UsersService } from '../user/users.service';
 import { Role } from '@/auth/enums/role.enum';
 import { BookingResponse } from './dto/booking-response.dto';
 import { FilterBookingDto } from './dto/filter-booking.dto';
@@ -38,9 +38,10 @@ import { CheckInDto } from './dto/check-in.dto';
 import { Booking } from './entities/booking.entity';
 
 /**
- * @controller BookingsController
- * @description Xử lý các yêu cầu HTTP liên quan đến việc đặt sân của người dùng.
- * Bao gồm các endpoint để tạo, hủy, và xem lịch sử đặt sân.
+ * @controller BookingController
+ * @description Xử lý các yêu cầu HTTP liên quan đến việc đặt sân.
+ * Bao gồm các endpoint để người dùng tạo, hủy, xem lịch sử đặt sân,
+ * và các endpoint quản trị cho nhân viên, quản lý.
  */
 @ApiTags('Bookings (Đặt sân)')
 @Controller('bookings')
@@ -54,12 +55,19 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /bookings
-   * @description Tạo một yêu cầu đặt sân mới cho người dùng đã đăng nhập.
-   * Quá trình này bao gồm việc kiểm tra tính khả dụng, tính giá, áp dụng voucher và tạo link thanh toán.
+   * @description (User) Tạo một yêu cầu đặt sân mới.
+   * Người dùng đã đăng nhập có thể tạo một đơn đặt sân. Hệ thống sẽ kiểm tra tính khả dụng,
+   * tính giá, áp dụng voucher (nếu có) và trả về URL thanh toán VNPAY.
+   * @param {CreateBookingDto} createBookingDto - DTO chứa thông tin chi tiết về lượt đặt sân.
+   * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực, chứa thông tin người dùng.
+   * @returns {Promise<BookingResponse>} - Một đối tượng chứa thông tin đặt sân, URL thanh toán và số tiền cuối cùng.
+   * @throws {NotFoundException} Nếu hồ sơ người dùng không tồn tại.
+   * @throws {ConflictException} Nếu sân đã bị người khác đặt trong khung giờ này.
+   * @throws {BadRequestException} Nếu voucher không hợp lệ.
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -67,9 +75,8 @@ export class BookingController {
   @ApiBearerAuth()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({
-    summary: 'Tạo yêu cầu đặt sân mới (Kèm xử lý Voucher & VNPay)',
+    summary: '(User) Tạo yêu cầu đặt sân mới (Kèm xử lý Voucher & VNPay)',
   })
-  // Cập nhật lại response type cho đúng với thực tế trả về
   @ApiResponse({
     status: 201,
     description: 'Đặt sân thành công. Trả về link thanh toán VNPay.',
@@ -92,12 +99,6 @@ export class BookingController {
     status: 409,
     description: 'Sân đã bị người khác đặt trong khung giờ này.',
   })
-  /**
-   * @param {CreateBookingDto} createBookingDto - DTO chứa thông tin chi tiết về lượt đặt sân.
-   * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực, chứa thông tin người dùng.
-   * @returns {Promise<BookingResponse>} - Một đối tượng chứa thông tin đặt sân, URL thanh toán và số tiền cuối cùng.
-   * @throws {NotFoundException} Nếu hồ sơ người dùng không tồn tại.
-   */
   async create(
     @Body() createBookingDto: CreateBookingDto,
     @Req() req: AuthenticatedRequest,
@@ -107,7 +108,6 @@ export class BookingController {
       `User ${accountId} creating booking for field ${createBookingDto.fieldId}`,
     );
 
-    // 1. Lấy profile
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
 
@@ -118,13 +118,16 @@ export class BookingController {
       );
     }
 
-    // 2. Gọi service (Service sẽ return { booking, paymentUrl, finalAmount, message })
     return this.bookingService.createBooking(createBookingDto, userProfile);
   }
 
   /**
    * @route PATCH /bookings/:id/cancel
    * @description Hủy một yêu cầu đặt sân đã tồn tại.
+   * - User: có thể hủy đơn của chính mình.
+   * - Admin/Manager: có thể hủy đơn bất kỳ (thường là trong chi nhánh của họ).
+   * @param {string} bookingId - ID của lượt đặt sân cần hủy.
+   * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực, chứa thông tin và vai trò của người dùng.
    */
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -139,10 +142,6 @@ export class BookingController {
   })
   @ApiResponse({ status: 400, description: 'Không thể hủy (Quá hạn giờ hủy).' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
-  /**
-   * @param {string} bookingId - ID của lượt đặt sân cần hủy.
-   * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực, chứa thông tin và vai trò của người dùng.
-   */
   async cancel(
     @Param('id', ParseUUIDPipe) bookingId: string,
     @Req() req: AuthenticatedRequest,
@@ -157,7 +156,8 @@ export class BookingController {
 
   /**
    * @route GET /bookings/me
-   * @description Lấy lịch sử đặt sân của người dùng đang đăng nhập, có hỗ trợ lọc và phân trang.
+   * @description (User) Lấy lịch sử đặt sân của người dùng đang đăng nhập.
+   * Hỗ trợ lọc và phân trang.
    * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực.
    * @param {FilterBookingDto} filterDto - DTO chứa các tham số để lọc và phân trang.
    * @returns {Promise<object>} - Một đối tượng chứa danh sách các đơn đặt sân và thông tin phân trang (meta).
@@ -165,7 +165,7 @@ export class BookingController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xem lịch sử đặt sân của tôi' })
+  @ApiOperation({ summary: '(User) Xem lịch sử đặt sân của tôi' })
   @ApiResponse({ status: 200, description: 'Trả về danh sách đơn đặt sân.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async getMyBookings(
@@ -178,40 +178,46 @@ export class BookingController {
 
   /**
    * @route GET /bookings/management/all
-   * @description Lấy danh sách booking.
+   * @description Lấy danh sách booking cho mục đích quản lý.
    * - Admin: Xem tất cả.
-   * - Manager/Staff: Chỉ xem booking thuộc chi nhánh của mình.
+   * - Manager/Staff: Chỉ xem các booking thuộc chi nhánh của mình.
+   * @param {FilterBookingDto} filter - DTO chứa các tham số lọc và phân trang.
+   * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu (để lấy branch_id).
+   * @returns {Promise<object>} - Danh sách đơn đặt sân và thông tin phân trang.
    */
-  @Get('management/all') // Đổi tên route cho phù hợp ngữ cảnh quản lý chung
+  @Get('management/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager, Role.Staff) // <--- Cho phép cả 3 role
+  @Roles(Role.Admin, Role.Manager, Role.Staff)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Manager/Staff) Lấy danh sách booking' })
   async getAllBooking(
-    @Query() filter: FilterBookingDto, // Dùng DTO Filter thay vì liệt kê từng param
-    @User() user: AuthenticatedUser, // <--- Truyền User vào để lấy branch_id
+    @Query() filter: FilterBookingDto,
+    @User() user: AuthenticatedUser,
   ) {
     this.logger.log(
       `User ${user.id} fetching all bookings with filter: ${JSON.stringify(
         filter,
       )}`,
     );
-    // Gọi hàm getAllBookings (số nhiều) bên Service mà ta đã sửa ở bước trước
     return this.bookingService.getAllBookings(filter, user);
   }
 
   /**
    * @route POST /bookings/management/create
-   * @description Nhân viên/Admin tạo đơn trực tiếp tại quầy (Không cần thanh toán online).
+   * @description (Admin/Staff/Manager) Tạo đơn trực tiếp tại quầy.
+   * Đơn được tạo với phương thức thanh toán là `CASH` và trạng thái `COMPLETED`.
+   * @param {AdminCreateBookingDto} dto - DTO chứa thông tin đơn đặt sân.
+   * @param {AuthenticatedUser} user - Người dùng (nhân viên) đang tạo đơn.
+   * @returns {Promise<Booking>} - Đơn đặt sân vừa được tạo.
    */
   @Post('management/create')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager, Role.Staff) // <--- Cho phép nhân viên tạo
+  @Roles(Role.Admin, Role.Manager, Role.Staff)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Admin/Staff) Tạo đơn đặt sân tại quầy' })
+  @ApiOperation({ summary: '(Admin/Staff/Manager) Tạo đơn đặt sân tại quầy' })
   async createBookingByAdmin(
     @Body() dto: AdminCreateBookingDto,
-    @User() user: AuthenticatedUser, // <--- Truyền User để check xem có tạo đúng chi nhánh không
+    @User() user: AuthenticatedUser,
   ) {
     this.logger.log(
       `User ${user.id} creating booking at counter: ${JSON.stringify(dto)}`,
@@ -222,12 +228,14 @@ export class BookingController {
   /**
    * @route POST /bookings/check-in
    * @description (Manager/Admin) Check-in cho khách hàng khi đến sân.
-   * Cập nhật trạng thái của đơn đặt sân thành 'CHECKED_IN'.
+   * Cập nhật trạng thái của đơn đặt sân từ `COMPLETED` thành `CHECKED_IN`.
+   * @param {CheckInDto} checkInDto - DTO chứa ID của đơn đặt sân cần check-in.
+   * @returns {Promise<Booking>} - Đơn đặt sân sau khi đã cập nhật.
    */
   @Post('check-in')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Manager, Role.Admin) // Chỉ Manager/Admin mới được check-in
+  @Roles(Role.Manager, Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Manager/Admin) Check-in cho khách hàng tại sân' })
   @ApiResponse({
@@ -250,19 +258,22 @@ export class BookingController {
 
   /**
    * @route GET /bookings/field/:fieldId/schedule
-   * @description Lấy danh sách các booking của một sân trong một ngày cụ thể.
-   * Endpoint này giúp hiển thị lịch trực quan (các khung giờ đã đặt).
+   * @description (Public) Lấy lịch các khung giờ đã được đặt của một sân trong một ngày cụ thể.
+   * Hữu ích cho việc hiển thị lịch trực quan cho người dùng.
+   * @param {string} fieldId - ID của sân bóng.
+   * @param {string} date - Ngày cần xem lịch (định dạng YYYY-MM-DD).
+   * @returns {Promise<object>} - Danh sách các khung giờ đã đặt.
    */
   @Get('field/:fieldId/schedule')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Lấy lịch đặt sân theo ngày' })
+  @ApiOperation({ summary: '(Public) Lấy lịch đặt sân theo ngày' })
   @ApiResponse({
     status: 200,
     description: 'Trả về danh sách các booking trong ngày',
   })
   async getFieldSchedule(
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
-    @Query('date') date: string, // Format: YYYY-MM-DD
+    @Query('date') date: string,
   ) {
     this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
     return this.bookingService.getFieldSchedule(fieldId, date);

@@ -28,7 +28,8 @@ import moment from 'moment';
 
 /**
  * @class BookingService
- * @description Dịch vụ xử lý logic liên quan đến việc đặt sân, bao gồm tạo, hủy và truy vấn thông tin đặt sân.
+ * @description Dịch vụ xử lý logic nghiệp vụ liên quan đến việc đặt sân,
+ * bao gồm tạo, hủy, truy vấn và quản lý các đơn đặt sân.
  */
 @Injectable()
 export class BookingService {
@@ -47,14 +48,20 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) { }
+  ) {}
 
   /**
-   * Tạo một đơn đặt sân mới.
-   * Quá trình này bao gồm kiểm tra giá và tính khả dụng, xác thực voucher, tạo bản ghi đặt sân và thanh toán trong một giao dịch cơ sở dữ liệu.
-   * @param createBookingDto DTO chứa thông tin chi tiết để tạo một đơn đặt sân.
-   * @param userProfile Hồ sơ của người dùng đang thực hiện việc đặt sân.
-   * @returns Một đối tượng chứa thông tin đơn đặt sân đã lưu, URL thanh toán, số tiền cuối cùng và một thông báo.
+   * @method createBooking
+   * @description (User) Tạo một đơn đặt sân mới.
+   * Quá trình này được thực hiện trong một giao dịch CSDL để đảm bảo tính toàn vẹn, bao gồm:
+   * - Kiểm tra và khóa (lock) các dòng dữ liệu để chống race condition.
+   * - Xác thực tính khả dụng của sân và tính giá.
+   * - Xác thực và áp dụng voucher (nếu có).
+   * - Tạo bản ghi `Booking` và `Payment` ở trạng thái `PENDING`.
+   * - Trả về URL thanh toán VNPAY.
+   * @param {CreateBookingDto} createBookingDto - DTO chứa thông tin chi tiết để tạo đơn đặt sân.
+   * @param {UserProfile} userProfile - Hồ sơ của người dùng đang thực hiện việc đặt sân.
+   * @returns {Promise<object>} Một đối tượng chứa thông tin đơn đặt sân, URL thanh toán, số tiền cuối cùng và thông báo.
    * @throws {ConflictException} Nếu sân đã được đặt trong khung giờ được yêu cầu.
    * @throws {NotFoundException} Nếu mã giảm giá không tồn tại.
    * @throws {BadRequestException} Nếu mã giảm giá không hợp lệ hoặc không đáp ứng điều kiện.
@@ -73,25 +80,19 @@ export class BookingService {
     await queryRunner.startTransaction();
 
     try {
-      // --- 1. TÍNH TOÁN THỜI GIAN ---
       const start = new Date(createBookingDto.startTime);
       const end = new Date(
         start.getTime() + createBookingDto.durationMinutes * 60000,
       );
 
-      // --- 2. [FIX RACE CONDITION 1] KIỂM TRA SÂN & KHÓA DÒNG DỮ LIỆU ---
-      // Thay vì tin tưởng pricingService, ta tự kiểm tra lại trong Transaction với khóa 'pessimistic_write'
-
-      // Tìm xem có đơn nào đang trùng giờ không
       const overlappingBooking = await queryRunner.manager.findOne(Booking, {
         where: {
           field: { id: createBookingDto.fieldId },
-          status: Not(BookingStatus.CANCELLED), // Chỉ tính các đơn chưa hủy
-          // Logic trùng giờ: (StartA < EndB) && (EndA > StartB)
+          status: Not(BookingStatus.CANCELLED),
           start_time: LessThan(end),
           end_time: MoreThan(start),
         },
-        lock: { mode: 'pessimistic_write' }, // 👈 QUAN TRỌNG: Khóa lại ngay khi đọc!
+        lock: { mode: 'pessimistic_write' },
       });
 
       if (overlappingBooking) {
@@ -103,8 +104,6 @@ export class BookingService {
         );
       }
 
-      // --- 3. GỌI SERVICE TÍNH GIÁ ---
-      // Lúc này sân đã an toàn, ta gọi service để lấy giá tiền chuẩn
       const pricingResult = await this.pricingService.checkPriceAndAvailability(
         {
           fieldId: createBookingDto.fieldId,
@@ -117,17 +116,15 @@ export class BookingService {
       let finalPrice = originalPrice;
       let appliedVoucher: Voucher | null = null;
 
-      // --- 4. [FIX RACE CONDITION 2] XỬ LÝ VOUCHER ---
       if (createBookingDto.voucherCode) {
         this.logger.log(
           `Applying voucher ${createBookingDto.voucherCode} for booking`,
         );
         const voucher = await queryRunner.manager.findOne(Voucher, {
           where: { code: createBookingDto.voucherCode },
-          lock: { mode: 'pessimistic_write' }, //  QUAN TRỌNG: Khóa Voucher để tránh 2 người cùng dùng cái cuối cùng
+          lock: { mode: 'pessimistic_write' },
         });
 
-        // Validate Voucher
         if (!voucher) throw new NotFoundException('Mã giảm giá không tồn tại');
         if (voucher.quantity <= 0)
           throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
@@ -145,7 +142,6 @@ export class BookingService {
           );
         }
 
-        // Tính toán giảm giá
         let discountAmount = 0;
         if (voucher.discountAmount) {
           discountAmount = Number(voucher.discountAmount);
@@ -162,7 +158,6 @@ export class BookingService {
         finalPrice = Math.max(0, originalPrice - discountAmount);
         appliedVoucher = voucher;
 
-        // Trừ số lượng (Vì đã lock nên đoạn này an toàn tuyệt đối)
         await queryRunner.manager.decrement(
           Voucher,
           { id: voucher.id },
@@ -171,13 +166,12 @@ export class BookingService {
         );
       }
 
-      // --- 5. LƯU BOOKING & PAYMENT ---
       const newBooking = queryRunner.manager.create(Booking, {
         start_time: start,
         end_time: end,
-        total_price: originalPrice, // Giá gốc
+        total_price: originalPrice,
         status: BookingStatus.PENDING,
-        code: this.generateBookingCode(), // <--- Tự động sinh mã
+        code: this.generateBookingCode(),
         bookingDate: new Date(),
         userProfile: userProfile,
         field: { id: createBookingDto.fieldId } as Field,
@@ -187,7 +181,7 @@ export class BookingService {
 
       const newPayment = queryRunner.manager.create(Payment, {
         amount: originalPrice,
-        finalAmount: finalPrice, // Giá sau giảm
+        finalAmount: finalPrice,
         paymentMethod: PaymentMethod.VNPAY,
         status: PaymentStatus.PENDING,
         booking: savedBooking,
@@ -197,17 +191,16 @@ export class BookingService {
 
       await queryRunner.manager.save(Payment, newPayment);
 
-      // --- 6. COMMIT ---
       await queryRunner.commitTransaction();
 
       this.logger.log(
         `Booking ${savedBooking.id} created successfully for user ${userProfile.id}`,
       );
-      // Tạo URL thanh toán (Làm ngoài transaction cho nhanh cũng được, hoặc trong cũng ok)
+
       const paymentUrl = this.paymentService.createVnPayUrl(
         finalPrice,
         savedBooking.id,
-        '127.0.0.1', // Nên lấy IP thật từ request nếu có thể
+        '127.0.0.1',
       );
 
       return {
@@ -217,33 +210,34 @@ export class BookingService {
         message: 'Đặt sân thành công, vui lòng thanh toán.',
       };
     } catch (error) {
-      // Rollback nếu có bất kỳ lỗi nào (kể cả lỗi Conflict ở bước 2)
       this.logger.error(
-        `Error creating booking for user ${userProfile.id}:`, error);
+        `Error creating booking for user ${userProfile.id}:`,
+        error,
+      );
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
-      // Giải phóng kết nối
       await queryRunner.release();
     }
   }
 
   /**
-   * Hủy đơn đặt sân.
-   * Chỉ chủ sở hữu đơn đặt hoặc quản trị viên mới có thể hủy. Không thể hủy nếu thời gian bắt đầu sắp diễn ra (ít hơn 60 phút).
-   * @param bookingId ID của đơn đặt sân cần hủy.
-   * @param accountId ID của tài khoản người dùng đang thực hiện hành động (lấy từ token).
-   * @param userRole Vai trò của người dùng đang thực hiện hành động.
+   * @method cancelBooking
+   * @description Hủy một đơn đặt sân.
+   * Chỉ chủ sở hữu đơn hoặc Admin/Manager mới có thể hủy. Không thể hủy nếu quá sát giờ đá.
+   * Nếu có áp dụng voucher, số lượng voucher sẽ được hoàn lại.
+   * @param {string} bookingId - ID của đơn đặt sân cần hủy.
+   * @param {string} accountId - ID của tài khoản người dùng đang thực hiện hành động.
+   * @param {Role} userRole - Vai trò của người dùng.
+   * @returns {Promise<object>} - Một đối tượng chứa thông báo xác nhận hủy thành công.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    * @throws {ForbiddenException} Nếu người dùng không có quyền hủy đơn này.
-   * @throws {BadRequestException} Nếu đơn đặt sân đã bị hủy hoặc không thể hủy do thời gian.
-   * @returns Một đối tượng chứa thông báo xác nhận hủy thành công.
+   * @throws {BadRequestException} Nếu đơn đặt sân không thể hủy (đã hủy, quá giờ,...).
    */
   async cancelBooking(bookingId: string, accountId: string, userRole: Role) {
     this.logger.log(
       `Attempting to cancel booking ${bookingId} by user ${accountId} with role ${userRole}`,
     );
-    // 1. Tìm booking kèm thông tin người đặt để kiểm tra quyền
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
       relations: ['userProfile', 'userProfile.account'],
@@ -254,15 +248,11 @@ export class BookingService {
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
-    // Safely resolve booking account id with explicit null checks and an explicit cast
-    // to avoid unsafe member access on a value that TypeScript/linters may consider error-typed.
     const bookingAccountId =
       booking.userProfile && booking.userProfile.account
         ? booking.userProfile.account.id
         : undefined;
 
-    // 2. Kiểm tra quyền
-    // Only allow the owner of the booking or an admin to cancel
     if (bookingAccountId !== accountId && userRole !== Role.Admin) {
       this.logger.error(
         `User ${accountId} does not have permission to cancel booking ${bookingId}`,
@@ -275,10 +265,8 @@ export class BookingService {
       throw new BadRequestException('Đơn đặt sân đã được hủy trước đó.');
     }
 
-    // 4.  Kiểm tra thời gian: Không cho hủy nếu còn < 60p là đá
     const timeDiff = booking.start_time.getTime() - new Date().getTime();
     if (timeDiff < 60 * 60 * 1000) {
-      // 60 phút
       this.logger.warn(
         `Booking ${bookingId} cannot be cancelled due to time limit`,
       );
@@ -290,12 +278,10 @@ export class BookingService {
     await queryRunner.startTransaction();
 
     try {
-      // 5. Cập nhật trạng thái booking -> Cancelled
       booking.status = BookingStatus.CANCELLED;
       await queryRunner.manager.save(Booking, booking);
       this.logger.log(`Booking ${bookingId} status updated to CANCELLED`);
 
-      //6. Xử lý payment và voucher
       const payment = await queryRunner.manager.findOne(Payment, {
         where: { booking: { id: booking.id } },
         relations: ['voucher'],
@@ -308,7 +294,6 @@ export class BookingService {
           `Payment for booking ${bookingId} status updated to FAILED`,
         );
 
-        //7. Hoàn voucher (Nếu có dùng)
         if (payment.voucher) {
           await queryRunner.manager.increment(
             Voucher,
@@ -338,9 +323,10 @@ export class BookingService {
   }
 
   /**
-   * Tìm một đơn đặt sân bằng ID.
-   * @param id ID của đơn đặt sân cần tìm.
-   * @returns Promise giải quyết về thực thể `Booking` nếu tìm thấy, ngược lại là `null`.
+   * @method findOne
+   * @description Tìm một đơn đặt sân bằng ID, kèm theo thông tin người dùng và sân.
+   * @param {string} id - ID của đơn đặt sân.
+   * @returns {Promise<Booking | null>} - Thực thể Booking hoặc null nếu không tìm thấy.
    */
   findOne(id: string) {
     this.logger.log(`Finding booking with id ${id}`);
@@ -351,13 +337,12 @@ export class BookingService {
   }
 
   /**
-   * Cập nhật trạng thái của một đơn đặt sân.
-   * Phương thức này thường được gọi bởi các dịch vụ khác (ví dụ: PaymentService) để phản ánh kết quả của một hành động, như thanh toán thành công hoặc thất bại.
    * @method updateStatus
+   * @description Cập nhật trạng thái của một đơn đặt sân.
+   * Thường được gọi bởi các service khác (ví dụ: `PaymentService` sau khi xử lý IPN).
    * @param {string} bookingId - ID của đơn đặt sân cần cập nhật.
-   * @param {BookingStatus} status - Trạng thái mới sẽ được gán cho đơn đặt sân.
-   * @returns {Promise<void>} - Promise được giải quyết khi cập nhật hoàn tất.
-   * @throws {NotFoundException} - Ném ra nếu không tìm thấy đơn đặt sân với ID đã cho.
+   * @param {BookingStatus} status - Trạng thái mới.
+   * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    */
   async updateStatus(bookingId: string, status: BookingStatus) {
     this.logger.log(`Updating booking ${bookingId} to status ${status}`);
@@ -375,10 +360,11 @@ export class BookingService {
   }
 
   /**
-   * Lấy danh sách các đơn đặt sân của một người dùng cụ thể.
-   * @param accountId ID của tài khoản người dùng.
-   * @param filter Đối tượng chứa các tiêu chí lọc và phân trang.
-   * @returns {Promise<{ data: Booking[]; meta: { total: number; page: number; limit: number; lastPage: number; } }>} Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
+   * @method getUserBooking
+   * @description Lấy danh sách các đơn đặt sân của một người dùng cụ thể, có phân trang và lọc.
+   * @param {string} accountId - ID tài khoản của người dùng.
+   * @param {FilterBookingDto} filter - DTO chứa các tiêu chí lọc và phân trang.
+   * @returns {Promise<object>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
   async getUserBooking(accountId: string, filter: FilterBookingDto) {
     this.logger.log(
@@ -391,12 +377,12 @@ export class BookingService {
 
     const query = this.bookingRepository
       .createQueryBuilder('booking')
-      .leftJoinAndSelect('booking.field', 'field') // Lấy thông tin sân
-      .leftJoinAndSelect('field.images', 'images') // Lấy ảnh sân (nếu cần)
+      .leftJoinAndSelect('booking.field', 'field')
+      .leftJoinAndSelect('field.images', 'images')
       .leftJoin('booking.userProfile', 'userProfile')
       .leftJoin('userProfile.account', 'account')
       .where('account.id = :accountId', { accountId })
-      .orderBy('booking.createdAt', 'DESC') // Mới nhất lên đầu
+      .orderBy('booking.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
@@ -418,13 +404,18 @@ export class BookingService {
   }
 
   /**
-   * Lấy tất cả các đơn đặt sân (dành cho Admin hoặc các vai trò có quyền).
-   * @param filter Đối tượng chứa các tiêu chí lọc và phân trang.
-   * @returns {Promise<{ data: Booking[]; meta: { total: number; page: number; limit: number; lastPage: number; } }>} Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
+   * @method getAllBookings
+   * @description Lấy tất cả các đơn đặt sân cho mục đích quản lý.
+   * - Admin: Xem tất cả.
+   * - Manager/Staff: Chỉ xem các booking thuộc chi nhánh của mình.
+   * @param {FilterBookingDto} filter - DTO chứa các tiêu chí lọc và phân trang.
+   * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu.
+   * @returns {Promise<object>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
   async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
     this.logger.log(
-      `Getting all bookings for user ${user.id
+      `Getting all bookings for user ${
+        user.id
       } with filter: ${JSON.stringify(filter)}`,
     );
     const { status, page = 1, limit = 10 } = filter;
@@ -432,12 +423,12 @@ export class BookingService {
 
     const query = this.bookingRepository
       .createQueryBuilder('booking')
-      .leftJoinAndSelect('booking.field', 'field') // Lấy thông tin sân
+      .leftJoinAndSelect('booking.field', 'field')
       .leftJoinAndSelect('field.branch', 'branch')
-      .leftJoinAndSelect('field.images', 'images') // Lấy ảnh sân (nếu cần)
+      .leftJoinAndSelect('field.images', 'images')
       .leftJoin('booking.userProfile', 'userProfile')
       .leftJoin('userProfile.account', 'account')
-      .orderBy('booking.createdAt', 'DESC') // Mới nhất lên đầu
+      .orderBy('booking.createdAt', 'DESC')
       .skip(skip)
       .take(limit);
 
@@ -469,6 +460,7 @@ export class BookingService {
    * @param {number} limit - Số lượng kết quả trên mỗi trang.
    * @param {BookingStatus} [status] - (Tùy chọn) Lọc các đơn đặt sân theo một trạng thái cụ thể.
    * @returns {Promise<{ data: Booking[]; total: number; page: number; lastPage: number; }>} - Một đối tượng chứa danh sách các đơn đặt sân, tổng số lượng, trang hiện tại và trang cuối cùng.
+   * @deprecated Should use `getAllBookings` instead for better role-based filtering.
    */
   async findAll(page: number, limit: number, status?: BookingStatus) {
     this.logger.log(
@@ -496,6 +488,15 @@ export class BookingService {
     };
   }
 
+  /**
+   * @method createBookingByAdmin
+   * @description (Admin/Staff/Manager) Tạo đơn đặt sân trực tiếp tại quầy.
+   * Đơn được tạo với phương thức thanh toán là `CASH` và trạng thái `COMPLETED`.
+   * @param {AdminCreateBookingDto} dto - DTO chứa thông tin đơn đặt sân.
+   * @param {AuthenticatedUser} user - Người dùng (nhân viên) đang tạo đơn.
+   * @returns {Promise<Booking>} - Đơn đặt sân vừa được tạo.
+   * @throws {ForbiddenException} Nếu nhân viên cố gắng tạo đơn cho chi nhánh khác.
+   */
   async createBookingByAdmin(
     dto: AdminCreateBookingDto,
     user: AuthenticatedUser,
@@ -505,13 +506,11 @@ export class BookingService {
         dto,
       )}`,
     );
-    // Dùng Transaction để an toàn dữ liệu
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 1. Kiểm tra Sân thuộc chi nhánh nào
       const field = await this.fieldRepository.findOne({
         where: { id: dto.fieldId },
         relations: ['branch'],
@@ -520,13 +519,11 @@ export class BookingService {
         throw new NotFoundException('Sân không tồn tại.');
       }
 
-      // 2. LOGIC BẢO MẬT: Kiểm tra quyền của nhân viên
       if (user.branch_id && field.branch.id !== user.branch_id) {
         throw new ForbiddenException(
           'Bạn không thể tạo đơn cho sân thuộc chi nhánh khác.',
         );
       }
-      // 3.check giá và sân
       const pricingResult =
         await this.pricingService.checkPriceAndAvailability({
           fieldId: dto.fieldId,
@@ -534,7 +531,6 @@ export class BookingService {
           durationMinutes: dto.durationMinutes,
         });
 
-      // 4. Tìm User
       let userProfile: UserProfile | null = null;
       if (dto.customerPhone) {
         userProfile = await this.userService.findProfileByPhoneNumber(
@@ -545,12 +541,11 @@ export class BookingService {
       const start = new Date(dto.startTime);
       const end = new Date(start.getTime() + dto.durationMinutes * 60000);
 
-      // 5. Tạo Booking (Dùng queryRunner.manager)
       const newBooking = queryRunner.manager.create(Booking, {
         start_time: start,
         end_time: end,
         total_price: pricingResult.pricing.total_price,
-        status: BookingStatus.COMPLETED, // Admin chốt đơn
+        status: BookingStatus.COMPLETED,
         bookingDate: new Date(),
         field: { id: dto.fieldId } as Field,
         userProfile: userProfile || undefined,
@@ -561,7 +556,6 @@ export class BookingService {
       });
       const savedBooking = await queryRunner.manager.save(Booking, newBooking);
 
-      // 6. Tạo Payment (CASH - Completed)
       const newPayment = queryRunner.manager.create(Payment, {
         amount: pricingResult.pricing.total_price,
         finalAmount: pricingResult.pricing.total_price,
@@ -587,11 +581,13 @@ export class BookingService {
   }
 
   /**
-   * Xử lý check-in cho khách hàng tại sân.
-   * @param bookingId ID của đơn đặt sân cần check-in.
-   * @returns Thông tin đơn đặt sân đã được cập nhật.
+   * @method checkInCustomer
+   * @description (Manager/Admin) Check-in cho khách hàng tại sân.
+   * Cập nhật trạng thái đơn đặt sân từ `COMPLETED` thành `CHECKED_IN`.
+   * @param {string} bookingId - ID của đơn đặt sân cần check-in.
+   * @returns {Promise<Booking>} - Thông tin đơn đặt sân đã được cập nhật.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
-   * @throws {BadRequestException} Nếu đơn đặt sân không ở trạng thái 'COMPLETED' hoặc đã được check-in.
+   * @throws {BadRequestException} Nếu đơn không ở trạng thái `COMPLETED` hoặc đã được check-in.
    */
   async checkInCustomer(bookingId: string): Promise<Booking> {
     this.logger.log(`Checking in customer for booking ${bookingId}`);
@@ -628,40 +624,23 @@ export class BookingService {
     return this.bookingRepository.save(booking);
   }
 
-  private generateBookingCode(): string {
-    const now = new Date();
-    const datePrefix = moment(now).format('YYMMDD'); // Cần import moment hoặc tự format
-
-    // Sinh 4 ký tự ngẫu nhiên
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let suffix = '';
-    for (let i = 0; i < 4; i++) {
-      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return `${datePrefix}-${suffix}`; // VD: 251206-AH92
-  }
-
   /**
-   * Lấy danh sách các booking của một sân trong một ngày cụ thể
-   * @param fieldId ID của sân
-   * @param date Ngày cần xem lịch (format: YYYY-MM-DD)
-   * @returns Danh sách các booking trong ngày
+   * @method getFieldSchedule
+   * @description Lấy lịch các khung giờ đã được đặt của một sân trong một ngày cụ thể.
+   * @param {string} fieldId - ID của sân.
+   * @param {string} date - Ngày cần xem lịch (format: YYYY-MM-DD).
+   * @returns {Promise<object>} - Danh sách các khung giờ đã đặt trong ngày.
    */
   async getFieldSchedule(fieldId: string, date: string) {
     this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
-    
-    // Parse date string to get start and end of day
+
     const startOfDay = new Date(`${date}T00:00:00`);
     const endOfDay = new Date(`${date}T23:59:59`);
 
-    // Find all bookings where:
-    // - Booking starts before end of day AND
-    // - Booking ends after start of day
-    // This catches all bookings that overlap with the selected date
     const bookings = await this.bookingRepository.find({
       where: {
         field: { id: fieldId },
-        status: Not(BookingStatus.CANCELLED), // Chỉ lấy các booking chưa hủy
+        status: Not(BookingStatus.CANCELLED),
         start_time: LessThan(endOfDay),
         end_time: MoreThan(startOfDay),
       },
@@ -678,5 +657,23 @@ export class BookingService {
         status: b.status,
       })),
     };
+  }
+
+  /**
+   * @private
+   * @method generateBookingCode
+   * @description Tạo mã đặt sân duy nhất theo định dạng YYMMDD-XXXX.
+   * @returns {string} - Mã đặt sân.
+   */
+  private generateBookingCode(): string {
+    const now = new Date();
+    const datePrefix = moment(now).format('YYMMDD');
+
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let suffix = '';
+    for (let i = 0; i < 4; i++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${datePrefix}-${suffix}`;
   }
 }

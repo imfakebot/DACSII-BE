@@ -28,7 +28,11 @@ export class UserProfile {
   @Column({ type: 'varchar', length: 255 })
   full_name!: string;
 
-  @Exclude()
+  @ApiProperty({
+    description: 'Ngày sinh của người dùng',
+    example: '2000-01-20',
+    required: false,
+  })
   @Column({ type: 'date', nullable: true })
   date_of_birth!: Date;
 
@@ -40,7 +44,10 @@ export class UserProfile {
   })
   gender?: Gender | null;
 
-  @Exclude()
+  @ApiProperty({
+    description: 'Số điện thoại của người dùng',
+    example: '0987654321',
+  })
   @Column({ unique: true })
   phone_number!: string;
 

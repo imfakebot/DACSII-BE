@@ -10,6 +10,7 @@ import {
   NotFoundException,
   BadRequestException,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { BookingService } from '@/booking/booking.service';
@@ -35,15 +36,17 @@ import { VnpayReturnDto } from './dto/vnpay-return.dto';
 
 /**
  * @controller PaymentController
- * @description Xử lý các yêu cầu HTTP liên quan đến thanh toán, đặc biệt là tích hợp với VNPAY.
- * Bao gồm tạo URL thanh toán, xử lý URL trả về (return) và URL thông báo tức thì (IPN).
+ * @description Xử lý các yêu cầu HTTP liên quan đến thanh toán.
+ * Chịu trách nhiệm tích hợp với cổng thanh toán VNPAY, bao gồm tạo URL thanh toán,
+ * xử lý URL trả về (return URL) và URL thông báo tức thì (IPN).
+ * Đồng thời cung cấp các endpoint cho việc thống kê doanh thu.
  */
-@ApiTags('Payment (Thanh toán VNPAY)')
+@ApiTags('Payment (Thanh toán & Thống kê)')
 @Controller('payment')
 export class PaymentController {
   /**
    * @constructor
-   * @param {PaymentService} paymentService - Service xử lý logic thanh toán VNPAY.
+   * @param {PaymentService} paymentService - Service xử lý logic thanh toán.
    * @param {BookingService} bookingService - Service để truy vấn thông tin đặt sân.
    */
   constructor(
@@ -53,22 +56,23 @@ export class PaymentController {
 
   /**
    * @route POST /payment/create_payment_url
-   * @description Tạo URL thanh toán VNPAY cho một đơn đặt sân đã tồn tại.
-   * Endpoint này được gọi khi người dùng muốn thanh toán cho một đơn hàng đã tạo trước đó (ví dụ: thanh toán lại).
+   * @description (Public) Tạo URL thanh toán VNPAY cho một đơn đặt sân đã tồn tại.
+   * Thường được dùng khi người dùng muốn thử thanh toán lại cho một đơn hàng đang ở trạng thái `PENDING`.
    * @param {string} bookingId - ID của đơn đặt sân cần tạo link thanh toán.
    * @param {Request} req - Đối tượng request để lấy địa chỉ IP của người dùng.
    * @returns {Promise<{ url: string }>} - Một đối tượng chứa URL thanh toán VNPAY.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân hoặc thông tin thanh toán tương ứng.
-   * @throws {BadRequestException} Nếu đơn đặt sân đã được xác nhận hoặc hoàn thành.
+   * @throws {BadRequestException} Nếu đơn đặt sân đã được xử lý (đã thanh toán hoặc hủy).
    */
   @Post('create_payment_url')
-  @ApiOperation({ summary: 'Tạo URL thanh toán VNPAY cho một đơn đặt sân' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '(Public) Tạo URL thanh toán VNPAY cho đơn đặt sân' })
   @SkipThrottle()
   @ApiBody({
     schema: { properties: { bookingId: { type: 'string', format: 'uuid' } } },
   })
   @ApiResponse({
-    status: 201,
+    status: 200,
     description: 'Trả về URL thanh toán VNPAY.',
     schema: { properties: { url: { type: 'string' } } },
   })
@@ -124,9 +128,9 @@ export class PaymentController {
 
   /**
    * @route GET /payment/vnpay_return
-   * @description Endpoint mà VNPAY chuyển hướng người dùng về sau khi hoàn tất thanh toán trên cổng VNPAY.
-   * Nhiệm vụ chính là xác thực chữ ký (checksum) và hiển thị kết quả giao dịch cho người dùng.
-   * **Lưu ý:** Không cập nhật trạng thái đơn hàng ở đây vì không đáng tin cậy.
+   * @description Endpoint mà VNPAY chuyển hướng người dùng về sau khi hoàn tất thanh toán.
+   * Nhiệm vụ chính là xác thực chữ ký (checksum) và hiển thị kết quả giao dịch cho người dùng phía client.
+   * **Lưu ý quan trọng:** Endpoint này không dùng để cập nhật trạng thái đơn hàng vì không đáng tin cậy (client có thể không được chuyển hướng về).
    */
   @Get('vnpay_return')
   @ApiOperation({ summary: '(VNPAY) Xử lý URL trả về cho phía Client' })
@@ -168,7 +172,7 @@ export class PaymentController {
    * @route GET /payment/vnpay_ipn
    * @description (Quan trọng) Endpoint để nhận Instant Payment Notification (IPN) từ server VNPAY.
    * Đây là một yêu cầu server-to-server, dùng để cập nhật trạng thái cuối cùng và đáng tin cậy của đơn hàng.
-   * Luồng này đảm bảo đơn hàng được cập nhật kể cả khi người dùng tắt trình duyệt.
+   * Luồng này đảm bảo đơn hàng được cập nhật kể cả khi người dùng tắt trình duyệt sau khi thanh toán.
    */
   @Get('vnpay_ipn')
   @ApiOperation({
@@ -186,11 +190,14 @@ export class PaymentController {
   }
 
   /**
-   * @route GET /payment/admin/stats
-   * @description (Admin) Lấy thống kê tổng quan về doanh thu và số lượng giao dịch.
-   * Endpoint này cho phép lọc theo một khoảng thời gian cụ thể.
-   * @param {string} [startDate] - Ngày bắt đầu để lọc (định dạng YYYY-MM-DD).
-   * @param {string} [endDate] - Ngày kết thúc để lọc (định dạng YYYY-MM-DD).
+   * @route GET /payment/stats/overview
+   * @description Lấy thống kê tổng quan về doanh thu đặt sân.
+   * - Admin: Xem toàn bộ hệ thống hoặc lọc theo chi nhánh.
+   * - Manager: Chỉ xem chi nhánh của mình.
+   * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu.
+   * @param {string} [startDate] - Ngày bắt đầu để lọc (YYYY-MM-DD).
+   * @param {string} [endDate] - Ngày kết thúc để lọc (YYYY-MM-DD).
+   * @param {string} [branchId] - (Chỉ Admin) ID của chi nhánh muốn lọc.
    * @returns {Promise<object>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
    */
   @Get('stats/overview')
@@ -198,7 +205,7 @@ export class PaymentController {
   @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu và giao dịch',
+    summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu đặt sân',
   })
   @ApiQuery({
     name: 'startDate',
@@ -240,9 +247,13 @@ export class PaymentController {
 
   /**
    * @route GET /payment/chart
-   * @description (Admin) Lấy dữ liệu doanh thu hàng tháng để vẽ biểu đồ.
-   * @param {number} [year=current_year] - Năm cần lấy dữ liệu. Mặc định là năm hiện tại.
-   * @returns {Promise<Array<object>>} - Một mảng các đối tượng, mỗi đối tượng chứa thông tin doanh thu của một tháng.
+   * @description Lấy dữ liệu doanh thu đặt sân hàng tháng trong một năm để vẽ biểu đồ.
+   * - Admin: Xem toàn bộ hệ thống hoặc lọc theo chi nhánh.
+   * - Manager: Chỉ xem chi nhánh của mình.
+   * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu.
+   * @param {number} [year] - Năm cần lấy dữ liệu (mặc định là năm hiện tại).
+   * @param {string} [branchId] - (Chỉ Admin) ID của chi nhánh muốn lọc.
+   * @returns {Promise<Array<object>>} - Mảng dữ liệu doanh thu theo từng tháng.
    */
   @Get('chart')
   @UseGuards(JwtAuthGuard, RolesGuard)

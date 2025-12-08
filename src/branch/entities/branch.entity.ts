@@ -13,11 +13,12 @@ import { Address } from '@/location/entities/address.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Field } from '@/field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { UtilitySale } from '@/utility/entities/utility-sale.entity';
 
 /**
  * @class Branch
  * @description Đại diện cho một chi nhánh hoặc một cơ sở sân bóng cụ thể trong hệ thống.
- * Mỗi chi nhánh có thông tin riêng, địa chỉ, giờ hoạt động và quản lý các sân bóng thuộc về nó.
+ * Mỗi chi nhánh có thông tin riêng, địa chỉ, giờ hoạt động và quản lý các sân bóng, nhân viên thuộc về nó.
  */
 @Entity('branches')
 export class Branch {
@@ -44,7 +45,7 @@ export class Branch {
   name!: string;
 
   /**
-   * Số điện thoại liên hệ của chi nhánh.
+   * Số điện thoại liên hệ (hotline) của chi nhánh.
    */
   @ApiProperty({
     description: 'Số điện thoại liên hệ của chi nhánh',
@@ -55,7 +56,7 @@ export class Branch {
   phone_number!: string;
 
   /**
-   * Mô tả chi tiết về chi nhánh (cơ sở vật chất, đường đi...).
+   * Mô tả chi tiết về chi nhánh (cơ sở vật chất, đường đi, v.v.).
    */
   @ApiProperty({
     description: 'Mô tả chi tiết về chi nhánh',
@@ -146,4 +147,10 @@ export class Branch {
    */
   @OneToMany(() => UserProfile, (profile) => profile.branch)
   staffMembers!: UserProfile[];
+
+  /**
+   * Mối quan hệ 1-N với UtilitySale. Một chi nhánh có thể có nhiều giao dịch bán sản phẩm.
+   */
+  @OneToMany(() => UtilitySale, (sale) => sale.branch)
+  utilitySales!: UtilitySale[];
 }
