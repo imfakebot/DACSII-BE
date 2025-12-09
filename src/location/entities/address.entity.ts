@@ -27,18 +27,18 @@ export class Address {
 
   @ApiProperty({ description: 'Vĩ độ', example: 10.853, required: false })
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
-  latitude!: number;
+  latitude!: number | null;
 
   @ApiProperty({ description: 'Kinh độ', example: 106.77, required: false })
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
-  longitude!: number;
+  longitude!: number | null;
 
   /**
    * Một Địa chỉ thuộc về một Thành phố (City).
    */
   @ApiProperty({ type: () => City })
   @ManyToOne(() => City, (city) => city.addresses)
-  @JoinColumn({ name: 'city_id' }) // TypeORM thường dùng snake_case cho cột trong DB
+  @JoinColumn({ name: 'cityId' }) // TypeORM thường dùng snake_case cho cột trong DB
   city!: City;
 
   /**

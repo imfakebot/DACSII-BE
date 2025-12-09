@@ -48,7 +48,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @method createBooking
@@ -414,8 +414,7 @@ export class BookingService {
    */
   async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
     this.logger.log(
-      `Getting all bookings for user ${
-        user.id
+      `Getting all bookings for user ${user.id
       } with filter: ${JSON.stringify(filter)}`,
     );
     const { status, page = 1, limit = 10 } = filter;

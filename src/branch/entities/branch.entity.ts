@@ -13,7 +13,6 @@ import { Address } from '@/location/entities/address.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Field } from '@/field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
-import { UtilitySale } from '@/utility/entities/utility-sale.entity';
 
 /**
  * @class Branch
@@ -116,7 +115,18 @@ export class Branch {
     required: false,
   })
   @Column({ name: 'manager_id', nullable: true })
-  manager_id!: string;
+  manager_id!: string | null;
+
+  /**
+   * ID của tài khoản đã tạo chi nhánh (tham chiếu đến UserProfile).
+   */
+  @ApiProperty({
+    description: 'ID của người tạo (UserProfile)',
+    format: 'uuid',
+    required: false,
+  })
+  @Column({ name: 'created_by_id', nullable: true })
+  created_by_id!: string | null;
 
   // --- RELATIONS (QUAN HỆ) ---
 
@@ -137,6 +147,13 @@ export class Branch {
   manager!: UserProfile;
 
   /**
+   * Mối quan hệ N-1 với UserProfile. Mỗi chi nhánh được tạo bởi một người dùng.
+   */
+  @ManyToOne(() => UserProfile)
+  @JoinColumn({ name: 'created_by_id' })
+  created_by!: UserProfile;
+
+  /**
    * Mối quan hệ 1-N với Field. Một chi nhánh có thể có nhiều sân bóng.
    */
   @OneToMany(() => Field, (field) => field.branch)
@@ -147,10 +164,4 @@ export class Branch {
    */
   @OneToMany(() => UserProfile, (profile) => profile.branch)
   staffMembers!: UserProfile[];
-
-  /**
-   * Mối quan hệ 1-N với UtilitySale. Một chi nhánh có thể có nhiều giao dịch bán sản phẩm.
-   */
-  @OneToMany(() => UtilitySale, (sale) => sale.branch)
-  utilitySales!: UtilitySale[];
 }

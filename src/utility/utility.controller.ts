@@ -10,7 +10,6 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  Query,
 } from '@nestjs/common';
 import { UtilityService } from './utility.service';
 import { CreateUtilityDto } from './dto/create-utility.dto';
@@ -18,7 +17,6 @@ import { UpdateUtilityDto } from './dto/update-utility.dto';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -27,9 +25,6 @@ import { RolesGuard } from '@/auth/guards/role.guard';
 import { Role } from '@/auth/enums/role.enum';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Utility } from '@/utility/entities/utility.entity';
-import { RecordSaleDto } from './dto/record-sale.dto';
-import { User } from '@/auth/decorator/users.decorator';
-import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 
 /**
  * @controller UtilityController
@@ -39,7 +34,7 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 @ApiTags('Utilities (Tiện ích & Sản phẩm)')
 @Controller('utilities')
 export class UtilityController {
-  constructor(private readonly utilityService: UtilityService) {}
+  constructor(private readonly utilityService: UtilityService) { }
 
   /**
    * @route POST /utilities
@@ -75,51 +70,6 @@ export class UtilityController {
   })
   findAll() {
     return this.utilityService.findAll();
-  }
-
-  /**
-   * @route POST /utilities/sales/record
-   * @description (Staff/Manager/Admin) Ghi nhận một giao dịch bán sản phẩm tại quầy.
-   * @param {RecordSaleDto} dto - DTO chứa thông tin về sản phẩm và số lượng bán.
-   * @param {AuthenticatedUser} user - Người dùng (nhân viên) đang thực hiện thao tác.
-   * @returns {Promise<UtilitySale>} - Giao dịch vừa được ghi nhận.
-   */
-  @Post('sales/record')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Staff, Role.Manager, Role.Admin)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '(Staff/Manager/Admin) Ghi nhận bán sản phẩm' })
-  @ApiResponse({ status: 201, description: 'Ghi nhận thành công.' })
-  @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
-  @ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại.' })
-  recordSale(@Body() dto: RecordSaleDto, @User() user: AuthenticatedUser) {
-    return this.utilityService.recordSale(dto, user);
-  }
-
-  /**
-   * @route GET /utilities/sales/stats
-   * @description (Manager/Admin) Lấy dữ liệu thống kê doanh thu từ việc bán sản phẩm.
-   * - Admin: Có thể xem toàn bộ hệ thống.
-   * - Manager: Chỉ có thể xem trong phạm vi chi nhánh của mình.
-   * @param {AuthenticatedUser} user - Người dùng đang yêu cầu thống kê.
-   * @param {string} [startDate] - Ngày bắt đầu lọc (YYYY-MM-DD).
-   * @param {string} [endDate] - Ngày kết thúc lọc (YYYY-MM-DD).
-   * @returns {Promise<object>} - Đối tượng chứa dữ liệu thống kê.
-   */
-  @Get('sales/stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Manager, Role.Admin)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '(Manager/Admin) Thống kê doanh thu tiện ích' })
-  @ApiQuery({ name: 'startDate', required: false, type: String })
-  @ApiQuery({ name: 'endDate', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Dữ liệu thống kê.' })
-  getStats(
-    @User() user: AuthenticatedUser,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.utilityService.getStats(user, startDate, endDate);
   }
 
   /**

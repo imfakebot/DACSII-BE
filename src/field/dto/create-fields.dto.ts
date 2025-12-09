@@ -55,8 +55,8 @@ export class CreateFieldDto {
    * @description ID của Chi nhánh mà sân này thuộc về.
    */
   @ApiPropertyOptional({
-    description:
-      '[DEPRECATED] Không cần cung cấp. ID chi nhánh sẽ được lấy tự động từ tài khoản của bạn.',
+    description: `ID của chi nhánh mà sân này thuộc về. Bắt buộc đối với Admin. 
+      Đối với Manager, hệ thống sẽ tự động lấy từ hồ sơ người dùng nếu không được cung cấp.`,
     format: 'uuid',
   })
   @IsOptional()

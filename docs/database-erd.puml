@@ -1,286 +1,256 @@
-@startuml ERD
-' ERD CHI TIẾT - HỆ THỐNG ĐẶT SÂN BÓNG ĐÁ (DỰA TRÊN MYSQL DUMP)
-
-title Sơ đồ Quan hệ Thực thể - Hệ thống Đặt sân bóng đá
-
-' --- Cấu hình giao diện ERD ---
+@startuml
+!theme plain
 hide circle
 skinparam linetype ortho
-skinparam tableBackgroundColor #White
-skinparam tableBorderColor #5E81AC
-skinparam shadowing false
-skinparam packageBackgroundColor #ECEFF4
-skinparam packageBorderColor #D8DEE9
-skinparam tableAttributeFontSize 12
 
+' --- NHÓM 1: ĐỊA CHÍNH (LOCATION) ---
+package "Location Module" {
+  entity "cities" {
+    *id : int <<PK>>
+    --
+    name : varchar
+    type : varchar
+  }
 
-' ========================================
-package "1. KHỐI QUẢN LÝ USER & PHÂN QUYỀN" {
-    entity "UserProfiles" as UP {
-      + **id** (PK) : VARCHAR(36) 'UUID của hồ sơ người dùng
-      --
-      full_name : VARCHAR(100)
-      date_of_birth : DATE
-      gender : ENUM
-      phone_number : VARCHAR(15)
-      avatar_url : TEXT
-      bio : TEXT
-      is_profile_complete : BOOLEAN
-      created_at : TIMESTAMP
-      updated_at : TIMESTAMP
-      .. Indexes ..
-      UNIQUE(phone_number)
-    }
+  entity "wards" {
+    *id : int <<PK>>
+    --
+    name : varchar
+    type : varchar
+    *city_id : int <<FK>>
+  }
 
-    entity "Roles" as ROL {
-      + **id** (PK) : INT (AUTO_INCREMENT)
-      --
-      name : VARCHAR(50) 'Tên vai trò (e.g., admin, user, field_owner)
-      .. Indexes ..
-      UNIQUE(name)
-    }
-
-    entity "Accounts" as AC {
-      + **id** (PK) : VARCHAR(36) 'UUID của tài khoản
-      --
-      email : VARCHAR(255)
-      password_hash : VARCHAR(255)
-      provider : VARCHAR(50)
-      status : VARCHAR(20)
-      is_verified : BOOLEAN
-      last_login : TIMESTAMP
-      two_factor_enabled : BOOLEAN
-      two_factor_secret : VARCHAR(255)
-      two_factor_recovery_codes : TEXT
-      verification_code : VARCHAR(100)
-      verification_code_expires_at : DATETIME
-      hashed_refresh_token : VARCHAR(255)
-      password_reset_token : VARCHAR(255)
-      password_reset_expires : DATETIME
-      created_at : TIMESTAMP
-      updated_at : TIMESTAMP
-      --
-      # //user_profile_id// (FK) : VARCHAR(36)
-      # //role_id// (FK) : INT
-    }
-    ' ghi chú: UNIQUE(email), UNIQUE(user_profile_id)
-    ' Indexes: idx_accounts_status, idx_accounts_provider
-
+  entity "addresses" {
+    *id : varchar <<PK>>
+    --
+    street : varchar
+    latitude : decimal
+    longitude : decimal
+    *ward_id : int <<FK>>
+    *cityId : int <<FK>>
+  }
 }
 
-' ========================================
-package "2. KHỐI QUẢN LÝ SÂN BÓNG & VỊ TRÍ" {
-    entity "Cities" as C {
-      + **id** (PK) : INT 'Mã tỉnh/thành phố
-      --
-      name : VARCHAR(100)
-      type : VARCHAR(50)
-    }
-    entity "Wards" as W {
-      + **id** (PK) : INT (AUTO_INCREMENT) 'Mã phường/xã
-      --
-      name : VARCHAR(100)
-      type : VARCHAR(50)
-      --
-      # //city_id// (FK) : INT
-    }
+' --- NHÓM 2: NGƯỜI DÙNG & PHÂN QUYỀN (AUTH) ---
+package "Auth Module" {
+  entity "roles" {
+    *id : int <<PK>>
+    --
+    name : varchar
+  }
 
-    entity "Addresses" as ADDR {
-      + **id** (PK) : VARCHAR(36) 'UUID
-      --
-      street : VARCHAR(255)
-      --
-      # //ward_id// (FK) : INT
-      # //cityId// (FK) : INT
-    }
+  entity "accounts" {
+    *id : varchar <<PK>>
+    --
+    email : varchar
+    password_hash : varchar
+    status : varchar
+    *user_profile_id : varchar <<FK>>
+    *role_id : int <<FK>>
+  }
 
-    entity "Utilities" as UT {
-      + **id** (PK) : INT (AUTO_INCREMENT)
-      --
-      name : VARCHAR(100)
-      icon_url : TEXT
-    }
-
-    entity "FieldTypes" as FT {
-      + **id** (PK) : VARCHAR(36)
-      --
-      name : VARCHAR(50)
-      description : TEXT
-      .. Indexes ..
-      UNIQUE(name)
-    }
-
-    entity "Fields" as F {
-      + **id** (PK) : VARCHAR(36)
-      --
-      name : VARCHAR(150)
-      description : TEXT
-      status : BOOLEAN
-      --
-      # //field_type_id// (FK) : VARCHAR(36)
-      # //address_id// (FK) : VARCHAR(36)
-      # //owner_id// (FK) : VARCHAR(36)
-    }
-
-    entity "FieldImages" as FI {
-      + **id** (PK) : VARCHAR(36)
-      --
-      image_url : TEXT
-      is_cover : BOOLEAN
-      --
-      # //field_id// (FK) : VARCHAR(36)
-    }
-
-    entity "Field_Utilities" as FU {
-      + **//field_id//** (PFK) : VARCHAR(36)
-      + **//utility_id//** (PFK) : INT
-    }
+  entity "user_profiles" {
+    *id : varchar <<PK>>
+    --
+    full_name : varchar
+    phone_number : varchar
+    avatar_url : text
+    branch_id : varchar <<FK>>
+  }
 }
 
-' ========================================
-package "3. KHỐI QUẢN LÝ ĐẶT SÂN & GIÁ CẢ" {
-    entity "TimeSlots" as TS {
-      + **id** (PK) : INT (AUTO_INCREMENT)
-      --
-      start_time : TIME
-      end_time : TIME
-      price : DECIMAL
-      is_peak_hour : BOOLEAN
-      --
-      # //field_type_id// (FK) : VARCHAR(36)
-      .. Indexes ..
-      UNIQUE(start_time, end_time, field_type_id)
-    }
+' --- NHÓM 3: CHI NHÁNH & SÂN BÃI (FACILITY) ---
+package "Facility Module" {
+  entity "branches" {
+    *id : varchar <<PK>>
+    --
+    name : varchar
+    open_time : time
+    close_time : time
+    status : tinyint
+    *address_id : varchar <<FK>>
+    *manager_id : varchar <<FK>>
+  }
 
-    entity "Bookings" as B {
-      + **id** (PK) : VARCHAR(36)
-      --
-      booking_date : DATE
-      total_price : DECIMAL
-      status : ENUM
-      --
-      # //user_profile_id// (FK) : VARCHAR(36)
-      # //field_id// (FK) : VARCHAR(36)
-      # //time_slot_id// (FK) : INT
-      .. Indexes ..
-      UNIQUE(field_id, booking_date, time_slot_id)
-    }
+  entity "field_types" {
+    *id : varchar <<PK>>
+    --
+    name : varchar
+    description : text
+  }
+
+  entity "fields" {
+    *id : varchar <<PK>>
+    --
+    name : varchar
+    status : tinyint
+    *branch_id : varchar <<FK>>
+    *field_type_id : varchar <<FK>>
+  }
+
+  entity "field_images" {
+    *id : varchar <<PK>>
+    --
+    image_url : text
+    is_cover : tinyint
+    *field_id : varchar <<FK>>
+  }
+
+  entity "time_slots" {
+    *id : int <<PK>>
+    --
+    start_time : time
+    end_time : time
+    price : decimal
+    is_peak_hour : tinyint
+    *field_type_id : varchar <<FK>>
+  }
 }
 
-' ========================================
-package "4. KHỐI QUẢN LÝ THANH TOÁN & KHUYẾN MÃI" {
-    entity "Vouchers" as V {
-      + **id** (PK) : VARCHAR(36)
-      --
-      code : VARCHAR(50)
-      discount_amount : DECIMAL
-      discount_percentage : INT
-      max_discount_amount : DECIMAL
-      min_order_value : DECIMAL
-      valid_from : DATETIME
-      valid_to : DATETIME
-      quantity : INT
-      .. Indexes ..
-      UNIQUE(code)
-    }
+' --- NHÓM 4: DỊCH VỤ & TIỆN ÍCH (CANTEEN/UTILITY) ---
+package "Utility & Canteen Module" {
+  entity "utilities" {
+    *id : int <<PK>>
+    --
+    name : varchar
+    price : decimal
+    type : enum('amenity','product')
+  }
 
-    entity "Payments" as P {
-      + **id** (PK) : VARCHAR(36)
-      --
-      amount : DECIMAL
-      final_amount : DECIMAL
-      payment_method : VARCHAR(50)
-      status : ENUM
-      --
-      # //booking_id// (FK) : VARCHAR(36)
-      # //voucher_id// (FK) : VARCHAR(36)
-    }
+  entity "field_utilities" {
+    *field_id : varchar <<PK, FK>>
+    *utility_id : int <<PK, FK>>
+  }
+
+  entity "utility_sales" {
+    *id : varchar <<PK>>
+    --
+    quantity : int
+    total_price : decimal
+    *utility_id : int <<FK>>
+    *branch_id : varchar <<FK>>
+    *booking_id : varchar <<FK>>
+    *sold_by_id : varchar <<FK>>
+  }
 }
 
-' ========================================
-package "5. KHỐI HỖ TRỢ & PHẢN HỒI" {
-    entity "Reviews" as REV {
-      + **id** (PK) : VARCHAR(36)
-      --
-      rating : INT
-      comment : TEXT
-      created_at : TIMESTAMP
-      --
-      # //booking_id// (FK) : VARCHAR(36)
-      .. Constraints ..
-      CHECK(rating >= 1 AND rating <= 5)
-      UNIQUE(booking_id)
-    }
-    
-    entity "Notifications" as NOTI {
-      + **id** (PK) : VARCHAR(36)
-      --
-      title : VARCHAR(255)
-      content : TEXT
-      is_read : BOOLEAN
-      created_at : TIMESTAMP
-      --
-      # //recipient_id// (FK) : VARCHAR(36)
-    }
+' --- NHÓM 5: ĐẶT SÂN & THANH TOÁN (CORE) ---
+package "Booking Core" {
+  entity "bookings" {
+    *id : varchar <<PK>>
+    --
+    code : varchar
+    booking_date : date
+    start_time : datetime
+    end_time : datetime
+    total_price : decimal
+    status : enum
+    check_in_at : timestamp
+    *user_profile_id : varchar <<FK>>
+    *field_id : varchar <<FK>>
+  }
 
-    entity "Feedbacks" as FB {
-      + **id** (PK) : VARCHAR(36)
-      --
-      title : VARCHAR(255)
-      category : VARCHAR(50)
-      status : VARCHAR(20)
-      created_at : TIMESTAMP
-      --
-      # //submitter_id// (FK) : VARCHAR(36)
-      # //assignee_id// (FK) : VARCHAR(36)
-    }
-    
-    entity "FeedbackResponses" as FBR {
-      + **id** (PK) : VARCHAR(36)
-      --
-      content : TEXT
-      created_at : TIMESTAMP
-      --
-      # //feedback_id// (FK) : VARCHAR(36)
-      # //responder_id// (FK) : VARCHAR(36)
-    }
+  entity "vouchers" {
+    *id : varchar <<PK>>
+    --
+    code : varchar
+    discount_amount : decimal
+    discount_percentage : int
+  }
+
+  entity "payments" {
+    *id : varchar <<PK>>
+    --
+    amount : decimal
+    final_amount : decimal
+    payment_method : enum
+    status : enum
+    transaction_code : varchar
+    *booking_id : varchar <<FK>>
+    voucher_id : varchar <<FK>>
+  }
 }
 
+' --- NHÓM 6: TƯƠNG TÁC (INTERACTION) ---
+package "Interaction Module" {
+  entity "reviews" {
+    *id : varchar <<PK>>
+    --
+    rating : int
+    comment : text
+    *booking_id : varchar <<FK, Unique>>
+    *field_id : varchar <<FK>>
+    *user_profile_id : varchar <<FK>>
+  }
 
-' --- ĐỊNH NGHĨA CÁC MỐI QUAN HỆ ĐÃ CẬP NHẬT ---
+  entity "feedbacks" {
+    *id : varchar <<PK>>
+    --
+    title : varchar
+    status : varchar
+    *submitter_id : varchar <<FK>>
+    assignee_id : varchar <<FK>>
+  }
 
-' Khối 1
-AC ||--|| UP : "has"
-ROL ||--o{ AC : "defines"
+  entity "feedback_responses" {
+    *id : varchar <<PK>>
+    --
+    content : text
+    *feedback_id : varchar <<FK>>
+    *responder_id : varchar <<FK>>
+  }
 
-' Khối 2
-C  ||--o{ W
-W  ||--o{ ADDR : "contains"
-C  }o--|| ADDR : "is in" 
-' Mối quan hệ logic, FK không trực tiếp nhưng cần thiết cho truy vấn
-F }o--|| ADDR : "located at"
-FT ||--o{ F : "categorizes"
-F  ||--o{ FI : "has"
-F  }|..|{ FU
-UT }|..|{ FU
-UP }o--o{ F : "owns"
+  entity "notifications" {
+    *id : varchar <<PK>>
+    --
+    title : varchar
+    content : text
+    *recipient_id : varchar <<FK>>
+  }
+}
 
-' Khối 3
-FT ||--o{ TS : "has pricing for"
-UP }o--|| B : "makes"
-F  }o--|| B : "is for"
-TS }o--|| B : "at"
+' --- QUAN HỆ (RELATIONSHIPS) ---
 
-' Khối 4
-B  ||--o{ P : "has"
-V  }o--o{ P : "applies"
+' Location Relationships
+cities ||..|{ wards
+cities ||..|{ addresses
+wards ||..|{ addresses
 
-' Khối 5
-B ||--|| REV : "has" ' Một booking chỉ có một review
-UP }o--o{ NOTI : "receives"
-UP }o--o{ FB : "submits"
-UP }o--o{ FB : "is assigned to"
-FB ||--o{ FBR : "has"
-UP }o--o{ FBR : "responds"
+' Auth Relationships
+roles ||..|{ accounts
+user_profiles ||..|| accounts : "1-1"
+branches |o..|{ user_profiles : "Employee Of"
+
+' Facility Relationships
+addresses ||..|| branches : "Located At"
+user_profiles ||..|{ branches : "Manages"
+branches ||..|{ fields
+field_types ||..|{ fields
+field_types ||..|{ time_slots
+fields ||..|{ field_images
+
+' Utility Relationships
+fields ||..|{ field_utilities
+utilities ||..|{ field_utilities
+utilities ||..|{ utility_sales
+branches ||..|{ utility_sales
+bookings |o..|{ utility_sales
+user_profiles ||..|{ utility_sales : "Sold By"
+
+' Booking Relationships
+user_profiles ||..|{ bookings : "Makes"
+fields ||..|{ bookings
+bookings ||..|| payments : "1-1"
+vouchers |o..|{ payments
+
+' Interaction Relationships
+bookings ||..|| reviews : "1-1"
+fields ||..|{ reviews
+user_profiles ||..|{ reviews
+user_profiles ||..|{ feedbacks : "Submits"
+user_profiles ||..|{ feedbacks : "Assigned"
+feedbacks ||..|{ feedback_responses
+user_profiles ||..|{ feedback_responses
+user_profiles ||..|{ notifications
 
 @enduml

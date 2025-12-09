@@ -160,7 +160,7 @@ export class FeedbackService {
     const roleName = account.role.name;
 
     // Nếu admin/manager trả lời, cập nhật trạng thái ticket
-    if (roleName !== Role.User && feedback.status === 'open') {
+    if (roleName !== String(Role.User) && feedback.status === 'open') {
       this.logger.log(
         `Updating feedback ${feedbackId} status to in_progress`,
       );

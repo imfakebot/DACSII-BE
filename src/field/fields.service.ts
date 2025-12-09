@@ -64,31 +64,40 @@ export class FieldsService {
       )}`,
     );
 
-    const { fieldTypeId, utilityIds, ...fieldData } = createFieldDto;
-
-    // Get branch automatically from the user's profile
-    const branch = userProfile.branch;
-
-    if (!branch) {
-      this.logger.error(
-        `User ${userProfile.id} is not associated with any branch.`,
-      );
-      throw new ForbiddenException(
-        'Tài khoản của bạn phải được gán vào một chi nhánh để có thể tạo sân bóng.',
-      );
-    }
-
-    // Permission check: User must be an Admin or the designated manager of this branch.
-    const isManagerOfBranch = branch.manager_id === userProfile.id;
+    const { fieldTypeId, utilityIds, branchId, ...fieldData } = createFieldDto;
     const isAdmin = userProfile.account.role.name === String(Role.Admin);
 
-    if (!isManagerOfBranch && !isAdmin) {
-      this.logger.error(
-        `User ${userProfile.id} (Role: ${userProfile.account.role.name}) does not have permission to add a field to branch ${branch.id}`,
-      );
-      throw new ForbiddenException(
-        'Bạn không phải là quản lý của chi nhánh này để thêm sân.',
-      );
+    let branch: Branch | null;
+
+    if (isAdmin) {
+      // Admin must provide a branchId
+      if (!branchId) {
+        throw new BadRequestException('Admin phải cung cấp ID chi nhánh (branchId).');
+      }
+      branch = await this.branchRepository.findOneBy({ id: branchId });
+      if (!branch) {
+        throw new NotFoundException(`Chi nhánh với ID ${branchId} không tồn tại.`);
+      }
+    } else {
+      // Manager's branch is taken from their profile
+      branch = userProfile.branch;
+      if (!branch) {
+        this.logger.error(`Manager ${userProfile.id} is not associated with any branch.`);
+        throw new ForbiddenException(
+          'Tài khoản Quản lý của bạn phải được gán vào một chi nhánh để có thể tạo sân bóng.',
+        );
+      }
+
+      // Permission check: User must be the designated manager of this branch.
+      const isManagerOfBranch = branch.manager_id === userProfile.id;
+      if (!isManagerOfBranch) {
+        this.logger.error(
+          `User ${userProfile.id} (Role: ${userProfile.account.role.name}) does not have permission to add a field to branch ${branch.id}`,
+        );
+        throw new ForbiddenException(
+          'Bạn không phải là quản lý của chi nhánh này để thêm sân.',
+        );
+      }
     }
 
     const newField = this.fieldRepository.create({

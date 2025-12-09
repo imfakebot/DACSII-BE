@@ -105,13 +105,13 @@ describe('AuthController', () => {
       mockAuthService.loginComplete.mockResolvedValue(loginData);
 
       // Mock Express Response
-      const mockResponse = {
+      const mockResponse: Partial<Response> = {
         cookie: jest.fn(),
-      } as unknown as Response;
+      };
 
       const result = await controller.loginComplete(
         loginCompleteDto,
-        mockResponse,
+        mockResponse as Response,
       );
 
       expect(mockAuthService.loginComplete).toHaveBeenCalledWith(
@@ -142,7 +142,7 @@ describe('AuthController', () => {
 
       const result = await controller.completeRegistration(verifyDto);
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+       
       expect(mockAuthService.completeRegistration).toHaveBeenCalledWith(
         verifyDto.email,
         verifyDto.verificationCode,

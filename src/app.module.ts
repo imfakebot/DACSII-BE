@@ -179,4 +179,4 @@ import { UtilityModule } from './utility/utility.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

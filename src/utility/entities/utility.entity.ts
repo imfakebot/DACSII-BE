@@ -2,13 +2,11 @@ import {
   Column,
   Entity,
   ManyToMany,
-  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Field } from '../../field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { UtilityType } from '../enums/utility-type.enum';
-import { UtilitySale } from './utility-sale.entity';
 
 /**
  * @entity Utility
@@ -72,11 +70,4 @@ export class Utility {
    */
   @ManyToMany(() => Field, (field) => field.utilities)
   fields!: Field[];
-
-  /**
-   * Mối quan hệ Một-Nhiều với UtilitySale.
-   * Liên kết đến tất cả các giao dịch bán của **sản phẩm** này.
-   */
-  @OneToMany(() => UtilitySale, (sale) => sale.utility)
-  sales!: UtilitySale[];
 }
