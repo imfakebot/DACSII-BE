@@ -106,9 +106,9 @@ export class FeedbackService {
   async findMyFeedbacks(account: Account): Promise<Feedback[]> {
     this.logger.log(`Finding feedbacks for user ${account.id}`);
     return this.feedbackRepo.find({
-      where: { submitter: { id: account.userProfile.id } },
+      where: { submitter: { account: { id: account.id } } },
       order: { created_at: 'DESC' },
-      relations: ['responses'],
+      relations: ['responses', 'submitter'],
     });
   }
 
@@ -203,9 +203,9 @@ export class FeedbackService {
       content: savedResponse.content,
       created_at: savedResponse.created_at,
       responder: {
-        id: account.userProfile.id,
-        fullName: account.userProfile.full_name,
-        avatarUrl: account.userProfile.avatar_url,
+        id: userProfile.id,
+        fullName: userProfile.full_name,
+        avatarUrl: userProfile.avatar_url,
         role: account.role.name,
       },
     });
