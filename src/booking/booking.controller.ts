@@ -55,7 +55,7 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /bookings

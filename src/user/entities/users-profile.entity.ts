@@ -34,7 +34,7 @@ export class UserProfile {
     required: false,
   })
   @Column({ type: 'date', nullable: true })
-  date_of_birth!: Date;
+  date_of_birth!: Date | null;
 
   @ApiProperty({ enum: Gender, example: Gender.MALE, required: false })
   @Column({
@@ -47,8 +47,9 @@ export class UserProfile {
   @ApiProperty({
     description: 'Số điện thoại của người dùng',
     example: '0987654321',
+    required: false,
   })
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: true, default: null })
   phone_number!: string;
 
   @ApiProperty({
@@ -77,10 +78,12 @@ export class UserProfile {
   @UpdateDateColumn()
   updated_at!: Date;
 
+  @ApiProperty({ type: () => Account })
   @Exclude()
   @OneToOne(() => Account, (account) => account.userProfile)
   account!: Account;
 
+  @ApiProperty({ type: () => [Booking] })
   @Exclude()
   @OneToMany(() => Booking, (booking) => booking.userProfile)
   bookings!: Booking[];

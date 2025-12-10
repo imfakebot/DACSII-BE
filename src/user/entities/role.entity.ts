@@ -10,24 +10,21 @@ import { Account } from './account.entity';
 @Entity({ name: 'roles' })
 export class Role {
   /**
-   * ID duy nhất của vai trò, được tạo tự động.
-   * Thường là một số nguyên tự tăng.
+   * ID duy nhất của vai trò, là một số nguyên tự tăng.
    */
   @ApiProperty({ description: 'ID duy nhất của vai trò', example: 1 })
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  @PrimaryGeneratedColumn()
+  id!: number;
 
   /**
    * Tên của vai trò, phải là duy nhất để dễ dàng nhận dạng.
-   * Ví dụ: 'ADMIN', 'USER', 'OWNER'.
    */
   @ApiProperty({ description: 'Tên của vai trò', example: 'super_admin' })
-  @Column()
+  @Column({ unique: true, length: 50 })
   name!: string;
 
   /**
    * Mối quan hệ một-nhiều với thực thể Account.
-   * Một vai trò có thể được gán cho nhiều tài khoản.
    */
   @OneToMany(() => Account, (account) => account.role)
   accounts!: Account[];

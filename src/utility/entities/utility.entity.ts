@@ -1,9 +1,4 @@
-import {
-  Column,
-  Entity,
-  ManyToMany,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Field } from '../../field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { UtilityType } from '../enums/utility-type.enum';

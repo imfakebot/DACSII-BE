@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Utility } from '@/utility/entities/utility.entity';
@@ -17,12 +14,12 @@ import { UpdateUtilityDto } from './dto/update-utility.dto';
 export class UtilityService {
   /**
    * @constructor
-   * @param {Repository<Utility>} utilityRepository - Repository cho thực thể Utility. 
+   * @param {Repository<Utility>} utilityRepository - Repository cho thực thể Utility.
    */
   constructor(
     @InjectRepository(Utility)
     private readonly utilityRepository: Repository<Utility>,
-  ) { }
+  ) {}
 
   /**
    * @method create

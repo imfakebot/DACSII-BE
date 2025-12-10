@@ -18,5 +18,5 @@ export enum PaymentMethod {
   /**
    * Chuyển khoản ngân hàng.
    */
-  BANKING = 'banking'
+  BANKING = 'banking',
 }

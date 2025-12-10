@@ -32,7 +32,7 @@ import { Account } from '@/user/entities/account.entity';
 @ApiTags('Branches (Chi nhánh)')
 @Controller('branches')
 export class BranchController {
-  constructor(private readonly branchService: BranchService) { }
+  constructor(private readonly branchService: BranchService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -44,10 +44,7 @@ export class BranchController {
     description: 'Tạo chi nhánh thành công.',
     type: Branch,
   })
-  create(
-    @Body() createBranchDto: CreateBranchDto,
-    @User() creator: Account,
-  ) {
+  create(@Body() createBranchDto: CreateBranchDto, @User() creator: Account) {
     return this.branchService.create(createBranchDto, creator);
   }
 
@@ -80,7 +77,11 @@ export class BranchController {
 
   @Get(':id')
   @ApiOperation({ summary: '(Public) Lấy thông tin chi tiết một chi nhánh' })
-  @ApiResponse({ status: 200, description: 'Chi tiết chi nhánh.', type: Branch })
+  @ApiResponse({
+    status: 200,
+    description: 'Chi tiết chi nhánh.',
+    type: Branch,
+  })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.branchService.findOne(id);
   }

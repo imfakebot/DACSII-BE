@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,13 +13,13 @@ import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Account } from './entities/account.entity';
 import { Role } from '../auth/enums/role.enum';
+import { Role as RoleEntity } from './entities/role.entity';
 import { UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
 import { AuthProvider } from './enum/auth-provider.enum';
 import { Gender } from './enum/gender.enum';
 import { Branch } from '@/branch/entities/branch.entity';
-import { Role as RoleEntity } from './entities/role.entity'; // Import Role entity
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 
 /**
@@ -74,9 +75,7 @@ export class UsersService {
     @InjectRepository(Account) private accountRepository: Repository<Account>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-    @InjectRepository(RoleEntity) // Inject RoleRepository
-    private roleRepository: Repository<RoleEntity>,
-  ) { }
+  ) {}
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -104,11 +103,14 @@ export class UsersService {
     this.logger.log(`Creating unverified user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
-        // Tìm vai trò 'User'
-        const userRole = await transactionalEntityManager.findOneBy(RoleEntity, {
-          name: Role.User,
+        const userRole = await transactionalEntityManager.findOne(RoleEntity, {
+          where: { name: Role.User },
         });
-        if (!userRole) throw new Error("Vai trò 'User' mặc định không tồn tại.");
+        if (!userRole) {
+          throw new InternalServerErrorException(
+            "Vai trò 'User' mặc định không tồn tại.",
+          );
+        }
 
         const newProfile = transactionalEntityManager.create(UserProfile, {
           full_name: data.fullName,
@@ -143,11 +145,14 @@ export class UsersService {
     this.logger.log(`Creating OAuth user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
-        // Tìm vai trò 'User'
-        const userRole = await transactionalEntityManager.findOneBy(RoleEntity, {
-          name: Role.User,
+        const userRole = await transactionalEntityManager.findOne(RoleEntity, {
+          where: { name: Role.User },
         });
-        if (!userRole) throw new Error("Vai trò 'User' mặc định không tồn tại.");
+        if (!userRole) {
+          throw new InternalServerErrorException(
+            "Vai trò 'User' mặc định không tồn tại.",
+          );
+        }
 
         const newProfile = transactionalEntityManager.create(UserProfile, {
           full_name: data.fullName,
@@ -559,7 +564,9 @@ export class UsersService {
       }
       targetRoleName = Role.Staff;
     } else {
-      throw new ForbiddenException('Bạn không có quyền tạo tài khoản nhân viên.');
+      throw new ForbiddenException(
+        'Bạn không có quyền tạo tài khoản nhân viên.',
+      );
     }
 
     // 3. Kiểm tra Email đã tồn tại chưa
@@ -586,20 +593,24 @@ export class UsersService {
     // 6. Thực hiện Transaction lưu DB
     return this.accountRepository.manager.transaction(async (manager) => {
       // 6.1 Lấy Role từ DB (để đảm bảo vai trò tồn tại)
-      const targetRoleEntity = await manager.findOneBy(RoleEntity, {
-        name: targetRoleName,
+      const targetRoleEntity = await manager.findOne(RoleEntity, {
+        where: { name: targetRoleName },
       });
       if (!targetRoleEntity)
-        throw new NotFoundException(`Vai trò '${targetRoleName}' không tồn tại.`);
+        throw new NotFoundException(
+          `Vai trò '${targetRoleName}' không tồn tại.`,
+        );
 
       // Logic lấy Branch ID
       const targetBranchId =
-        requesterRoleName === String (Role.Admin)
+        requesterRoleName === String(Role.Admin)
           ? data.branchId
           : requester.userProfile?.branch?.id;
 
       if (!targetBranchId) {
-        throw new BadRequestException('Không xác định được chi nhánh làm việc.');
+        throw new BadRequestException(
+          'Không xác định được chi nhánh làm việc.',
+        );
       }
 
       // 6.2 Lấy Branch từ DB

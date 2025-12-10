@@ -22,6 +22,9 @@ export class vnPayIpnResponseDto {
    * Thông báo đi kèm mã phản hồi.
    * @example 'Confirm Success'
    */
-  @ApiProperty({ description: 'Thông báo cho VNPAY', example: 'Confirm Success' })
+  @ApiProperty({
+    description: 'Thông báo cho VNPAY',
+    example: 'Confirm Success',
+  })
   Message!: string;
 }

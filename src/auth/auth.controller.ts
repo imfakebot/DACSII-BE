@@ -52,7 +52,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /auth/register/initiate
@@ -169,9 +169,9 @@ export class AuthController {
     const script = `
     <script>
       window.opener.postMessage(${JSON.stringify({
-      accessToken: loginData.accessToken,
-      user: loginData.user,
-    })},'${frontendURL}');
+        accessToken: loginData.accessToken,
+        user: loginData.user,
+      })},'${frontendURL}');
       window.close();
     </script>
     `;

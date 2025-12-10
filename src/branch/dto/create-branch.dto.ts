@@ -42,7 +42,10 @@ export class CreateBranchDto {
   })
   open_time!: string;
 
-  @ApiProperty({ description: 'Giờ đóng cửa của chi nhánh', example: '23:00:00' })
+  @ApiProperty({
+    description: 'Giờ đóng cửa của chi nhánh',
+    example: '23:00:00',
+  })
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/, {
     message: 'Giờ đóng cửa không hợp lệ (HH:mm:ss)',
   })

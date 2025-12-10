@@ -142,7 +142,6 @@ describe('AuthController', () => {
 
       const result = await controller.completeRegistration(verifyDto);
 
-       
       expect(mockAuthService.completeRegistration).toHaveBeenCalledWith(
         verifyDto.email,
         verifyDto.verificationCode,

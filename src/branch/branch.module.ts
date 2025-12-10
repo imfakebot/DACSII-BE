@@ -19,4 +19,4 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
   providers: [BranchService],
   exports: [TypeOrmModule, BranchService],
 })
-export class BranchModule { }
+export class BranchModule {}

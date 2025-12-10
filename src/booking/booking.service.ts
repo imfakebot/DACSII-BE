@@ -48,7 +48,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @method createBooking
@@ -301,9 +301,7 @@ export class BookingService {
             'quantity',
             1,
           );
-          this.logger.log(
-            `Voucher for booking ${bookingId} has been refunded`,
-          );
+          this.logger.log(`Voucher for booking ${bookingId} has been refunded`);
         }
 
         await queryRunner.commitTransaction();
@@ -414,7 +412,8 @@ export class BookingService {
    */
   async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
     this.logger.log(
-      `Getting all bookings for user ${user.id
+      `Getting all bookings for user ${
+        user.id
       } with filter: ${JSON.stringify(filter)}`,
     );
     const { status, page = 1, limit = 10 } = filter;
@@ -523,12 +522,13 @@ export class BookingService {
           'Bạn không thể tạo đơn cho sân thuộc chi nhánh khác.',
         );
       }
-      const pricingResult =
-        await this.pricingService.checkPriceAndAvailability({
+      const pricingResult = await this.pricingService.checkPriceAndAvailability(
+        {
           fieldId: dto.fieldId,
           startTime: dto.startTime,
           durationMinutes: dto.durationMinutes,
-        });
+        },
+      );
 
       let userProfile: UserProfile | null = null;
       if (dto.customerPhone) {

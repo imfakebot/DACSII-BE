@@ -26,7 +26,10 @@ export class Notification {
   /**
    * Tiêu đề của thông báo.
    */
-  @ApiProperty({ description: 'Tiêu đề thông báo', example: 'Thanh toán thành công' })
+  @ApiProperty({
+    description: 'Tiêu đề thông báo',
+    example: 'Thanh toán thành công',
+  })
   @Column()
   title!: string;
 

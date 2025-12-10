@@ -5,10 +5,8 @@ import { UtilityService } from './utility.service';
 import { UtilityController } from './utility.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Utility]),
-  ],
+  imports: [TypeOrmModule.forFeature([Utility])],
   controllers: [UtilityController],
   providers: [UtilityService],
 })
-export class UtilityModule { }
+export class UtilityModule {}

@@ -34,7 +34,7 @@ import { Utility } from '@/utility/entities/utility.entity';
 @ApiTags('Utilities (Tiện ích & Sản phẩm)')
 @Controller('utilities')
 export class UtilityController {
-  constructor(private readonly utilityService: UtilityService) { }
+  constructor(private readonly utilityService: UtilityService) {}
 
   /**
    * @route POST /utilities

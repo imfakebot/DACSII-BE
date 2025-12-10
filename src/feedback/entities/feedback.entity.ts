@@ -10,7 +10,7 @@ import {
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { FeedbackResponse } from './feedback-response.entity';
 import { ApiProperty } from '@nestjs/swagger';
-
+import { FeedbackStatus } from '../enums/feedback-status.enum';
 /**
  * @class Feedback
  * @description Đại diện cho một "ticket" feedback, một cuộc hội thoại giữa người dùng và quản trị viên.
@@ -41,7 +41,8 @@ export class Feedback {
    * Danh mục của feedback, ví dụ: 'Góp ý', 'Khiếu nại', 'Báo lỗi'.
    */
   @ApiProperty({
-    description: "Danh mục của feedback, ví dụ: 'Góp ý', 'Khiếu nại', 'Báo lỗi'",
+    description:
+      "Danh mục của feedback, ví dụ: 'Góp ý', 'Khiếu nại', 'Báo lỗi'",
     example: 'suggestion',
   })
   @Column()
@@ -51,11 +52,16 @@ export class Feedback {
    * Trạng thái của ticket: 'open', 'in_progress', 'closed'.
    */
   @ApiProperty({
-    description: "Trạng thái của ticket: 'open', 'in_progress', 'closed'",
-    example: 'open',
+    description: 'Trạng thái của ticket',
+    enum: FeedbackStatus,
+    example: FeedbackStatus.OPEN,
   })
-  @Column({ default: 'open' })
-  status!: string;
+  @Column({
+    type: 'enum',
+    enum: FeedbackStatus,
+    default: FeedbackStatus.OPEN,
+  })
+  status!: FeedbackStatus;
 
   /**
    * Thời điểm ticket được tạo.

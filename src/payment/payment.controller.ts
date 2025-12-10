@@ -66,7 +66,9 @@ export class PaymentController {
    */
   @Post('create_payment_url')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '(Public) Tạo URL thanh toán VNPAY cho đơn đặt sân' })
+  @ApiOperation({
+    summary: '(Public) Tạo URL thanh toán VNPAY cho đơn đặt sân',
+  })
   @SkipThrottle()
   @ApiBody({
     schema: { properties: { bookingId: { type: 'string', format: 'uuid' } } },

@@ -49,4 +49,4 @@ import { Branch } from '@/branch/entities/branch.entity';
   // Export FieldsService để các module khác (ví dụ: BookingsModule) có thể sử dụng.
   exports: [FieldsService],
 })
-export class FieldsModule { }
+export class FieldsModule {}

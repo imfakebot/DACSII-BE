@@ -37,9 +37,13 @@ export class NotificationService {
       isRead: false,
     });
 
-    const savedNotification = await this.notificationRepository.save(notification);
+    const savedNotification =
+      await this.notificationRepository.save(notification);
 
-    this.eventGateway.sendNotificationToUser(dto.recipientId, savedNotification);
+    this.eventGateway.sendNotificationToUser(
+      dto.recipientId,
+      savedNotification,
+    );
 
     return savedNotification;
   }
@@ -52,7 +56,11 @@ export class NotificationService {
    * @param {number} limit - Số lượng trên mỗi trang.
    * @returns {Promise<object>} - Dữ liệu thông báo và thông tin meta (phân trang, số lượng chưa đọc).
    */
-  async findAllByUser(userProfileId: string, page: number = 1, limit: number = 10) {
+  async findAllByUser(
+    userProfileId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.notificationRepository.findAndCount({
@@ -121,14 +129,19 @@ export class NotificationService {
    * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa.
    * @throws {NotFoundException} Nếu không tìm thấy thông báo hoặc không có quyền xóa.
    */
-  async delete(id: string, userProfileId: string): Promise<{ message: string }> {
+  async delete(
+    id: string,
+    userProfileId: string,
+  ): Promise<{ message: string }> {
     const result = await this.notificationRepository.delete({
       id,
       recipient: { id: userProfileId },
     });
 
     if (result.affected === 0) {
-      throw new NotFoundException('Thông báo không tồn tại hoặc bạn không có quyền xóa.');
+      throw new NotFoundException(
+        'Thông báo không tồn tại hoặc bạn không có quyền xóa.',
+      );
     }
 
     return { message: 'Xóa thông báo thành công.' };

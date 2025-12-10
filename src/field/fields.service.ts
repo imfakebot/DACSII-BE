@@ -45,7 +45,7 @@ export class FieldsService {
     @InjectRepository(Utility)
     private readonly utilityRepository: Repository<Utility>,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method create
@@ -72,17 +72,23 @@ export class FieldsService {
     if (isAdmin) {
       // Admin must provide a branchId
       if (!branchId) {
-        throw new BadRequestException('Admin phải cung cấp ID chi nhánh (branchId).');
+        throw new BadRequestException(
+          'Admin phải cung cấp ID chi nhánh (branchId).',
+        );
       }
       branch = await this.branchRepository.findOneBy({ id: branchId });
       if (!branch) {
-        throw new NotFoundException(`Chi nhánh với ID ${branchId} không tồn tại.`);
+        throw new NotFoundException(
+          `Chi nhánh với ID ${branchId} không tồn tại.`,
+        );
       }
     } else {
       // Manager's branch is taken from their profile
       branch = userProfile.branch;
       if (!branch) {
-        this.logger.error(`Manager ${userProfile.id} is not associated with any branch.`);
+        this.logger.error(
+          `Manager ${userProfile.id} is not associated with any branch.`,
+        );
         throw new ForbiddenException(
           'Tài khoản Quản lý của bạn phải được gán vào một chi nhánh để có thể tạo sân bóng.',
         );
@@ -111,7 +117,9 @@ export class FieldsService {
         id: In(utilityIds),
       });
       if (utilities.length !== utilityIds.length) {
-        throw new BadRequestException('Một hoặc nhiều ID tiện ích không hợp lệ.');
+        throw new BadRequestException(
+          'Một hoặc nhiều ID tiện ích không hợp lệ.',
+        );
       }
       newField.utilities = utilities;
     }

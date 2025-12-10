@@ -49,7 +49,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   /**
    * @route POST /fields
@@ -90,7 +90,6 @@ export class FieldsController {
     return this.fieldsService.create(createFieldDto, userProfile);
   }
 
-
   /**
    * @route GET /fields
    * @description Lấy danh sách tất cả các sân bóng (Công khai).
@@ -102,7 +101,9 @@ export class FieldsController {
   })
   @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query() filterDto: FilterFieldDto) {
-    this.logger.log(`Finding all fields with filter: ${JSON.stringify(filterDto)}`);
+    this.logger.log(
+      `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
+    );
     return this.fieldsService.findAll(filterDto);
   }
 

@@ -35,13 +35,15 @@ export class BranchService {
     private readonly userProfileRepository: Repository<UserProfile>,
     private readonly geocodingService: GeocodingService,
     private readonly dataSource: DataSource,
-  ) { }
+  ) {}
 
   async create(
     createBranchDto: CreateBranchDto,
     creator: Account,
   ): Promise<Branch> {
-    this.logger.log(`Admin ${creator.id} creating new branch: ${createBranchDto.name}`);
+    this.logger.log(
+      `Admin ${creator.id} creating new branch: ${createBranchDto.name}`,
+    );
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -70,7 +72,9 @@ export class BranchService {
       // 2. Geocode address
       let coordinates: { latitude: number; longitude: number } | null = null;
       if (latitude !== undefined && longitude !== undefined) {
-        this.logger.log(`Using provided coordinates: [${latitude}, ${longitude}]`);
+        this.logger.log(
+          `Using provided coordinates: [${latitude}, ${longitude}]`,
+        );
         coordinates = { latitude, longitude };
       } else {
         coordinates = await this.geocodingService.geocode({
@@ -132,7 +136,9 @@ export class BranchService {
         await queryRunner.manager.update(UserProfile, managerProfile.id, {
           branch: savedBranch,
         });
-        this.logger.log(`Updated manager ${managerProfile.id} to be assigned to new branch ${savedBranch.id}`);
+        this.logger.log(
+          `Updated manager ${managerProfile.id} to be assigned to new branch ${savedBranch.id}`,
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -152,7 +158,7 @@ export class BranchService {
       relations: ['address', 'address.ward', 'address.city', 'manager'],
     });
   }
- 
+
   /**
    * Finds user profiles with the 'Manager' role who are not yet assigned to any branch.
    * @returns {Promise<UserProfile[]>} A list of available managers.
@@ -198,10 +204,14 @@ export class BranchService {
 
     if (street || wardId || cityId) {
       //Logic to update address would go here. Involving geocoding again.
-      this.logger.warn('Updating address is not fully implemented in this path.');
+      this.logger.warn(
+        'Updating address is not fully implemented in this path.',
+      );
     }
     if (manager_id) {
-      this.logger.warn('Updating manager is not fully implemented in this path.');
+      this.logger.warn(
+        'Updating manager is not fully implemented in this path.',
+      );
     }
 
     this.branchRepository.merge(branch, branchData);

@@ -8,6 +8,8 @@ import { ReplyFeedbackDto } from './dto/reply-feedback.dto';
 import { Account } from '../user/entities/account.entity';
 import { EventGateway } from '@/event/event.gateway';
 import { Role } from '@/auth/enums/role.enum';
+import { FeedbackStatus } from './enums/feedback-status.enum';
+import { UserProfile } from '@/user/entities/users-profile.entity';
 
 /**
  * @class FeedbackService
@@ -30,7 +32,7 @@ export class FeedbackService {
     private responseRepo: Repository<FeedbackResponse>,
     private readonly eventGateway: EventGateway,
     private dataSource: DataSource,
-  ) { }
+  ) {}
 
   /**
    * @method create
@@ -53,13 +55,22 @@ export class FeedbackService {
     await queryRunner.startTransaction();
 
     try {
-      const userProfile = account.userProfile;
+      // Truy vấn lại UserProfile một cách tường minh bên trong transaction
+      // để đảm bảo tính toàn vẹn dữ liệu.
+      const userProfile = await queryRunner.manager.findOne(UserProfile, {
+        where: { account: { id: account.id } },
+      });
+
+      if (!userProfile) {
+        this.logger.error(`User profile not found for account ${account.id}`);
+        throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+      }
 
       // Tạo ticket feedback
       const feedback = queryRunner.manager.create(Feedback, {
         title: createDto.title,
         category: createDto.category,
-        status: 'open',
+        status: FeedbackStatus.OPEN,
         submitter: userProfile,
       });
       const savedFeedback = await queryRunner.manager.save(feedback);
@@ -152,19 +163,22 @@ export class FeedbackService {
     account: Account,
   ): Promise<FeedbackResponse> {
     this.logger.log(
-      `User ${account.id
+      `User ${
+        account.id
       } replying to feedback ${feedbackId} with DTO: ${JSON.stringify(dto)}`,
     );
     const feedback = await this.findOne(feedbackId);
     const userProfile = account.userProfile;
-    const roleName = account.role.name;
 
-    // Nếu admin/manager trả lời, cập nhật trạng thái ticket
-    if (roleName !== String(Role.User) && feedback.status === 'open') {
-      this.logger.log(
-        `Updating feedback ${feedbackId} status to in_progress`,
-      );
-      await this.feedbackRepo.update(feedbackId, { status: 'in_progress' });
+    // Nếu admin/manager trả lời, cập nhật trạng thái ticket.
+    if (
+      account.role.name !== String(Role.User) &&
+      feedback.status === FeedbackStatus.OPEN
+    ) {
+      this.logger.log(`Updating feedback ${feedbackId} status to in_progress`);
+      await this.feedbackRepo.update(feedbackId, {
+        status: FeedbackStatus.IN_PROGRESS,
+      });
     }
 
     // Tạo và lưu tin nhắn mới
@@ -184,7 +198,7 @@ export class FeedbackService {
         id: account.userProfile.id,
         fullName: account.userProfile.full_name,
         avatarUrl: account.userProfile.avatar_url,
-        role: roleName,
+        role: account.role.name,
       },
     });
 

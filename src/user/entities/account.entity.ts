@@ -15,7 +15,7 @@ import { Exclude } from 'class-transformer';
 import { AccountStatus } from '../enum/account-status.enum';
 import { AuthProvider } from '../enum/auth-provider.enum';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role as RoleEntity } from './role.entity';
+import { Role } from './role.entity';
 
 /**
  * @enum Roles
@@ -160,10 +160,13 @@ export class Account {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
 
-  @ApiProperty({ type: () => RoleEntity })
-  @ManyToOne(() => RoleEntity, (role) => role.accounts)
+  /**
+   * Vai trò của tài khoản trong hệ thống.
+   */
+  @ApiProperty({ type: () => Role })
+  @ManyToOne(() => Role, (role) => role.accounts)
   @JoinColumn({ name: 'role_id' })
-  role!: RoleEntity;
+  role!: Role;
 
   /**
    * Mối quan hệ một-một với UserProfile, chứa thông tin hồ sơ chi tiết.

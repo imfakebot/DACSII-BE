@@ -13,11 +13,17 @@ export class City {
   @PrimaryGeneratedColumn({ type: 'int' })
   id!: number;
 
-  @ApiProperty({ description: 'Tên Tỉnh/Thành phố', example: 'Thành phố Hồ Chí Minh' })
+  @ApiProperty({
+    description: 'Tên Tỉnh/Thành phố',
+    example: 'Thành phố Hồ Chí Minh',
+  })
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
-  @ApiProperty({ description: 'Loại đơn vị hành chính', example: 'Thành phố Trung ương' })
+  @ApiProperty({
+    description: 'Loại đơn vị hành chính',
+    example: 'Thành phố Trung ương',
+  })
   @Column({ type: 'varchar', length: 255 })
   type!: string;
 

@@ -21,7 +21,6 @@ import { AuthProvider } from '@/user/enum/auth-provider.enum';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
 import { Gender } from '@/user/enum/gender.enum';
 
-
 interface JwtPayload {
   email: string;
   sub: string;
@@ -49,7 +48,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {}
 
   /**
    * @method initiateRegistration
@@ -229,8 +228,7 @@ export class AuthService {
     const userProfile = (user as Account).userProfile;
     const bracnhId = userProfile?.branch?.id;
 
-    const roleName =
-      typeof user.role === 'string' ? user.role : (user.role).name;
+    const roleName = (user.role as unknown as { name: string }).name;
 
     const payload: JwtPayload & { branch_id?: string } = {
       email: user.email,
@@ -289,12 +287,10 @@ export class AuthService {
         role: roleName,
         is_profile_complete:
           user.userProfile &&
-            typeof user.userProfile === 'object' &&
-            'is_profile_complete' in user.userProfile
-            ? (
-              (user.userProfile as { is_profile_complete?: boolean })
-                .is_profile_complete ?? false
-            )
+          typeof user.userProfile === 'object' &&
+          'is_profile_complete' in user.userProfile
+            ? ((user.userProfile as { is_profile_complete?: boolean })
+                .is_profile_complete ?? false)
             : false,
         branch_id: bracnhId,
       },
@@ -323,7 +319,9 @@ export class AuthService {
     // Nếu tài khoản đã tồn tại
     if (account) {
       if (account.status !== AccountStatus.ACTIVE) {
-        this.logger.warn(`OAuth login attempt for disabled account ${payload.email}`);
+        this.logger.warn(
+          `OAuth login attempt for disabled account ${payload.email}`,
+        );
         throw new ForbiddenException('Tài khoản của bạn đã bị vô hiệu hóa.');
       }
 
@@ -364,7 +362,9 @@ export class AuthService {
       'userProfile.branch',
     ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
-      this.logger.warn(`Token refresh attempt for non-existent or inactive user ${userID}`);
+      this.logger.warn(
+        `Token refresh attempt for non-existent or inactive user ${userID}`,
+      );
       throw new ForbiddenException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
       );
@@ -422,8 +422,7 @@ export class AuthService {
     this.logger.debug(`Creating new access token for user ${user.id}`);
     const userProfile = (user as Account).userProfile;
     const branchId = userProfile?.branch?.id || null;
-    const roleName =
-      typeof user.role === 'string' ? user.role : (user.role).name;
+    const roleName = (user.role as unknown as { name: string }).name;
 
     const payload = {
       email: user.email,
@@ -568,7 +567,9 @@ export class AuthService {
     // 1. Dùng lại validateUser để kiểm tra mật khẩu
     const account = await this.validateUser(email, pass);
     if (!account) {
-      this.logger.warn(`Invalid credentials for 2FA login attempt for ${email}`);
+      this.logger.warn(
+        `Invalid credentials for 2FA login attempt for ${email}`,
+      );
       throw new UnauthorizedException('Sai email hoặc mật khẩu.');
     }
 
@@ -619,7 +620,9 @@ export class AuthService {
       'userProfile.branch',
     ]);
     if (!account || account.status !== AccountStatus.ACTIVE) {
-      this.logger.warn(`2FA login attempt for non-existent or inactive account ${email}`);
+      this.logger.warn(
+        `2FA login attempt for non-existent or inactive account ${email}`,
+      );
       throw new UnauthorizedException(
         'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa.',
       );

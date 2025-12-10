@@ -5,8 +5,8 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { Account } from './entities/account.entity';
-import { Role } from './entities/role.entity';
 import { UserProfile } from './entities/users-profile.entity';
+import { Role } from './entities/role.entity';
 import { Address } from '../location/entities/address.entity';
 import { UsersController } from './users.controller';
 import { NotificationsModule } from '@/notification/notifications.module';
@@ -14,7 +14,7 @@ import { BranchModule } from '@/branch/branch.module'; // Giả định BranchMo
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Account, UserProfile, Address, Role]),
+    TypeOrmModule.forFeature([Account, UserProfile, Role, Address]),
     // Sử dụng forwardRef để phá vỡ circular dependency với NotificationsModule
     // Lý do: NotificationsModule import UsersModule, và UsersModule có thể cần NotificationsModule trong tương lai.
     forwardRef(() => BranchModule), // Thêm forwardRef cho BranchModule để giải quyết các phụ thuộc vòng tiềm ẩn
