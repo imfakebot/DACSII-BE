@@ -49,7 +49,7 @@ export class FieldsController {
   constructor(
     private readonly fieldsService: FieldsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /fields

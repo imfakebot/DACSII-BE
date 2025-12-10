@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Voucher } from './entities/voucher.entity';
-import { Repository } from 'typeorm';
+import { LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 
 /**
@@ -37,6 +37,28 @@ export class VoucherService {
 
     const voucher = this.voucherRepository.create(dto);
     return this.voucherRepository.save(voucher);
+  }
+
+  /**
+   * (Public) Lấy danh sách các voucher hợp lệ cho một giá trị đơn hàng cụ thể.
+   * @param orderValue Giá trị của đơn hàng để kiểm tra điều kiện minOrderValue.
+   * @returns Danh sách các voucher có thể áp dụng.
+   */
+  async findAvailableVouchers(orderValue: number): Promise<Voucher[]> {
+    const now = new Date();
+    return this.voucherRepository.find({
+      where: {
+        quantity: MoreThan(0),
+        validFrom: LessThanOrEqual(now),
+        validTo: MoreThan(now),
+        minOrderValue: LessThanOrEqual(orderValue),
+      },
+      order: {
+        // Ưu tiên sắp xếp, ví dụ: voucher giảm nhiều tiền hơn lên trước
+        discountAmount: 'DESC',
+        discountPercentage: 'DESC',
+      },
+    });
   }
 
   /**
@@ -72,7 +94,9 @@ export class VoucherService {
 
     if (orderValue < Number(voucher.minOrderValue)) {
       throw new BadRequestException(
-        `Đơn hàng phải tối thiểu ${Number(voucher.minOrderValue).toLocaleString()}đ để áp dụng`,
+        `Đơn hàng phải tối thiểu ${Number(
+          voucher.minOrderValue,
+        ).toLocaleString()}đ để áp dụng`,
       );
     }
 

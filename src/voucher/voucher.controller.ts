@@ -24,6 +24,7 @@ import {
 import { RolesGuard } from '../auth/guards/role.guard';
 import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
+import { Voucher } from './entities/voucher.entity';
 
 /**
  * @class VoucherController
@@ -63,6 +64,33 @@ export class VoucherController {
   })
   create(@Body() dto: CreateVoucherDto) {
     return this.voucherService.create(dto);
+  }
+
+  /**
+   * (Public) Lấy danh sách các voucher có sẵn cho người dùng lựa chọn.
+   * @param orderValue Giá trị đơn hàng để lọc các voucher phù hợp.
+   * @returns Danh sách các voucher có thể sử dụng.
+   */
+  @Get('available')
+  @ApiOperation({
+    summary: '(Public) Lấy danh sách voucher có thể sử dụng',
+  })
+  @ApiQuery({
+    name: 'orderValue',
+    type: Number,
+    description: 'Giá trị đơn hàng hiện tại để lọc voucher phù hợp',
+    example: 300000,
+    required: true,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách các voucher hợp lệ.',
+    type: [Voucher],
+  })
+  findAvailable(
+    @Query('orderValue', ParseFloatPipe) orderValue: number,
+  ): Promise<Voucher[]> {
+    return this.voucherService.findAvailableVouchers(orderValue);
   }
 
   /**
