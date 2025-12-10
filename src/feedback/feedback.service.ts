@@ -32,7 +32,7 @@ export class FeedbackService {
     private responseRepo: Repository<FeedbackResponse>,
     private readonly eventGateway: EventGateway,
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * @method create
@@ -163,12 +163,20 @@ export class FeedbackService {
     account: Account,
   ): Promise<FeedbackResponse> {
     this.logger.log(
-      `User ${
-        account.id
+      `User ${account.id
       } replying to feedback ${feedbackId} with DTO: ${JSON.stringify(dto)}`,
     );
     const feedback = await this.findOne(feedbackId);
-    const userProfile = account.userProfile;
+
+    // SỬA LỖI: Truy vấn lại UserProfile một cách tường minh để đảm bảo nó tồn tại
+    // và tránh lỗi khóa ngoại khi `account.userProfile` là undefined.
+    const userProfile = await this.dataSource.getRepository(UserProfile).findOne({
+      where: { account: { id: account.id } },
+    });
+
+    if (!userProfile) {
+      throw new NotFoundException(`Không tìm thấy hồ sơ người dùng cho tài khoản ${account.id}.`);
+    }
 
     // Nếu admin/manager trả lời, cập nhật trạng thái ticket.
     if (

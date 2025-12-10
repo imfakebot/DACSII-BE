@@ -21,6 +21,7 @@ import { AuthProvider } from './enum/auth-provider.enum';
 import { Gender } from './enum/gender.enum';
 import { Branch } from '@/branch/entities/branch.entity';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -75,7 +76,8 @@ export class UsersService {
     @InjectRepository(Account) private accountRepository: Repository<Account>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) { }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -326,6 +328,15 @@ export class UsersService {
       userProfile.gender = data.gender as Gender;
     }
     if (data.date_of_birth) {
+      // Chuyển đổi ngày sinh từ DTO thành đối tượng Date để so sánh
+      const dob = new Date(data.date_of_birth);
+      const today = new Date();
+      // So sánh ngày mà không tính đến thời gian trong ngày
+      dob.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      if (dob > today) {
+        throw new BadRequestException('Ngày sinh không được lớn hơn ngày hiện tại.');
+      }
       userProfile.date_of_birth = data.date_of_birth;
     }
     if (data.bio) {
@@ -442,16 +453,16 @@ export class UsersService {
    * @method updateAvatar
    * Cập nhật đường dẫn ảnh đại diện cho người dùng.
    * @param accountId ID của tài khoản người dùng.
-   * @param avatarPath Đường dẫn đến file ảnh đã được lưu trên server.
+   * @param avatarFilename Tên file ảnh đã được lưu trên server.
    * @returns Hồ sơ người dùng sau khi cập nhật.
    */
   async updateAvatar(
     accountId: string,
-    avatarPath: string,
+    avatarFilename: string,
   ): Promise<UserProfile> {
     this.logger.log(`Updating avatar for account id: ${accountId}`);
-    if (!avatarPath) {
-      throw new Error('Thiếu đường dẫn');
+    if (!avatarFilename) {
+      throw new Error('Thiếu tên file');
     }
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
@@ -461,9 +472,8 @@ export class UsersService {
     if (!account || !account.userProfile) {
       throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
     }
-
-    // Giả sử bạn có một cột 'avatar_url' trong bảng 'user_profiles'
-    account.userProfile.avatar_url = `/${avatarPath.replace(/\\/g, '/')}`; // Chuẩn hóa đường dẫn
+    const baseUrl = this.configService.get<string>('BASE_URL');
+    account.userProfile.avatar_url = `${baseUrl}/uploads/${avatarFilename}`;
 
     return this.userProfileRepository.save(account.userProfile);
   }
