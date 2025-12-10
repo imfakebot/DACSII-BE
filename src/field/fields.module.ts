@@ -42,10 +42,10 @@ import { Branch } from '@/branch/entities/branch.entity';
     // Import UsersModule để có thể truy cập UsersService, cần thiết để lấy thông tin chủ sân (owner).
     UsersModule,
   ],
-  // Cung cấp FieldsService để xử lý logic nghiệp vụ.
-  providers: [FieldsService],
-  // Đăng ký FieldsController để xử lý các request HTTP.
-  controllers: [FieldsController],
+  // Cung cấp FieldsService và FieldTypeService để xử lý logic nghiệp vụ.
+  providers: [FieldsService, FieldTypeService],
+  // Đăng ký FieldsController và FieldTypeController để xử lý các request HTTP.
+  controllers: [FieldsController, FieldTypeController],
   // Export FieldsService để các module khác (ví dụ: BookingsModule) có thể sử dụng.
   exports: [FieldsService],
 })

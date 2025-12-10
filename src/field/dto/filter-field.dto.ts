@@ -19,7 +19,7 @@ export class FilterFieldDto {
   @ApiPropertyOptional({ description: 'Lọc theo Chi nhánh cụ thể' })
   @IsOptional()
   @IsUUID()
-  branchId?: string; // 👈 THÊM MỚI
+  branchId?: string;
 
   @ApiPropertyOptional({ description: 'Vĩ độ của người dùng (User Latitude)' })
   @IsOptional()
