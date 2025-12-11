@@ -13,7 +13,7 @@ import { Ward } from '@/location/entities/ward.entity';
 import { City } from '@/location/entities/city.entity';
 import { Utility } from '../utility/entities/utility.entity';
 import { Branch } from '@/branch/entities/branch.entity';
-import { FieldTypeService } from './field-type.service';
+import { FieldTypeService } from './field-type.service'
 import { FieldTypeController } from './field-type.controller';
 
 /**
@@ -51,4 +51,4 @@ import { FieldTypeController } from './field-type.controller';
   // Export FieldsService để các module khác (ví dụ: BookingsModule) có thể sử dụng.
   exports: [FieldsService],
 })
-export class FieldsModule {}
+export class FieldsModule { }

@@ -80,6 +80,7 @@ export class FieldsController {
     );
     const userProfile = await this.usersService.findProfileByAccountId(userId, [
       'account.role',
+      'branch',
     ]);
 
     if (!userProfile) {
@@ -135,16 +136,23 @@ export class FieldsController {
     type: Field,
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  update(
+  async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<Field> {
     this.logger.log(
       `Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`,
     );
-    // Lưu ý: Nếu cần kiểm tra Manager có được sửa sân này không,
-    // cần truyền thêm UserProfile vào hàm update trong Service tương tự như hàm create.
-    return this.fieldsService.update(id, updateFieldDto);
+    const userId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(userId, [
+      'account.role',
+      'branch',
+    ]);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.fieldsService.update(id, updateFieldDto, userProfile);
   }
 
   /**
@@ -159,9 +167,20 @@ export class FieldsController {
   @ApiOperation({ summary: 'Xóa một sân bóng (Xóa mềm)' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ message: string }> {
     this.logger.log(`Removing field with id: ${id}`);
-    return this.fieldsService.remove(id);
+    const userId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(userId, [
+      'account.role',
+      'branch',
+    ]);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.fieldsService.remove(id, userProfile);
   }
 
   /**
@@ -176,11 +195,20 @@ export class FieldsController {
   @UseInterceptors(FilesInterceptor('images', 10))
   @ApiResponse({ status: 201, description: 'Tải ảnh lên thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  uploadImages(
+  async uploadImages(
     @Param('id') fieldId: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
+    @Req() req: AuthenticatedRequest,
   ) {
     this.logger.log(`Uploading ${files.length} images for field ${fieldId}`);
-    return this.fieldsService.addImagesToField(fieldId, files);
+    const userId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(userId, [
+      'account.role',
+      'branch',
+    ]);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.fieldsService.addImagesToField(fieldId, files, userProfile);
   }
 }

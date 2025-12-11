@@ -8,7 +8,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Field } from './entities/field.entity';
-import { CreateFieldDto } from './dto/create-fields.dto'; // Nhớ cập nhật DTO này
+import { CreateFieldDto } from './dto/create-fields.dto';
 import { UpdateFieldDto } from './dto/update-fields.dto';
 import { FieldType } from './entities/field-types.entity';
 import { FilterFieldDto } from './dto/filter-field.dto';
@@ -27,14 +27,6 @@ import { Utility } from '../utility/entities/utility.entity';
 export class FieldsService {
   private readonly logger = new Logger(FieldsService.name);
 
-  /**
-   * @constructor
-   * @param {Repository<Field>} fieldRepository - Repository cho thực thể Field.
-   * @param {Repository<FieldImage>} fieldImageRepository - Repository cho thực thể FieldImage.
-   * @param {Repository<Branch>} branchRepository - Repository cho thực thể Branch.
-   * @param {ConfigService} configService - Service để truy cập biến môi trường.
-   * @param {Repository<Utility>} utilityRepository - Repository cho thực thể Utility.
-   */
   constructor(
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
@@ -47,13 +39,6 @@ export class FieldsService {
     private readonly configService: ConfigService,
   ) {}
 
-  /**
-   * @method create
-   * @description Tạo sân bóng mới thuộc về một chi nhánh cụ thể.
-   * @param {CreateFieldDto} createFieldDto - DTO chứa thông tin để tạo sân.
-   * @param {UserProfile} userProfile - Hồ sơ người dùng của người tạo (để kiểm tra quyền).
-   * @returns {Promise<Field>} - Sân bóng vừa được tạo.
-   */
   async create(
     createFieldDto: CreateFieldDto,
     userProfile: UserProfile,
@@ -70,7 +55,6 @@ export class FieldsService {
     let branch: Branch | null;
 
     if (isAdmin) {
-      // Admin must provide a branchId
       if (!branchId) {
         throw new BadRequestException(
           'Admin phải cung cấp ID chi nhánh (branchId).',
@@ -83,7 +67,6 @@ export class FieldsService {
         );
       }
     } else {
-      // Manager's branch is taken from their profile
       branch = userProfile.branch;
       if (!branch) {
         this.logger.error(
@@ -94,7 +77,6 @@ export class FieldsService {
         );
       }
 
-      // Permission check: User must be the designated manager of this branch.
       const isManagerOfBranch = branch.manager_id === userProfile.id;
       if (!isManagerOfBranch) {
         this.logger.error(
@@ -131,13 +113,6 @@ export class FieldsService {
     return this.findOne(savedField.id);
   }
 
-  /**
-   * @method findAll
-   * @description Tìm kiếm và lọc danh sách các sân bóng.
-   * Hỗ trợ lọc theo tên, chi nhánh, loại sân, thành phố và tìm kiếm theo vị trí địa lý.
-   * @param {FilterFieldDto} filterDto - DTO chứa các tham số lọc.
-   * @returns {Promise<Field[]>} - Danh sách các sân bóng phù hợp.
-   */
   async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
     this.logger.log(
       `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
@@ -204,13 +179,6 @@ export class FieldsService {
     return fields;
   }
 
-  /**
-   * @method findOne
-   * @description Tìm thông tin chi tiết của một sân bóng bằng ID.
-   * @param {string} id - ID của sân bóng.
-   * @returns {Promise<Field>} - Thông tin chi tiết của sân bóng.
-   * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
-   */
   async findOne(id: string): Promise<Field> {
     this.logger.log(`Finding field with ID: ${id}`);
     const field = await this.fieldRepository.findOne({
@@ -232,37 +200,47 @@ export class FieldsService {
     return field;
   }
 
-  /**
-   * @method update
-   * @description Cập nhật thông tin của một sân bóng.
-   * @param {string} id - ID của sân bóng cần cập nhật.
-   * @param {UpdateFieldDto} updateFieldDto - DTO chứa thông tin cập nhật.
-   * @returns {Promise<Field>} - Sân bóng sau khi đã được cập nhật.
-   */
-  async update(id: string, updateFieldDto: UpdateFieldDto): Promise<Field> {
+  async update(
+    id: string,
+    updateFieldDto: UpdateFieldDto,
+    userProfile: UserProfile,
+  ): Promise<Field> {
     this.logger.log(
-      `Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`,
+      `User ${userProfile.id} updating field ${id} with DTO: ${JSON.stringify(
+        updateFieldDto,
+      )}`,
     );
     const field = await this.fieldRepository.findOne({
       where: { id },
-      relations: ['utilities'], // <-- Load existing utilities
+      relations: ['branch', 'utilities'],
     });
 
     if (!field) {
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
 
+    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    if (!isAdmin) {
+      if (!field.branch || field.branch.manager_id !== userProfile.id) {
+        throw new ForbiddenException(
+          'Bạn không có quyền cập nhật sân bóng này.',
+        );
+      }
+    }
+
     const { branchId, fieldTypeId, utilityIds, ...fieldData } = updateFieldDto;
 
-    // Merge scalar properties
+    if (!isAdmin && branchId && branchId !== field.branch.id) {
+      throw new ForbiddenException('Quản lý không được phép thay đổi chi nhánh của sân.');
+    }
+    
     this.fieldRepository.merge(field, fieldData);
 
-    // Handle relations
     if (fieldTypeId) {
       field.fieldType = { id: fieldTypeId } as FieldType;
     }
 
-    if (branchId) {
+    if (branchId && isAdmin) {
       const branch: Branch | null = await this.branchRepository.findOneBy({
         id: branchId,
       });
@@ -273,9 +251,6 @@ export class FieldsService {
       field.branch = branch;
     }
 
-    // Handle utilities - This logic is better
-    // If utilityIds is in the DTO, we update the relation.
-    // If it's not present (undefined), we don't touch the existing utilities.
     if (utilityIds !== undefined) {
       if (utilityIds.length === 0) {
         field.utilities = [];
@@ -294,43 +269,63 @@ export class FieldsService {
 
     await this.fieldRepository.save(field);
     this.logger.log(`Field ${id} updated successfully`);
-    return this.findOne(id); // Reload to get all relations fresh from DB
+    return this.findOne(id);
   }
 
-  /**
-   * @method remove
-   * @description Xóa mềm một sân bóng.
-   * @param {string} id - ID của sân bóng cần xóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa thành công.
-   * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
-   */
-  async remove(id: string): Promise<{ message: string }> {
-    this.logger.log(`Removing field with ID: ${id}`);
-    const result = await this.fieldRepository.softDelete(id);
-    if (result.affected === 0) {
-      this.logger.error(`Field with ID ${id} not found for removal`);
+  async remove(
+    id: string,
+    userProfile: UserProfile,
+  ): Promise<{ message: string }> {
+    this.logger.log(`User ${userProfile.id} removing field with ID: ${id}`);
+    const field = await this.fieldRepository.findOne({
+      where: { id },
+      relations: ['branch'],
+    });
+
+    if (!field) {
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
-    this.logger.log(`Field ${id} removed successfully`);
+
+    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    if (!isAdmin) {
+      if (!field.branch || field.branch.manager_id !== userProfile.id) {
+        throw new ForbiddenException('Bạn không có quyền xóa sân bóng này.');
+      }
+    }
+
+    const result = await this.fieldRepository.softDelete(id);
+    if (result.affected === 0) {
+      // This case should theoretically not be reached if findOne succeeds
+      throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
+    }
+    this.logger.log(`Field ${id} removed successfully by user ${userProfile.id}`);
     return { message: 'Đã xóa sân bóng thành công' };
   }
 
-  /**
-   * @method addImagesToField
-   * @description Thêm một hoặc nhiều hình ảnh cho một sân bóng.
-   * @param {string} fieldID - ID của sân bóng.
-   * @param {Array<Express.Multer.File>} files - Mảng các file ảnh được tải lên.
-   * @returns {Promise<FieldImage[]>} - Mảng các đối tượng hình ảnh vừa được lưu.
-   */
   async addImagesToField(
-    fieldID: string,
+    fieldId: string,
     files: Array<Express.Multer.File>,
+    userProfile: UserProfile,
   ): Promise<FieldImage[]> {
-    this.logger.log(`Adding ${files.length} images to field ${fieldID}`);
-    const field = await this.fieldRepository.findOneBy({ id: fieldID });
+    this.logger.log(
+      `User ${userProfile.id} adding ${files.length} images to field ${fieldId}`,
+    );
+    const field = await this.fieldRepository.findOne({
+      where: { id: fieldId },
+      relations: ['branch'],
+    });
     if (!field) {
-      this.logger.error(`Field with ID ${fieldID} not found for image upload`);
+      this.logger.error(`Field with ID ${fieldId} not found for image upload`);
       throw new NotFoundException(`Sân bóng không tồn tại`);
+    }
+
+    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    if (!isAdmin) {
+      if (!field.branch || field.branch.manager_id !== userProfile.id) {
+        throw new ForbiddenException(
+          'Bạn không có quyền thêm ảnh cho sân bóng này.',
+        );
+      }
     }
 
     const baseUrl = this.configService.get<string>('BASE_URL');
@@ -344,7 +339,7 @@ export class FieldsService {
 
     const savedImages = await this.fieldImageRepository.save(images);
     this.logger.log(
-      `Added ${savedImages.length} images to field ${fieldID} successfully`,
+      `Added ${savedImages.length} images to field ${fieldId} successfully`,
     );
     return savedImages;
   }
