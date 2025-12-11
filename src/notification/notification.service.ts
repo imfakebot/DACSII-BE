@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateNotificationDto } from './dto/create-notification.dto';
@@ -12,6 +12,7 @@ import { EventGateway } from '@/event/event.gateway';
  */
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name);
   /**
    * @constructor
    * @param {Repository<Notification>} notificationRepository - Repository cho thực thể Notification.
@@ -30,6 +31,7 @@ export class NotificationService {
    * @returns {Promise<Notification>} - Thông báo vừa được tạo.
    */
   async createNotification(dto: CreateNotificationDto): Promise<Notification> {
+    this.logger.log(`Creating notification for recipient: ${dto.recipientId}`);
     const notification = this.notificationRepository.create({
       title: dto.title,
       content: dto.content,
@@ -44,7 +46,7 @@ export class NotificationService {
       dto.recipientId,
       savedNotification,
     );
-
+    this.logger.log(`Notification ${savedNotification.id} created and sent.`);
     return savedNotification;
   }
 
@@ -61,6 +63,7 @@ export class NotificationService {
     page: number = 1,
     limit: number = 10,
   ) {
+    this.logger.log(`Fetching notifications for user ${userProfileId}, page ${page}, limit ${limit}`);
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.notificationRepository.findAndCount({
@@ -73,7 +76,7 @@ export class NotificationService {
     const unreadCount = await this.notificationRepository.count({
       where: { recipient: { id: userProfileId }, isRead: false },
     });
-
+    this.logger.log(`Found ${total} notifications for user ${userProfileId}, ${unreadCount} unread.`);
     return {
       data,
       meta: {
@@ -95,16 +98,20 @@ export class NotificationService {
    * @throws {NotFoundException} Nếu không tìm thấy thông báo.
    */
   async markAsRead(id: string, userProfileId: string): Promise<Notification> {
+    this.logger.log(`Marking notification ${id} as read for user ${userProfileId}`);
     const notification = await this.notificationRepository.findOne({
       where: { id, recipient: { id: userProfileId } },
     });
 
     if (!notification) {
+      this.logger.warn(`Notification ${id} not found for user ${userProfileId} or unauthorized.`);
       throw new NotFoundException('Thông báo không tồn tại.');
     }
 
     notification.isRead = true;
-    return this.notificationRepository.save(notification);
+    const savedNotification = this.notificationRepository.save(notification);
+    this.logger.log(`Notification ${id} marked as read.`);
+    return savedNotification;
   }
 
   /**
@@ -114,10 +121,12 @@ export class NotificationService {
    * @returns {Promise<{ message: string }>} - Thông báo xác nhận.
    */
   async markAllAsRead(userProfileId: string): Promise<{ message: string }> {
+    this.logger.log(`Marking all notifications as read for user ${userProfileId}`);
     await this.notificationRepository.update(
       { recipient: { id: userProfileId }, isRead: false },
       { isRead: true },
     );
+    this.logger.log(`All notifications marked as read for user ${userProfileId}`);
     return { message: 'Đã đánh dấu tất cả là đã đọc.' };
   }
 
@@ -133,17 +142,19 @@ export class NotificationService {
     id: string,
     userProfileId: string,
   ): Promise<{ message: string }> {
+    this.logger.log(`Deleting notification ${id} for user ${userProfileId}`);
     const result = await this.notificationRepository.delete({
       id,
       recipient: { id: userProfileId },
     });
 
     if (result.affected === 0) {
+      this.logger.warn(`Notification ${id} not found for user ${userProfileId} or unauthorized deletion.`);
       throw new NotFoundException(
         'Thông báo không tồn tại hoặc bạn không có quyền xóa.',
       );
     }
-
+    this.logger.log(`Notification ${id} deleted successfully.`);
     return { message: 'Xóa thông báo thành công.' };
   }
 }

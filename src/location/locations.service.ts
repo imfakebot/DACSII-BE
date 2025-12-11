@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { City } from './entities/city.entity';
 import { Repository } from 'typeorm';
@@ -10,6 +10,7 @@ import { Ward } from './entities/ward.entity';
  */
 @Injectable()
 export class LocationsService {
+  private readonly logger = new Logger(LocationsService.name);
   /**
    * @constructor
    * @param {Repository<City>} cityRepository - Repository cho thực thể City.
@@ -26,6 +27,7 @@ export class LocationsService {
    * @returns {Promise<City[]>} - Mảng các đối tượng City.
    */
   async findAll(): Promise<City[]> {
+    this.logger.log('Fetching all cities');
     return this.cityRepository.find();
   }
 
@@ -36,6 +38,7 @@ export class LocationsService {
    * @returns {Promise<Ward[]>} - Mảng các đối tượng Ward.
    */
   async findWardsByCityId(cityId: number): Promise<Ward[]> {
+    this.logger.log(`Fetching wards for cityId: ${cityId}`);
     return this.wardRepository.find({ where: { city: { id: cityId } } });
   }
 }

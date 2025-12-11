@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Voucher } from './entities/voucher.entity';
@@ -15,6 +16,7 @@ import { CreateVoucherDto } from './dto/create-voucher.dto';
  */
 @Injectable()
 export class VoucherService {
+  private readonly logger = new Logger(VoucherService.name);
   constructor(
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
@@ -28,15 +30,19 @@ export class VoucherService {
    * @throws {BadRequestException} Nếu mã voucher đã tồn tại.
    */
   async create(dto: CreateVoucherDto) {
+    this.logger.log(`Creating new voucher with DTO: ${JSON.stringify(dto)}`);
     const exists = await this.voucherRepository.findOne({
       where: { code: dto.code },
     });
     if (exists) {
+      this.logger.warn(`Voucher with code ${dto.code} already exists.`);
       throw new BadRequestException('Voucher đã tồn tại');
     }
 
     const voucher = this.voucherRepository.create(dto);
-    return this.voucherRepository.save(voucher);
+    const savedVoucher = await this.voucherRepository.save(voucher);
+    this.logger.log(`Voucher ${savedVoucher.code} created successfully.`);
+    return savedVoucher;
   }
 
   /**
@@ -45,8 +51,9 @@ export class VoucherService {
    * @returns Danh sách các voucher có thể áp dụng.
    */
   async findAvailableVouchers(orderValue: number): Promise<Voucher[]> {
+    this.logger.log(`Finding available vouchers for order value: ${orderValue}`);
     const now = new Date();
-    return this.voucherRepository.find({
+    const availableVouchers = await this.voucherRepository.find({
       where: {
         quantity: MoreThan(0),
         validFrom: LessThanOrEqual(now),
@@ -59,6 +66,8 @@ export class VoucherService {
         discountPercentage: 'DESC',
       },
     });
+    this.logger.log(`Found ${availableVouchers.length} available vouchers.`);
+    return availableVouchers;
   }
 
   /**
@@ -75,24 +84,30 @@ export class VoucherService {
    * @throws {BadRequestException} Nếu voucher không hợp lệ (hết hạn, hết lượt, không đủ điều kiện,...).
    */
   async checkVoucher(code: string, orderValue: number) {
+    this.logger.log(`Checking voucher code "${code}" for order value: ${orderValue}`);
     const voucher = await this.voucherRepository.findOne({ where: { code } });
 
     if (!voucher) {
+      this.logger.warn(`Voucher "${code}" not found.`);
       throw new NotFoundException('Voucher không tồn tại');
     }
 
     const now = new Date();
     if (now < new Date(voucher.validFrom)) {
+      this.logger.warn(`Voucher "${code}" not yet valid.`);
       throw new BadRequestException('Mã giảm giá chưa đến đợt áp dụng');
     }
     if (now > new Date(voucher.validTo)) {
+      this.logger.warn(`Voucher "${code}" expired.`);
       throw new BadRequestException('Mã giảm giá đã hết hạn');
     }
     if (voucher.quantity <= 0) {
+      this.logger.warn(`Voucher "${code}" out of stock.`);
       throw new BadRequestException('Mã giảm giá đã hết');
     }
 
     if (orderValue < Number(voucher.minOrderValue)) {
+      this.logger.warn(`Voucher "${code}" minimum order value not met. Required: ${voucher.minOrderValue}, actual: ${orderValue}`);
       throw new BadRequestException(
         `Đơn hàng phải tối thiểu ${Number(
           voucher.minOrderValue,
@@ -120,7 +135,7 @@ export class VoucherService {
     if (discountAmount > orderValue) {
       discountAmount = orderValue;
     }
-
+    this.logger.log(`Voucher "${code}" applied, discount amount: ${discountAmount}.`);
     return {
       isValid: true,
       code: voucher.code,
@@ -131,15 +146,17 @@ export class VoucherService {
   }
 
   async remove(id: string) {
+    this.logger.log(`Deleting voucher with ID: ${id}`);
     // Kiểm tra tồn tại
     const voucher = await this.voucherRepository.findOne({ where: { id } });
     if (!voucher) {
+      this.logger.warn(`Voucher with ID ${id} not found for deletion.`);
       throw new NotFoundException('Voucher không tồn tại.');
     }
 
     // Soft delete (TypeORM tự động set deletedAt = now())
     await this.voucherRepository.softDelete(id);
-
+    this.logger.log(`Voucher ${id} soft deleted successfully.`);
     return { message: 'Xóa voucher thành công.' };
   }
 }

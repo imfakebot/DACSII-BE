@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Logger } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { City } from './entities/city.entity';
 import { Ward } from './entities/ward.entity';
@@ -12,6 +12,7 @@ import { LocationsService } from './locations.service';
 @ApiTags('Locations')
 @Controller('locations')
 export class LocationsController {
+  private readonly logger = new Logger(LocationsController.name);
   /**
    * @param {LocationsService} locationsService - Service xử lý logic nghiệp vụ cho các địa điểm.
    */
@@ -26,6 +27,7 @@ export class LocationsController {
   @ApiOperation({ summary: 'Lấy danh sách tất cả các Thành phố' })
   @ApiResponse({ status: 200, description: 'Thành công', type: [City] })
   async findAllCities(): Promise<City[]> {
+    this.logger.log('Fetching all cities');
     return this.locationsService.findAll();
   }
 
@@ -41,6 +43,7 @@ export class LocationsController {
   async findWardsByCityId(
     @Param('cityId', ParseIntPipe) cityId: number,
   ): Promise<Ward[]> {
+    this.logger.log(`Fetching wards for cityId: ${cityId}`);
     return this.locationsService.findWardsByCityId(cityId);
   }
 }

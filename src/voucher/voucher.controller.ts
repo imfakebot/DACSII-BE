@@ -10,6 +10,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Logger,
 } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -33,6 +34,7 @@ import { Voucher } from './entities/voucher.entity';
 @ApiTags('Vouchers (Mã giảm giá)')
 @Controller('voucher')
 export class VoucherController {
+  private readonly logger = new Logger(VoucherController.name);
   constructor(private readonly voucherService: VoucherService) {}
 
   /**
@@ -63,6 +65,7 @@ export class VoucherController {
     description: 'Không có quyền Admin.',
   })
   create(@Body() dto: CreateVoucherDto) {
+    this.logger.log(`Admin creating new voucher with DTO: ${JSON.stringify(dto)}`);
     return this.voucherService.create(dto);
   }
 
@@ -90,6 +93,7 @@ export class VoucherController {
   findAvailable(
     @Query('orderValue', ParseFloatPipe) orderValue: number,
   ): Promise<Voucher[]> {
+    this.logger.log(`Fetching available vouchers for order value: ${orderValue}`);
     return this.voucherService.findAvailableVouchers(orderValue);
   }
 
@@ -131,6 +135,7 @@ export class VoucherController {
     @Query('code') code: string,
     @Query('orderValue', ParseFloatPipe) orderValue: number,
   ): Promise<object> {
+    this.logger.log(`Checking voucher code "${code}" for order value: ${orderValue}`);
     return this.voucherService.checkVoucher(code, Number(orderValue));
   }
 
@@ -141,6 +146,7 @@ export class VoucherController {
   @ApiOperation({ summary: '(Admin) Xóa mã giảm giá' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   async remove(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`Admin deleting voucher with ID: ${id}`);
     return this.voucherService.remove(id);
   }
 }

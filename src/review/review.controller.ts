@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -37,6 +38,7 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 @ApiTags('Reviews (Đánh giá)')
 @Controller('review')
 export class ReviewController {
+  private readonly logger = new Logger(ReviewController.name);
   constructor(
     private readonly reviewService: ReviewService,
     private readonly userService: UsersService,
@@ -67,10 +69,12 @@ export class ReviewController {
     @User() user: AuthenticatedUser,
   ) {
     const accountId = user.id;
+    this.logger.log(`User ${accountId} creating new review.`);
     const userProfile =
       await this.userService.findProfileByAccountId(accountId);
 
     if (!userProfile) {
+      this.logger.warn(`User profile not found for account ${accountId}.`);
       throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
     }
 
@@ -93,6 +97,7 @@ export class ReviewController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
   ) {
+    this.logger.log(`Fetching reviews for field ${fieldId}, page ${page}, limit ${limit}.`);
     return this.reviewService.findByField(fieldId, Number(page), Number(limit));
   }
 
@@ -120,6 +125,7 @@ export class ReviewController {
     @Query('limit') limit: number = 10,
     @User() user: AuthenticatedUser, // Lấy thông tin user để lọc theo branch
   ) {
+    this.logger.log(`User ${user.id} fetching all reviews, page ${page}, limit ${limit}.`);
     return this.reviewService.findAllReviews(Number(page), Number(limit), user);
   }
 
@@ -144,6 +150,7 @@ export class ReviewController {
     @Param('id', ParseUUIDPipe) id: string,
     @User() user: AuthenticatedUser, // Truyền user xuống service để check quyền
   ) {
+    this.logger.log(`User ${user.id} attempting to delete review ${id}.`);
     return this.reviewService.delete(id, user);
   }
 }

@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { BranchService } from './branch.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -32,6 +33,7 @@ import { Account } from '@/user/entities/account.entity';
 @ApiTags('Branches (Chi nhánh)')
 @Controller('branches')
 export class BranchController {
+  private readonly logger = new Logger(BranchController.name);
   constructor(private readonly branchService: BranchService) {}
 
   @Post()
@@ -45,6 +47,11 @@ export class BranchController {
     type: Branch,
   })
   create(@Body() createBranchDto: CreateBranchDto, @User() creator: Account) {
+    this.logger.log(
+      `Admin ${creator.id} creating branch with DTO: ${JSON.stringify(
+        createBranchDto,
+      )}`,
+    );
     return this.branchService.create(createBranchDto, creator);
   }
 
@@ -56,6 +63,7 @@ export class BranchController {
     type: [Branch],
   })
   findAll() {
+    this.logger.log('Fetching all branches');
     return this.branchService.findAll();
   }
 
@@ -72,6 +80,7 @@ export class BranchController {
     type: [UserProfile],
   })
   findAvailableManagers() {
+    this.logger.log('Fetching available managers');
     return this.branchService.findAvailableManagers();
   }
 
@@ -83,6 +92,7 @@ export class BranchController {
     type: Branch,
   })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`Fetching branch with id ${id}`);
     return this.branchService.findOne(id);
   }
 
@@ -100,6 +110,9 @@ export class BranchController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateBranchDto: UpdateBranchDto,
   ) {
+    this.logger.log(
+      `Updating branch ${id} with DTO: ${JSON.stringify(updateBranchDto)}`,
+    );
     return this.branchService.update(id, updateBranchDto);
   }
 
@@ -111,6 +124,7 @@ export class BranchController {
   @ApiOperation({ summary: '(Admin) Xóa một chi nhánh' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`Deleting branch ${id}`);
     return this.branchService.remove(id);
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Utility } from '@/utility/entities/utility.entity';
@@ -12,6 +12,7 @@ import { UpdateUtilityDto } from './dto/update-utility.dto';
  */
 @Injectable()
 export class UtilityService {
+  private readonly logger = new Logger(UtilityService.name);
   /**
    * @constructor
    * @param {Repository<Utility>} utilityRepository - Repository cho thực thể Utility.
@@ -28,8 +29,11 @@ export class UtilityService {
    * @returns {Promise<Utility>} - Tiện ích vừa được tạo.
    */
   async create(createUtilityDto: CreateUtilityDto): Promise<Utility> {
+    this.logger.log(`Creating utility with DTO: ${JSON.stringify(createUtilityDto)}`);
     const utility = this.utilityRepository.create(createUtilityDto);
-    return this.utilityRepository.save(utility);
+    const savedUtility = this.utilityRepository.save(utility);
+    this.logger.log(`Utility ${utility.id} created successfully.`);
+    return savedUtility;
   }
 
   /**
@@ -38,6 +42,7 @@ export class UtilityService {
    * @returns {Promise<Utility[]>} - Danh sách các tiện ích.
    */
   async findAll(): Promise<Utility[]> {
+    this.logger.log('Fetching all utilities.');
     return this.utilityRepository.find();
   }
 
@@ -49,8 +54,10 @@ export class UtilityService {
    * @throws {NotFoundException} Nếu không tìm thấy tiện ích.
    */
   async findOne(id: number): Promise<Utility> {
+    this.logger.log(`Fetching utility with ID: ${id}`);
     const utility = await this.utilityRepository.findOne({ where: { id } });
     if (!utility) {
+      this.logger.warn(`Utility with ID ${id} not found.`);
       throw new NotFoundException(`Utility with ID ${id} not found`);
     }
     return utility;
@@ -67,9 +74,12 @@ export class UtilityService {
     id: number,
     updateUtilityDto: UpdateUtilityDto,
   ): Promise<Utility> {
+    this.logger.log(`Updating utility ${id} with DTO: ${JSON.stringify(updateUtilityDto)}`);
     const utility = await this.findOne(id);
     this.utilityRepository.merge(utility, updateUtilityDto);
-    return this.utilityRepository.save(utility);
+    const updatedUtility = this.utilityRepository.save(utility);
+    this.logger.log(`Utility ${id} updated successfully.`);
+    return updatedUtility;
   }
 
   /**
@@ -80,10 +90,13 @@ export class UtilityService {
    * @throws {NotFoundException} Nếu không tìm thấy tiện ích.
    */
   async remove(id: number): Promise<{ message: string }> {
+    this.logger.log(`Deleting utility with ID: ${id}`);
     const result = await this.utilityRepository.delete(id);
     if (result.affected === 0) {
+      this.logger.warn(`Utility with ID ${id} not found for deletion.`);
       throw new NotFoundException(`Utility with ID ${id} not found`);
     }
+    this.logger.log(`Utility with ID ${id} removed successfully.`);
     return { message: `Utility with ID ${id} has been removed` };
   }
 }
