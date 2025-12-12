@@ -49,7 +49,7 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
-  ) {}
+  ) { }
 
   /**
    * @method createVnPayUrl
@@ -111,7 +111,7 @@ export class PaymentService {
     delete vnp_Params_Data['vnp_SecureHash'];
     delete vnp_Params_Data['vnp_SecureHashType'];
 
-    const sortedParams = this.sortObject(vnp_Params);
+    const sortedParams = this.sortObject(vnp_Params_Data);
 
     const { secretKey } = this.vnpayConfiguration;
     if (!secretKey) {
@@ -232,12 +232,11 @@ export class PaymentService {
 
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
-        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${
-            branchAddressObj.city?.name || ''
+        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${branchAddressObj.city?.name || ''
           }`
-            .replace(/,\s*,/g, ',')
-            .trim()
-            .replace(/,\s*$/, '')
+          .replace(/,\s*,/g, ',')
+          .trim()
+          .replace(/,\s*$/, '')
         : 'Đang cập nhật';
 
       const startTime = moment(payment.booking.start_time).format(
