@@ -61,9 +61,9 @@ export class PaymentService {
    * @throws {Error} Nếu thiếu cấu hình VNPAY.
    */
   createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
-    const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
+    const { tmnCode, secretKey, url, returnUrl, ipnUrl } = this.vnpayConfiguration;
 
-    if (!secretKey || !url || !tmnCode || !returnUrl) {
+    if (!secretKey || !url || !tmnCode || !returnUrl || !ipnUrl) {
       throw new Error('VNPAY configuration is missing');
     }
 
@@ -82,6 +82,7 @@ export class PaymentService {
       vnp_OrderType: 'other',
       vnp_Amount: amount * 100, // VNPAY yêu cầu số tiền nhân 100
       vnp_ReturnUrl: returnUrl,
+      vnp_IpnURL: ipnUrl,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: createDate,
     };
