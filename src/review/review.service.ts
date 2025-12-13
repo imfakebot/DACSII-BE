@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,6 +21,7 @@ import { Role } from '@/auth/enums/role.enum';
  */
 @Injectable()
 export class ReviewService {
+  private readonly logger = new Logger(ReviewService.name);
   /**
    * @constructor
    * @param {Repository<Review>} reviewRepository - Repository để tương tác với thực thể Review.
@@ -44,21 +46,25 @@ export class ReviewService {
     createReviewDto: CreateReviewDto,
     userProfile: UserProfile,
   ) {
+    this.logger.log(`User ${userProfile.id} creating review for booking ${createReviewDto.bookingId}`);
     const { bookingId, rating, comment } = createReviewDto;
 
     // 1. Tìm Booking, đảm bảo join đủ các quan hệ cần thiết (field, userProfile)
     const booking = await this.bookingService.findOne(bookingId); // findOne đã có relations: ['userProfile', 'field']
     if (!booking) {
+      this.logger.warn(`Booking ${bookingId} not found.`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
     // 2. Kiểm tra quyền sở hữu (User này có phải người đặt không?)
     if (booking.userProfile.id !== userProfile.id) {
+      this.logger.warn(`User ${userProfile.id} unauthorized to review booking ${bookingId}.`);
       throw new BadRequestException('Bạn không có quyền đánh giá đơn này.');
     }
 
     // 3. Kiểm tra trạng thái đơn (Phải đá xong mới được review)
     if (booking.status !== BookingStatus.COMPLETED) {
+      this.logger.warn(`Booking ${bookingId} not in COMPLETED state for review.`);
       throw new BadRequestException(
         'Chỉ có thể đánh giá các đơn đặt sân đã hoàn thành.',
       );
@@ -69,6 +75,7 @@ export class ReviewService {
       where: { booking: { id: bookingId } },
     });
     if (existingReview) {
+      this.logger.warn(`Booking ${bookingId} already has a review.`);
       throw new BadRequestException('Bạn đã đánh giá đơn này trước đó.');
     }
 
@@ -82,7 +89,9 @@ export class ReviewService {
       userProfile: userProfile, // Lấy userProfile từ người đang review
     });
 
-    return this.reviewRepository.save(newReview);
+    const savedReview = this.reviewRepository.save(newReview);
+    this.logger.log(`Review ${newReview.id} created successfully for booking ${bookingId}.`);
+    return savedReview;
   }
 
   /**
@@ -93,6 +102,7 @@ export class ReviewService {
    * @returns {Promise<object>} - Một đối tượng chứa danh sách đánh giá và thông tin meta (tổng số, trang, điểm trung bình...).
    */
   async findByField(fieldId: string, page: number = 1, limit: number = 10) {
+    this.logger.log(`Fetching reviews for field ${fieldId}, page ${page}, limit ${limit}.`);
     const skip = (page - 1) * limit;
 
     const [review, total] = await this.reviewRepository.findAndCount({
@@ -110,7 +120,7 @@ export class ReviewService {
     // Tính điểm trung bình (Optional - để hiển thị rating chung của sân)
     const averageRating =
       total > 0 ? review.reduce((sum, r) => sum + r.rating, 0) / total : 0;
-
+    this.logger.log(`Found ${total} reviews for field ${fieldId}, average rating: ${averageRating}.`);
     return {
       data: review.map((review) => ({
         id: review.id,
@@ -139,6 +149,7 @@ export class ReviewService {
    * - Manager: Chỉ lấy review thuộc chi nhánh mình quản lý.
    */
   async findAllReviews(page: number, limit: number, user: AuthenticatedUser) {
+    this.logger.log(`User ${user.id} fetching all reviews (management), page ${page}, limit ${limit}. Role: ${user.role}.`);
     const skip = (page - 1) * limit;
 
     const query = this.reviewRepository
@@ -153,11 +164,12 @@ export class ReviewService {
     // LOGIC PHÂN QUYỀN:
     // Nếu là Manager, thêm điều kiện lọc theo branch_id
     if (user.role === Role.Manager && user.branch_id) {
+      this.logger.debug(`Filtering reviews for manager ${user.id} by branch ${user.branch_id}.`);
       query.andWhere('branch.id = :branchId', { branchId: user.branch_id });
     }
 
     const [data, total] = await query.getManyAndCount();
-
+    this.logger.log(`Found ${total} reviews for management view.`);
     return {
       data,
       meta: {
@@ -174,6 +186,7 @@ export class ReviewService {
    * @description Xóa review. Kiểm tra quyền hạn kỹ càng.
    */
   async delete(id: string, user: AuthenticatedUser) {
+    this.logger.log(`User ${user.id} attempting to delete review ${id}. Role: ${user.role}.`);
     // 1. Tìm review kèm thông tin chi nhánh
     const review = await this.reviewRepository.findOne({
       where: { id },
@@ -186,29 +199,36 @@ export class ReviewService {
     });
 
     if (!review) {
+      this.logger.warn(`Review ${id} not found for deletion.`);
       throw new NotFoundException('Không tìm thấy đánh giá');
     }
 
     // 2. Logic kiểm tra quyền
     if (user.role === Role.Admin) {
+      this.logger.debug(`Admin ${user.id} deleting review ${id}.`);
       // Admin được quyền xóa tất cả -> Pass
     } else if (user.role === Role.Manager) {
       // Manager chỉ được xóa review của chi nhánh mình
       if (review.field.branch.id !== user.branch_id) {
+        this.logger.warn(`Manager ${user.id} unauthorized to delete review ${id} (different branch).`);
         throw new ForbiddenException(
           'Bạn không có quyền xóa đánh giá của chi nhánh khác.',
         );
       }
+      this.logger.debug(`Manager ${user.id} deleting review ${id} in own branch.`);
     } else {
       // User thường chỉ được xóa review của chính mình
       // (user.sub hoặc user.id tùy vào JWT payload bạn cấu hình, thường là user.id khớp với account id)
       if (review.userProfile.account.id !== user.id) {
+        this.logger.warn(`User ${user.id} unauthorized to delete review ${id} (not owner).`);
         throw new ForbiddenException('Bạn không có quyền xóa đánh giá này.');
       }
+      this.logger.debug(`User ${user.id} deleting own review ${id}.`);
     }
 
     // 3. Xóa
     await this.reviewRepository.delete(id);
+    this.logger.log(`Review ${id} deleted successfully.`);
     return { message: 'Xóa đánh giá thành công.' };
   }
 }

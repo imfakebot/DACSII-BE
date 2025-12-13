@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Logger } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PricingService } from './pricing.service';
 import { CheckPriceResponseDto } from './dto/check-price-response.dto';
@@ -11,6 +11,7 @@ import { CheckPriceDto } from './dto/check-price.dto';
 @ApiTags('Pricing(Tính giá)')
 @Controller('pricing')
 export class PricingController {
+  private readonly logger = new Logger(PricingController.name);
   /**
    * @constructor
    * @param {PricingService} pricingService - Service xử lý logic tính giá.
@@ -28,6 +29,7 @@ export class PricingController {
     type: CheckPriceResponseDto,
   })
   checkPrice(@Body() checkPriceDto: CheckPriceDto) {
+    this.logger.log(`Checking price and availability for DTO: ${JSON.stringify(checkPriceDto)}`);
     return this.pricingService.checkPriceAndAvailability(checkPriceDto);
   }
 }

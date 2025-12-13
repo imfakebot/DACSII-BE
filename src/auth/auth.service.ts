@@ -20,12 +20,9 @@ import { AccountStatus } from '@/user/enum/account-status.enum';
 import { AuthProvider } from '@/user/enum/auth-provider.enum';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
 import { Gender } from '@/user/enum/gender.enum';
+import { JwtPayload } from './interface/jwtpayload.interface';
 
-interface JwtPayload {
-  email: string;
-  sub: string;
-  role: string;
-}
+
 
 /**
  * @class AuthService
@@ -48,7 +45,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @method initiateRegistration
@@ -287,10 +284,10 @@ export class AuthService {
         role: roleName,
         is_profile_complete:
           user.userProfile &&
-          typeof user.userProfile === 'object' &&
-          'is_profile_complete' in user.userProfile
+            typeof user.userProfile === 'object' &&
+            'is_profile_complete' in user.userProfile
             ? ((user.userProfile as { is_profile_complete?: boolean })
-                .is_profile_complete ?? false)
+              .is_profile_complete ?? false)
             : false,
         branch_id: bracnhId,
       },

@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { UtilityService } from './utility.service';
 import { CreateUtilityDto } from './dto/create-utility.dto';
@@ -34,6 +35,7 @@ import { Utility } from '@/utility/entities/utility.entity';
 @ApiTags('Utilities (Tiện ích & Sản phẩm)')
 @Controller('utilities')
 export class UtilityController {
+  private readonly logger = new Logger(UtilityController.name);
   constructor(private readonly utilityService: UtilityService) {}
 
   /**
@@ -53,6 +55,7 @@ export class UtilityController {
     type: Utility,
   })
   create(@Body() createUtilityDto: CreateUtilityDto) {
+    this.logger.log(`Creating utility with DTO: ${JSON.stringify(createUtilityDto)}`);
     return this.utilityService.create(createUtilityDto);
   }
 
@@ -69,6 +72,7 @@ export class UtilityController {
     type: [Utility],
   })
   findAll() {
+    this.logger.log('Fetching all utilities.');
     return this.utilityService.findAll();
   }
 
@@ -87,6 +91,7 @@ export class UtilityController {
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tiện ích.' })
   findOne(@Param('id', ParseIntPipe) id: number) {
+    this.logger.log(`Fetching utility with ID: ${id}`);
     return this.utilityService.findOne(id);
   }
 
@@ -111,6 +116,7 @@ export class UtilityController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUtilityDto: UpdateUtilityDto,
   ) {
+    this.logger.log(`Updating utility ${id} with DTO: ${JSON.stringify(updateUtilityDto)}`);
     return this.utilityService.update(id, updateUtilityDto);
   }
 
@@ -128,6 +134,7 @@ export class UtilityController {
   @ApiOperation({ summary: '(Admin) Xoá một tiện ích' })
   @ApiResponse({ status: 200, description: 'Xoá thành công.' })
   remove(@Param('id', ParseIntPipe) id: number) {
+    this.logger.log(`Deleting utility with ID: ${id}`);
     return this.utilityService.remove(id);
   }
 }

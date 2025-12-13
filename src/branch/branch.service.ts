@@ -18,10 +18,24 @@ import { Role as RoleEnum } from '@/auth/enums/role.enum';
 import { Account } from '@/user/entities/account.entity';
 import { IsNull } from 'typeorm';
 
+/**
+ * @class BranchService
+ * @description Service to handle business logic for branches.
+ */
 @Injectable()
 export class BranchService {
   private readonly logger = new Logger(BranchService.name);
 
+  /**
+   * @constructor
+   * @param {Repository<Branch>} branchRepository - Repository for the Branch entity.
+   * @param {Repository<Address>} addressRepository - Repository for the Address entity.
+   * @param {Repository<City>} cityRepository - Repository for the City entity.
+   * @param {Repository<Ward>} wardRepository - Repository for the Ward entity.
+   * @param {Repository<UserProfile>} userProfileRepository - Repository for the UserProfile entity.
+   * @param {GeocodingService} geocodingService - Service for geocoding addresses.
+   * @param {DataSource} dataSource - The data source for managing transactions.
+   */
   constructor(
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
@@ -37,6 +51,13 @@ export class BranchService {
     private readonly dataSource: DataSource,
   ) {}
 
+  /**
+   * @method create
+   * @description Creates a new branch with its address and optionally assigns a manager.
+   * @param {CreateBranchDto} createBranchDto - The data to create the branch.
+   * @param {Account} creator - The account of the user creating the branch.
+   * @returns {Promise<Branch>} The newly created branch.
+   */
   async create(
     createBranchDto: CreateBranchDto,
     creator: Account,
@@ -153,6 +174,11 @@ export class BranchService {
     }
   }
 
+  /**
+   * @method findAll
+   * @description Retrieves all branches with their address and manager information.
+   * @returns {Promise<Branch[]>} A list of all branches.
+   */
   async findAll(): Promise<Branch[]> {
     return this.branchRepository.find({
       relations: ['address', 'address.ward', 'address.city', 'manager'],
@@ -160,7 +186,8 @@ export class BranchService {
   }
 
   /**
-   * Finds user profiles with the 'Manager' role who are not yet assigned to any branch.
+   * @method findAvailableManagers
+   * @description Finds user profiles with the 'Manager' role who are not yet assigned to any branch.
    * @returns {Promise<UserProfile[]>} A list of available managers.
    */
   async findAvailableManagers(): Promise<UserProfile[]> {
@@ -177,6 +204,13 @@ export class BranchService {
     });
   }
 
+  /**
+   * @method findOne
+   * @description Finds a single branch by its ID, including related entities.
+   * @param {string} id - The ID of the branch to find.
+   * @returns {Promise<Branch>} The found branch.
+   * @throws {NotFoundException} If the branch with the given ID is not found.
+   */
   async findOne(id: string): Promise<Branch> {
     const branch = await this.branchRepository.findOne({
       where: { id },
@@ -195,6 +229,13 @@ export class BranchService {
     return branch;
   }
 
+  /**
+   * @method update
+   * @description Updates a branch's information.
+   * @param {string} id - The ID of the branch to update.
+   * @param {UpdateBranchDto} updateBranchDto - The data to update the branch with.
+   * @returns {Promise<Branch>} The updated branch.
+   */
   async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
     // For simplicity, this update will not handle changing the address or manager for now.
     // That would require a more complex transaction.
@@ -220,6 +261,13 @@ export class BranchService {
     return this.findOne(id);
   }
 
+  /**
+   * @method remove
+   * @description Deletes a branch by its ID.
+   * @param {string} id - The ID of the branch to delete.
+   * @returns {Promise<{ message: string }>} A confirmation message.
+   * @throws {NotFoundException} If the branch with the given ID is not found.
+   */
   async remove(id: string): Promise<{ message: string }> {
     const result = await this.branchRepository.delete(id);
     if (result.affected === 0) {

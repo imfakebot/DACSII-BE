@@ -11,6 +11,7 @@ import {
   BadRequestException,
   UseGuards,
   HttpCode,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { BookingService } from '@/booking/booking.service';
@@ -44,6 +45,7 @@ import { VnpayReturnDto } from './dto/vnpay-return.dto';
 @ApiTags('Payment (Thanh toán & Thống kê)')
 @Controller('payment')
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
   /**
    * @constructor
    * @param {PaymentService} paymentService - Service xử lý logic thanh toán.
@@ -90,13 +92,16 @@ export class PaymentController {
     @Body('bookingId') bookingId: string,
     @Req() req: Request,
   ) {
+    this.logger.log(`Received request to create VNPAY URL for booking ID: ${bookingId}`);
     // 1. Tìm đơn hàng để lấy số tiền CHÍNH XÁC trong DB
     const booking = await this.bookingService.findOne(bookingId);
     if (!booking) {
+      this.logger.warn(`Booking ${bookingId} not found.`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
     if (booking.status === BookingStatus.COMPLETED) {
+      this.logger.warn(`Booking ${bookingId} is already completed, cannot create new payment URL.`);
       throw new BadRequestException(
         'Đơn đặt sân đã được xác nhận hoặc hoàn thành.',
       );
@@ -105,6 +110,7 @@ export class PaymentController {
     // 2. Lấy số tiền CHUẨN từ bảng Payment (đã trừ Voucher)
     const payment = await this.paymentService.findByBookingId(bookingId);
     if (!payment) {
+      this.logger.warn(`Payment info not found for booking ${bookingId}.`);
       throw new NotFoundException(
         'Không tìm thấy thông tin thanh toán cho đơn đặt sân.',
       );
@@ -117,6 +123,7 @@ export class PaymentController {
       ipAddr = ipAddr[0];
     }
     const ip = ipAddr ? ipAddr.toString() : '127.0.0.1';
+    this.logger.debug(`Client IP for booking ${bookingId}: ${ip}`);
 
     // 4. Tạo URL
     const url = this.paymentService.createVnPayUrl(
@@ -124,7 +131,7 @@ export class PaymentController {
       booking.id,
       ip,
     );
-
+    this.logger.log(`VNPAY URL created for booking ${bookingId}`);
     return { url };
   }
 
@@ -149,6 +156,7 @@ export class PaymentController {
     @Query() query: VnpayReturnDto,
     @Res({ passthrough: true }) res: Response,
   ) {
+    this.logger.log(`Received VNPAY return callback with query: ${JSON.stringify(query)}`);
     // Gọi service để kiểm tra chữ ký (secure hash) và trạng thái giao dịch
     const result = this.paymentService.verifyReturnUrl(
       query as unknown as Record<string, any>,
@@ -156,12 +164,14 @@ export class PaymentController {
 
     // Xử lý kết quả
     if (result.isSuccess) {
+      this.logger.log(`VNPAY return successful for booking ${query.vnp_TxnRef}`);
       res.status(HttpStatus.OK);
       return {
         message: 'Thanh toán thành công',
         data: result,
       };
     } else {
+      this.logger.warn(`VNPAY return failed for booking ${query.vnp_TxnRef}. Error: ${result.message}`);
       res.status(HttpStatus.BAD_REQUEST);
       return {
         message: 'Thanh toán thất bại',
@@ -188,6 +198,7 @@ export class PaymentController {
   vnpayIpn(
     @Query() query: VnpayIpnDto,
   ): Promise<{ RspCode: string; Message: string }> {
+    this.logger.log(`Received VNPAY IPN callback with query: ${JSON.stringify(query)}`);
     return this.paymentService.handleIpn(query);
   }
 
@@ -238,12 +249,15 @@ export class PaymentController {
     @Query('endDate') endDate?: string,
     @Query('branchId') branchId?: string,
   ) {
+    this.logger.log(`Fetching admin stats for user ${user.id} with role ${user.role}. StartDate: ${startDate}, EndDate: ${endDate}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
     // Nếu là Manager, chỉ được xem chi nhánh của mình và không được dùng filter branchId
     if (user.role === Role.Manager) {
+      this.logger.debug(`User is manager, filtering by own branchId: ${userBranchId}`);
       return this.paymentService.getStats(startDate, endDate, userBranchId);
     }
     // Admin có thể xem tất cả hoặc lọc theo chi nhánh
+    this.logger.debug(`User is admin, filtering by branchId: ${branchId}`);
     return this.paymentService.getStats(startDate, endDate, branchId);
   }
 
@@ -280,8 +294,10 @@ export class PaymentController {
     @Query('year') year: number = new Date().getFullYear(),
     @Query('branchId') branchId?: string,
   ) {
+    this.logger.log(`Fetching revenue chart for user ${user.id} with role ${user.role}. Year: ${year}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
     const targetBranchId = user.role === Role.Manager ? userBranchId : branchId;
+    this.logger.debug(`Target branchId for chart: ${targetBranchId}`);
     return this.paymentService.getRevenueChart(year, targetBranchId);
   }
 }

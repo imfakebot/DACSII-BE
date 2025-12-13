@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -21,6 +22,7 @@ import { Branch } from '@/branch/entities/branch.entity';
  */
 @Injectable()
 export class PricingService {
+  private readonly logger = new Logger(PricingService.name);
   constructor(
     /**
      * @constructor
@@ -53,12 +55,14 @@ export class PricingService {
    * @throws {ConflictException} Nếu khung giờ đã được người khác đặt.
    */
   async checkPriceAndAvailability(dto: CheckPriceDto) {
+    this.logger.log(`Checking price and availability for field ${dto.fieldId} at ${dto.startTime} for ${dto.durationMinutes} minutes.`);
     const { fieldId, startTime, durationMinutes } = dto;
 
     // 1. Tính toán thời gian Bắt đầu và Kết thúc
     const start = new Date(startTime);
     // Kiểm tra ngày quá khứ
     if (start < new Date()) {
+      this.logger.warn(`Attempt to book in the past for field ${fieldId}.`);
       throw new BadRequestException('Không thể đặt sân trong quá khứ.');
     }
 
@@ -71,9 +75,11 @@ export class PricingService {
     });
 
     if (!field) {
+      this.logger.warn(`Field with ID ${fieldId} not found.`);
       throw new NotFoundException(`Sân bóng với ID ${fieldId} không tồn tại.`);
     }
     if (!field.status) {
+      this.logger.warn(`Field ${fieldId} is not active.`);
       throw new BadRequestException('Sân bóng này đang tạm ngưng hoạt động.');
     }
 
@@ -94,6 +100,7 @@ export class PricingService {
       .getOne();
 
     if (conflictingBooking) {
+      this.logger.warn(`Conflicting booking found for field ${fieldId} between ${start} and ${end}.`);
       throw new ConflictException(
         `Khung giờ bạn chọn (${start.toLocaleTimeString('vi-VN')} - ${end.toLocaleTimeString('vi-VN')}) đã bị trùng với một lịch đặt khác.`,
       );
@@ -124,7 +131,7 @@ export class PricingService {
 
     // Làm tròn tiền (ví dụ làm tròn đến hàng nghìn)
     const roundedPrice = Math.ceil(finalPrice / 1000) * 1000;
-
+    this.logger.log(`Price calculated for field ${fieldId}: ${roundedPrice} VND.`);
     return {
       available: true,
       field_name: field.name,
@@ -150,6 +157,7 @@ export class PricingService {
   }
 
   private validateOperatingHour(start: Date, end: Date, branch: Branch) {
+    this.logger.debug(`Validating operating hours for branch ${branch.id}. Start: ${start}, End: ${end}.`);
     // 1. Parse giờ mở/đóng cửa của Branch (Lưu dạng '05:00:00')
     const [openH, openM] = branch.open_time.split(':').map(Number);
     const [closeH, closeM] = branch.close_time.split(':').map(Number);
@@ -166,12 +174,14 @@ export class PricingService {
 
     // 2. Logic kiểm tra
     if (requestStartMinutes < branchOpenMinutes) {
+      this.logger.warn(`Booking outside of operating hours: branch ${branch.id} opens at ${branch.open_time}.`);
       throw new BadRequestException(
         `Chi nhánh này chỉ mở cửa từ ${branch.open_time}.`,
       );
     }
 
     if (requestEndMinutes > branchCloseMinutes) {
+      this.logger.warn(`Booking outside of operating hours: branch ${branch.id} closes at ${branch.close_time}.`);
       throw new BadRequestException(
         `Chi nhánh này đóng cửa lúc ${branch.close_time}. Vui lòng chọn giờ kết thúc sớm hơn.`,
       );
