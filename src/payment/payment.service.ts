@@ -67,8 +67,13 @@ export class PaymentService {
       throw new Error('VNPAY configuration is missing');
     }
 
+    // --- FIX: Xử lý ngày giờ chuẩn GMT+7 ---
     const date = new Date();
-    const createDate = moment(date).format('YYYYMMDDHHmmss');
+    // 1. Tạo createDate: Lấy giờ hiện tại, ép về UTC+7, format chuẩn VNPAY
+    const createDate = moment(date).utcOffset(7).format('YYYYMMDDHHmmss');
+    // 2. Tạo expireDate: Cộng thêm 15 phút, ép về UTC+7
+    const expireDate = moment(date).utcOffset(7).add(15, 'minutes').format('YYYYMMDDHHmmss');
+
     const orderIdStr = orderId.toString();
 
     let vnp_Params: Record<string, any> = {
@@ -85,6 +90,7 @@ export class PaymentService {
       vnp_IpnURL: ipnUrl,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: createDate,
+      vnp_ExpireDate: expireDate,
     };
 
     vnp_Params = this.sortObject(vnp_Params);
@@ -350,7 +356,10 @@ export class PaymentService {
 
       return { RspCode: '00', Message: 'Xác nhận thành công' };
     } catch (error) {
-      this.logger.error(`Lỗi xử lí IPN Booking ${bookingId}`, error);
+      this.logger.error(
+        `[VNPAY IPN ERROR] Lỗi xử lí cho Booking ID ${bookingId}:`,
+        error instanceof Error ? error.stack : JSON.stringify(error),
+      );
       return { RspCode: '99', Message: 'Lỗi không xác định' };
     }
   }
