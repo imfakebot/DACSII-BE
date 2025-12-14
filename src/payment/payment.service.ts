@@ -67,41 +67,54 @@ export class PaymentService {
       throw new Error('VNPAY configuration is missing');
     }
 
-    // --- FIX: Xử lý ngày giờ chuẩn GMT+7 ---
+    // 1. Config thời gian (GMT+7)
     const date = new Date();
-    // 1. Tạo createDate: Lấy giờ hiện tại, ép về UTC+7, format chuẩn VNPAY
     const createDate = moment(date).utcOffset(7).format('YYYYMMDDHHmmss');
-    // 2. Tạo expireDate: Cộng thêm 15 phút, ép về UTC+7
     const expireDate = moment(date).utcOffset(7).add(15, 'minutes').format('YYYYMMDDHHmmss');
 
-    const orderIdStr = orderId.toString();
+    // 2. Xử lý IP (Tránh localhost 127.0.0.1)
+    const realIp = (ipAddr === '127.0.0.1' || ipAddr === '::1') ? '113.160.2.11' : ipAddr;
 
-    let vnp_Params: Record<string, any> = {
+    // 3. Chuẩn bị tham số
+    const vnp_Params: Record<string, string | number> = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
       vnp_TmnCode: tmnCode,
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
-      vnp_TxnRef: orderIdStr,
-      vnp_OrderInfo: `Thanh toan don hang ${orderIdStr}`,
+      vnp_TxnRef: orderId, // Có thể dùng orderId.replace(/-/g, '') nếu muốn bỏ dấu gạch ngang
+      vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
       vnp_OrderType: 'other',
-      vnp_Amount: amount * 100, // VNPAY yêu cầu số tiền nhân 100
+      vnp_Amount: amount * 100,
       vnp_ReturnUrl: returnUrl,
       vnp_IpnURL: ipnUrl,
-      vnp_IpAddr: ipAddr,
+      vnp_IpAddr: realIp, // Dùng IP thực hoặc IP giả lập hợp lệ
       vnp_CreateDate: createDate,
       vnp_ExpireDate: expireDate,
     };
 
-    vnp_Params = this.sortObject(vnp_Params);
+    // 4. Sắp xếp tham số (Chỉ sắp xếp Key, GIỮ NGUYÊN Value thô)
+    const sortedKeys = Object.keys(vnp_Params).sort();
 
-    const signData = qs.stringify(vnp_Params, { encode: false });
+    // 5. Tạo chuỗi Hash (Dữ liệu THÔ - RAW DATA)
+    //[cite_start]// Tài liệu Java/PHP/C# đều dùng dữ liệu thô để hash [cite: 1182-1187, 1259-1261]
+    const signData = sortedKeys.map(key => {
+      return `${key}=${vnp_Params[key]}`; // Không encode ở đây!
+    }).join('&');
+
+    // 6. Tạo chữ ký (HMAC SHA512)
     const hmac = crypto.createHmac('sha512', secretKey);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    vnp_Params['vnp_SecureHash'] = signed;
+    // 7. Tạo URL cuối cùng (Dữ liệu ENCODED)
+    // Lúc này mới encode để trình duyệt hiểu
+    const queryUrl = sortedKeys.map(key => {
+      const value = vnp_Params[key];
+      const encodedValue = encodeURIComponent(String(value)).replace(/%20/g, "+");
+      return `${key}=${encodedValue}`;
+    }).join('&');
 
-    return `${url}?${qs.stringify(vnp_Params, { encode: false })}`;
+    return `${url}?${queryUrl}&vnp_SecureHash=${signed}`;
   }
 
   /**
@@ -470,21 +483,22 @@ export class PaymentService {
   /**
    * @private
    * @method sortObject
-   * @description Sắp xếp các thuộc tính của một object theo thứ tự alphabet.
-   * @param {object} obj - Object cần sắp xếp.
-   * @returns {object} - Object đã được sắp xếp.
+   * @description Sắp xếp các key của object theo thứ tự alphabet (a-z).
+   * QUAN TRỌNG: Hàm này chỉ sắp xếp và chuyển về string, KHÔNG encode URL.
+   * Dữ liệu trả về sẽ dùng để tạo chuỗi Hash (Raw data).
    */
-  private sortObject(
-    obj: Record<string, string | number | undefined | null>,
-  ): Record<string, string> {
-    const sorted: Record<string, any> = {};
-    const keys = Object.keys(obj).sort();
+  private sortObject(obj: Record<string, any>): Record<string, string> {
+    const sorted: Record<string, string> = {};
+    const keys = Object.keys(obj).sort(); // 1. Sắp xếp key a-z
+
     keys.forEach((key) => {
-      const value = obj[key];
-      const valueString =
-        value === null || value === undefined ? '' : String(value);
-      sorted[key] = encodeURIComponent(valueString).replace(/%20/g, '+');
+      // 2. Chỉ lấy các tham số có giá trị thực (không null, undefined hoặc rỗng)
+      // Tài liệu Java mẫu (trang 37) có check: if (fieldValue != null && fieldValue.length > 0) [cite: 1183]
+      if (obj[key] !== null && obj[key] !== undefined && obj[key] !== '') {
+        sorted[key] = String(obj[key]); // 3. Chỉ convert sang string, KHÔNG encodeURIComponent tại đây
+      }
     });
+
     return sorted;
   }
 
