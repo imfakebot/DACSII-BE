@@ -61,60 +61,55 @@ export class PaymentService {
    * @throws {Error} Nếu thiếu cấu hình VNPAY.
    */
   createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
-    const { tmnCode, secretKey, url, returnUrl, ipnUrl } = this.vnpayConfiguration;
+    const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
+    if (!secretKey) throw new Error('VNPAY Secret Key is missing');
 
-    if (!secretKey || !url || !tmnCode || !returnUrl || !ipnUrl) {
-      throw new Error('VNPAY configuration is missing');
-    }
-
-    // 1. Config thời gian (GMT+7)
-    const date = new Date();
-    const createDate = moment(date).utcOffset(7).format('YYYYMMDDHHmmss');
-    const expireDate = moment(date).utcOffset(7).add(15, 'minutes').format('YYYYMMDDHHmmss');
-
-    // 2. Xử lý IP (Tránh localhost 127.0.0.1)
-    const realIp = (ipAddr === '127.0.0.1' || ipAddr === '::1') ? '113.160.2.11' : ipAddr;
-
-    // 3. Chuẩn bị tham số
+    // 1. Config Params
     const vnp_Params: Record<string, string | number> = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
-      vnp_TmnCode: tmnCode,
+      vnp_TmnCode: tmnCode ?? '',
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
-      vnp_TxnRef: orderId, // Có thể dùng orderId.replace(/-/g, '') nếu muốn bỏ dấu gạch ngang
+      vnp_TxnRef: orderId.replace(/-/g, ''), // Đảm bảo mã này là duy nhất cho mỗi lần thanh toán
       vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
       vnp_OrderType: 'other',
-      vnp_Amount: amount * 100,
-      vnp_ReturnUrl: returnUrl,
-      vnp_IpnURL: ipnUrl,
-      vnp_IpAddr: realIp, // Dùng IP thực hoặc IP giả lập hợp lệ
-      vnp_CreateDate: createDate,
-      vnp_ExpireDate: expireDate,
+      vnp_Amount: Math.floor(amount * 100),
+      vnp_ReturnUrl: returnUrl ?? '',
+      vnp_IpAddr: ipAddr || '127.0.0.1', // Nên dùng IP thực của client
+      vnp_CreateDate: moment(new Date()).format('YYYYMMDDHHmmss'),
     };
 
-    // 4. Sắp xếp tham số (Chỉ sắp xếp Key, GIỮ NGUYÊN Value thô)
+    // 2. Sắp xếp tham số (Manual Sort A-Z)
+    // Bước này quan trọng để đảm bảo thứ tự
     const sortedKeys = Object.keys(vnp_Params).sort();
+    const sortedParams: Record<string, string | number> = {};
+    sortedKeys.forEach(key => {
+      sortedParams[key] = vnp_Params[key];
+    });
 
-    // 5. Tạo chuỗi Hash (Dữ liệu THÔ - RAW DATA)
-    //[cite_start]// Tài liệu Java/PHP/C# đều dùng dữ liệu thô để hash [cite: 1182-1187, 1259-1261]
-    const signData = sortedKeys.map(key => {
-      return `${key}=${vnp_Params[key]}`; // Không encode ở đây!
-    }).join('&');
+    // 3. Ký (FIX: Dùng qs.stringify để encode giá trị ngay tại bước này)
+    // encode: true là mặc định, nhưng viết rõ ra để dễ kiểm soát
+    const signData = qs.stringify(sortedParams, { encode: true });
 
-    // 6. Tạo chữ ký (HMAC SHA512)
+    this.logger.debug(`🔑 Key đang dùng: ${secretKey?.substring(0, 5)}...`);
+    this.logger.debug(`📝 Chuỗi mang đi ký (Encoded): ${signData}`);
+
+    // 4. Hash (HMAC SHA512)
     const hmac = crypto.createHmac('sha512', secretKey);
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    // 7. Tạo URL cuối cùng (Dữ liệu ENCODED)
-    // Lúc này mới encode để trình duyệt hiểu
-    const queryUrl = sortedKeys.map(key => {
-      const value = vnp_Params[key];
-      const encodedValue = encodeURIComponent(String(value)).replace(/%20/g, "+");
-      return `${key}=${encodedValue}`;
-    }).join('&');
+    // 5. Tạo URL
+    // Thêm mã hash vào params
+    sortedParams['vnp_SecureHash'] = signed;
 
-    return `${url}?${queryUrl}&vnp_SecureHash=${signed}`;
+    // Tạo URL cuối cùng (Lưu ý: không cần sort lại vì sortedParams đã sort rồi, nhưng qs stringify có thể đổi thứ tự nếu không cẩn thận, tuy nhiên URL param order không ảnh hưởng việc nhận diện hash của VNPay, chỉ ảnh hưởng lúc ký thôi)
+    const finalUrl = url + '?' + qs.stringify(sortedParams, { encode: true });
+
+    this.logger.debug(`🚀 Final URL: ${finalUrl}`);
+
+    return finalUrl;
+
   }
 
   /**
