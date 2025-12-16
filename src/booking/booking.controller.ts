@@ -37,6 +37,7 @@ import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { CheckInDto } from './dto/check-in.dto';
 import { Booking } from './entities/booking.entity';
 
+
 /**
  * @controller BookingController
  * @description Xử lý các yêu cầu HTTP liên quan đến việc đặt sân.
@@ -55,7 +56,7 @@ export class BookingController {
   constructor(
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /bookings
@@ -108,6 +109,21 @@ export class BookingController {
       `User ${accountId} creating booking for field ${createBookingDto.fieldId}`,
     );
 
+    // 1. Xử lý IP Address (Fix lỗi VNPAY)
+    // Nếu app chạy sau Nginx/Cloudflare, IP nằm trong header 'x-forwarded-for'
+    const forwarded = req.headers['x-forwarded-for'];
+    let ip = forwarded
+      ? (typeof forwarded === 'string' ? forwarded : forwarded[0])
+      : req.socket.remoteAddress;
+
+    // Xử lý trường hợp IP có nhiều lớp (ví dụ: client, proxy1, proxy2) -> lấy cái đầu
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+
+    // Nếu không lấy được hoặc là IPv6 loopback (::1), gán mặc định localhost IPv4
+    const clientIp = (ip && ip !== '::1') ? ip : '127.0.0.1';
+
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
 
@@ -118,7 +134,7 @@ export class BookingController {
       );
     }
 
-    return this.bookingService.createBooking(createBookingDto, userProfile);
+    return this.bookingService.createBooking(createBookingDto, userProfile, clientIp);
   }
 
   /**
