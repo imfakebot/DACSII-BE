@@ -65,17 +65,18 @@ export class PaymentService {
     if (!secretKey) throw new Error('VNPAY Secret Key is missing');
 
     // 1. Config Params
-    const vnp_Params: Record<string, string | number> = {
+    const vnp_Params: Record<string, number | string | undefined> = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
-      vnp_TmnCode: tmnCode ?? '',
+      vnp_TmnCode: tmnCode,
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
       vnp_TxnRef: orderId.replace(/-/g, ''), // Đảm bảo mã này là duy nhất cho mỗi lần thanh toán
-      vnp_OrderInfo: `Thanh toan don hang ${orderId}`,
+      vnp_OrderInfo: 'ThanhToanDonHangTest2',
       vnp_OrderType: 'other',
       vnp_Amount: Math.floor(amount * 100),
-      vnp_ReturnUrl: returnUrl ?? '',
+      vnp_ReturnUrl: returnUrl,
+      // vnp_BankCode: 'NCB', // Trong môi trường thật nên để null để user chọn bank
       vnp_IpAddr: ipAddr || '127.0.0.1', // Nên dùng IP thực của client
       vnp_CreateDate: moment(new Date()).format('YYYYMMDDHHmmss'),
     };
@@ -83,7 +84,7 @@ export class PaymentService {
     // 2. Sắp xếp tham số (Manual Sort A-Z)
     // Bước này quan trọng để đảm bảo thứ tự
     const sortedKeys = Object.keys(vnp_Params).sort();
-    const sortedParams: Record<string, string | number> = {};
+    const sortedParams: Record<string, any> = {};
     sortedKeys.forEach(key => {
       sortedParams[key] = vnp_Params[key];
     });
@@ -96,7 +97,7 @@ export class PaymentService {
     this.logger.debug(`📝 Chuỗi mang đi ký (Encoded): ${signData}`);
 
     // 4. Hash (HMAC SHA512)
-    const hmac = crypto.createHmac('sha512', secretKey);
+    const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
     // 5. Tạo URL
@@ -109,7 +110,6 @@ export class PaymentService {
     this.logger.debug(`🚀 Final URL: ${finalUrl}`);
 
     return finalUrl;
-
   }
 
   /**
@@ -133,7 +133,7 @@ export class PaymentService {
       throw new Error('VNPAY configuration is missing');
     }
     const signData = qs.stringify(sortedParams, { encode: false });
-    const hmac = crypto.createHmac('sha512', secretKey);
+    const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
     const orderId = vnp_Params_Data['vnp_TxnRef'] as string;
@@ -196,7 +196,7 @@ export class PaymentService {
     }
 
     const signData = qs.stringify(sortedParams, { encode: false });
-    const hmac = crypto.createHmac('sha512', secretKey);
+    const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
     if (secureHash !== signed) {

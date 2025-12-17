@@ -52,7 +52,7 @@ export class AuthController {
      * @param {ConfigService} configService - Service để truy cập các biến môi trường.
      */
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /auth/register/initiate
@@ -160,7 +160,7 @@ export class AuthController {
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
       secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       path: '/',
     });
@@ -168,11 +168,28 @@ export class AuthController {
     // 2. Gửi access token và thông tin user về cho frontend qua postMessage
     const script = `
     <script>
-      window.opener.postMessage(${JSON.stringify({
-        accessToken: loginData.accessToken,
-        user: loginData.user,
-      })},'${frontendURL}');
-      window.close();
+      try {
+        const payload = ${JSON.stringify({
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    })};
+        const targetOrigin = new URL('${frontendURL}').origin;
+
+        if (window.opener) {
+          console.log('Auth Callback: Attempting to post message to target origin:', targetOrigin);
+          console.log('Auth Callback: Payload:', payload);
+          window.opener.postMessage(payload, targetOrigin);
+          setTimeout(() => {
+            window.close();
+          }, 1000);
+        } else {
+          console.error('Auth Callback Error: window.opener is not available. This happens if the login page was not opened as a popup. Cannot send token.');
+          document.body.innerHTML = "<h1>Login Error</h1><p>Could not communicate with the main application window. Please ensure this page is opened as a popup.</p>";
+        }
+      } catch (e) {
+        console.error('Auth Callback Script Error:', e);
+        document.body.innerHTML = '<h1>An unexpected error occurred</h1><p>Please check the console for details and verify your FRONTEND_URL configuration.</p><pre>' + e.toString() + '</pre>';
+      }
     </script>
     `;
 

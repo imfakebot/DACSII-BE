@@ -1,6 +1,6 @@
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, Profile, VerifyCallback } from 'passport-google-oauth20';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import googleOauthConfig from '../config/google-oauth.config';
 import { ConfigType } from '@nestjs/config';
 import { AuthProvider } from '@/user/enum/auth-provider.enum';
@@ -18,6 +18,7 @@ import { AuthService } from '../auth.service'; // Import AuthService
  */
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  private readonly logger = new Logger(GoogleStrategy.name);
   /**
    * @constructor
    * @param googleConfiguration - Cấu hình Google OAuth được inject từ `googleOauthConfig`.
@@ -28,22 +29,26 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private googleConfiguration: ConfigType<typeof googleOauthConfig>,
     private authService: AuthService,
   ) {
+    super({
+      clientID: googleConfiguration.clientID || '',
+      clientSecret: googleConfiguration.clientSecret || '',
+      callbackURL: googleConfiguration.callbackURL || '',
+      scope: ['email', 'profile'],
+    });
+    this.logger.log(
+      'Initializing GoogleStrategy with configuration:',
+      JSON.stringify(googleConfiguration),
+    );
     if (
       !googleConfiguration.clientID ||
       !googleConfiguration.clientSecret ||
       !googleConfiguration.callbackURL
     ) {
+      this.logger.error('Google OAuth configuration is missing required values!');
       throw new Error(
         'Google OAuth configuration is missing required values (clientID, clientSecret, callbackURL).',
       );
     }
-
-    super({
-      clientID: googleConfiguration.clientID,
-      clientSecret: googleConfiguration.clientSecret,
-      callbackURL: googleConfiguration.callbackURL,
-      scope: ['email', 'profile'],
-    });
   }
 
   /**
