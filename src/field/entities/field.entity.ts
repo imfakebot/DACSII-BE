@@ -1,4 +1,5 @@
 import {
+  BeforeInsert,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -11,6 +12,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { FieldType } from './field-types.entity';
 import { FieldImage } from './field-image.entity';
 import { Utility } from '../../utility/entities/utility.entity';
@@ -57,6 +59,11 @@ export class Field {
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamp', nullable: true })
   deletedAt!: Date | null;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) this.id = uuidv4();
+  }
 
   // --- CÁC QUAN HỆ ---
 

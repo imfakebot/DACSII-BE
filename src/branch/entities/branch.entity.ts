@@ -8,7 +8,9 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  BeforeInsert,
 } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Address } from '@/location/entities/address.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Field } from '@/field/entities/field.entity';
@@ -127,6 +129,11 @@ export class Branch {
   })
   @Column({ name: 'created_by_id', nullable: true })
   created_by_id!: string | null;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) this.id = uuidv4();
+  }
 
   // --- RELATIONS (QUAN HỆ) ---
 

@@ -36,16 +36,17 @@ async function bootstrap() {
         connectSrc: ["'self'"],
       },
     },
-  }),
-);
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        stopAtFirstError: true, // Nếu gặp 1 lỗi thì báo luôn, không cần check hết các trường khác
-      }),
-    )
+  }));
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      stopAtFirstError: true, // Nếu gặp 1 lỗi thì báo luôn, không cần check hết các trường khác
+    }),
+  );
+
 
   app.use(cookieParser());
 
