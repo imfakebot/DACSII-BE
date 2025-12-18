@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 /**
  * @class CheckInDto
@@ -7,14 +7,14 @@ import { IsNotEmpty, IsUUID } from 'class-validator';
  */
 export class CheckInDto {
   /**
-   * ID của đơn đặt sân cần check-in.
-   * @example 'a1b2c3d4-e5f6-7890-1234-567890abcdef'
+   * Mã đặt sân (VD: 241216-ABCD) hoặc ID (UUID) của đơn đặt sân cần check-in.
+   * @example '241216-ABCD'
    */
   @ApiProperty({
-    description: 'ID của đơn đặt sân cần check-in.',
-    format: 'uuid',
+    description: 'Mã đặt sân (VD: 241216-ABCD) hoặc ID (UUID) của đơn đặt sân cần check-in.',
+    example: '241216-ABCD',
   })
   @IsNotEmpty()
-  @IsUUID()
-  bookingId!: string;
+  @IsString()
+  identifier!: string;
 }

@@ -588,21 +588,24 @@ export class BookingService {
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    * @throws {BadRequestException} Nếu đơn không ở trạng thái `COMPLETED` hoặc đã được check-in.
    */
-  async checkInCustomer(bookingId: string): Promise<Booking> {
-    this.logger.log(`Checking in customer for booking ${bookingId}`);
+  async checkInCustomer(identifier: string): Promise<Booking> {
+    this.logger.log(`Checking in customer for booking with identifier ${identifier}`);
     const booking = await this.bookingRepository.findOne({
-      where: { id: bookingId },
+      where: [
+        { id: identifier }, // Searches by UUID
+        { code: identifier }, // Searches by code
+      ],
     });
 
     if (!booking) {
-      this.logger.warn(`Booking ${bookingId} not found for check-in`);
+      this.logger.warn(`Booking with identifier ${identifier} not found for check-in`);
       throw new NotFoundException(
-        `Không tìm thấy đơn đặt sân với mã: ${bookingId}`,
+        `Không tìm thấy đơn đặt sân với mã: ${identifier}`,
       );
     }
 
     if (booking.status === BookingStatus.CHECKED_IN) {
-      this.logger.warn(`Booking ${bookingId} is already checked in`);
+      this.logger.warn(`Booking ${booking.id} is already checked in`);
       throw new BadRequestException(
         'Đơn đặt sân này đã được check-in trước đó.',
       );
@@ -610,7 +613,7 @@ export class BookingService {
 
     if (booking.status !== BookingStatus.COMPLETED) {
       this.logger.warn(
-        `Booking ${bookingId} is not in COMPLETED state for check-in`,
+        `Booking ${booking.id} is not in COMPLETED state for check-in`,
       );
       throw new BadRequestException(
         `Không thể check-in cho đơn ở trạng thái "${booking.status}". Đơn phải được thanh toán thành công.`,
@@ -619,7 +622,7 @@ export class BookingService {
 
     booking.status = BookingStatus.CHECKED_IN;
     booking.check_in_at = new Date();
-    this.logger.log(`Booking ${bookingId} checked in successfully`);
+    this.logger.log(`Booking ${booking.id} checked in successfully`);
     return this.bookingRepository.save(booking);
   }
 

@@ -268,8 +268,8 @@ export class BookingController {
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
   checkIn(@Body() checkInDto: CheckInDto) {
-    this.logger.log(`Checking in booking ${checkInDto.bookingId}`);
-    return this.bookingService.checkInCustomer(checkInDto.bookingId);
+    this.logger.log(`Checking in booking with identifier ${checkInDto.identifier}`);
+    return this.bookingService.checkInCustomer(checkInDto.identifier);
   }
 
   /**

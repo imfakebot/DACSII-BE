@@ -20,15 +20,32 @@ async function bootstrap() {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.use(helmet());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      stopAtFirstError: true, // Nếu gặp 1 lỗi thì báo luôn, không cần check hết các trường khác
-    }),
-  );
+  app.use(helmet({
+    // 1. Tắt hẳn COOP: Để browser hoạt động như mặc định, 
+    // giúp giữ kết nối window.opener chắc chắn 100%.
+    crossOriginOpenerPolicy: false,
+
+    // 2. Cấu hình CSP: Cho phép script inline (unsafe-inline)
+    // Nếu không có dòng này, script postMessage sẽ bị chặn.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // QUAN TRỌNG: Cho phép script trả về chạy
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+      },
+    },
+  }),
+);
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+        stopAtFirstError: true, // Nếu gặp 1 lỗi thì báo luôn, không cần check hết các trường khác
+      }),
+    )
 
   app.use(cookieParser());
 
