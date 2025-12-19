@@ -71,7 +71,7 @@ export class PaymentService {
       vnp_TmnCode: tmnCode,
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
-      vnp_TxnRef: orderId.replace(/-/g, ''), // Đảm bảo mã này là duy nhất cho mỗi lần thanh toán
+      vnp_TxnRef: orderId, // Đảm bảo mã này là duy nhất cho mỗi lần thanh toán
       vnp_OrderInfo: 'ThanhToanDonHangTest2',
       vnp_OrderType: 'other',
       vnp_Amount: Math.floor(amount * 100),
@@ -203,7 +203,16 @@ export class PaymentService {
       return { RspCode: '97', Message: 'Chữ ký không hợp lệ' };
     }
 
-    const bookingId = String(vnp_Params['vnp_TxnRef'] ?? '');
+    let bookingId = String(vnp_Params['vnp_TxnRef'] ?? '');
+    if (bookingId.length === 32) {
+      bookingId = `${bookingId.substring(0, 8)}-${bookingId.substring(
+        8,
+        12,
+      )}-${bookingId.substring(12, 16)}-${bookingId.substring(
+        16,
+        20,
+      )}-${bookingId.substring(20)}`;
+    }
     const rspCode = String(vnp_Params['vnp_ResponseCode'] ?? '');
     const vnp_Amount = parseInt(String(vnp_Params['vnp_Amount'] ?? '0')) / 100;
 
