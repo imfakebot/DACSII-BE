@@ -138,8 +138,7 @@ export class PaymentController {
   /**
    * @route GET /payment/vnpay_return
    * @description Endpoint mà VNPAY chuyển hướng người dùng về sau khi hoàn tất thanh toán.
-   * Nhiệm vụ chính là xác thực chữ ký (checksum) và hiển thị kết quả giao dịch cho người dùng phía client.
-   * **Lưu ý quan trọng:** Endpoint này không dùng để cập nhật trạng thái đơn hàng vì không đáng tin cậy (client có thể không được chuyển hướng về).
+   * Xác thực chữ ký (checksum), hiển thị kết quả giao dịch cho người dùng và CẬP NHẬT trạng thái booking.
    */
   @Get('vnpay_return')
   @ApiOperation({ summary: '(VNPAY) Xử lý URL trả về cho phía Client' })
@@ -152,18 +151,28 @@ export class PaymentController {
     status: 400,
     description: 'Giao dịch thất bại hoặc chữ ký không hợp lệ.',
   })
-  vnpayReturn(
+  async vnpayReturn(
     @Query() query: VnpayReturnDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     this.logger.log(`Received VNPAY return callback with query: ${JSON.stringify(query)}`);
+    
     // Gọi service để kiểm tra chữ ký (secure hash) và trạng thái giao dịch
     const result = this.paymentService.verifyReturnUrl(
       query as unknown as Record<string, any>,
     );
 
-    // Xử lý kết quả
+    // Nếu verify thành công, cập nhật trạng thái booking và payment
     if (result.isSuccess) {
+      try {
+        // Gọi handleIpn để cập nhật database (tương tự logic IPN)
+        this.logger.log(`Payment verified successfully, updating booking status for ${query.vnp_TxnRef}`);
+        await this.paymentService.handleIpn(query as unknown as VnpayIpnDto);
+      } catch (updateError: any) {
+        this.logger.warn(`Failed to update booking status: ${updateError.message}`);
+        // Vẫn trả về success cho user vì thanh toán đã thành công, IPN sẽ xử lý sau
+      }
+      
       this.logger.log(`VNPAY return successful for booking ${query.vnp_TxnRef}`);
       res.status(HttpStatus.OK);
       return {
