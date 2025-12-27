@@ -138,25 +138,6 @@ export class BookingController {
   }
 
   /**
-   * @route GET /bookings/:id
-   * @description Lấy chi tiết một đơn đặt sân cụ thể.
-   * @param {string} id - ID của đơn đặt sân.
-   * @returns {Promise<Booking>} - Thông tin chi tiết đơn đặt sân.
-   */
-  @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy chi tiết đơn đặt sân' })
-  @ApiResponse({ status: 200, description: 'Tìm thấy đơn đặt sân.', type: BookingResponse })
-  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    this.logger.log(`Finding booking with id ${id}`);
-    const booking = await this.bookingService.findOne(id);
-    if (!booking) throw new NotFoundException('Không tìm thấy đơn đặt sân');
-    return booking;
-  }
-
-  /**
    * @route PATCH /bookings/:id/cancel
    * @description Hủy một yêu cầu đặt sân đã tồn tại.
    * - User: có thể hủy đơn của chính mình.
@@ -312,5 +293,24 @@ export class BookingController {
   ) {
     this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
     return this.bookingService.getFieldSchedule(fieldId, date);
+  }
+
+  /**
+   * @route GET /bookings/:id
+   * @description Lấy chi tiết một đơn đặt sân cụ thể.
+   * @param {string} id - ID của đơn đặt sân.
+   * @returns {Promise<Booking>} - Thông tin chi tiết đơn đặt sân.
+   */
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy chi tiết đơn đặt sân' })
+  @ApiResponse({ status: 200, description: 'Tìm thấy đơn đặt sân.', type: BookingResponse })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    this.logger.log(`Finding booking with id ${id}`);
+    const booking = await this.bookingService.findOne(id);
+    if (!booking) throw new NotFoundException('Không tìm thấy đơn đặt sân');
+    return booking;
   }
 }

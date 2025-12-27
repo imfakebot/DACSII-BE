@@ -337,7 +337,9 @@ export class FieldsService {
       }),
     );
 
-    const savedImages = await this.fieldImageRepository.save(images);
+    const savedImages = await Promise.all(
+      images.map((image) => this.fieldImageRepository.save(image)),
+    );
     this.logger.log(
       `Added ${savedImages.length} images to field ${fieldId} successfully`,
     );

@@ -176,6 +176,8 @@ export class BookingService {
         bookingDate: new Date(),
         userProfile: userProfile,
         field: { id: createBookingDto.fieldId } as Field,
+        customerName: userProfile.full_name,
+        customerPhone: userProfile.phone_number,
       });
 
       const savedBooking = await queryRunner.manager.save(Booking, newBooking);

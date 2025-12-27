@@ -111,16 +111,7 @@ export class FeedbackService {
       relations: ['responses', 'submitter', 'submitter.account'],
     });
 
-    // copy related account email onto submitter.email for clients
-    for (const f of feedbacks) {
-      try {
-        if (f.submitter && (f.submitter as any).account && (f.submitter as any).account.email) {
-          (f.submitter as any).email = (f.submitter as any).email || (f.submitter as any).account.email;
-        }
-      } catch (e) {
-        // ignore mapping errors
-      }
-    }
+    feedbacks.forEach((f) => this.mapFeedbackEmail(f));
 
     return feedbacks;
   }
@@ -137,13 +128,7 @@ export class FeedbackService {
       relations: ['submitter', 'submitter.account'], // Load thông tin người gửi + account
     });
 
-    for (const f of feedbacks) {
-      try {
-        if (f.submitter && (f.submitter as any).account && (f.submitter as any).account.email) {
-          (f.submitter as any).email = (f.submitter as any).email || (f.submitter as any).account.email;
-        }
-      } catch (e) {}
-    }
+    feedbacks.forEach((f) => this.mapFeedbackEmail(f));
 
     return feedbacks;
   }
@@ -168,14 +153,7 @@ export class FeedbackService {
       this.logger.error(`Feedback with id ${id} not found`);
       throw new NotFoundException('Không tìm thấy ticket feedback.');
     }
-    // expose submitter's account email on submitter.email so frontend can read it
-    try {
-      if (feedback.submitter && (feedback.submitter as any).account && (feedback.submitter as any).account.email) {
-        (feedback.submitter as any).email = (feedback.submitter as any).email || (feedback.submitter as any).account.email;
-      }
-    } catch (e) {
-      // ignore
-    }
+    this.mapFeedbackEmail(feedback);
 
     return feedback;
   }
@@ -243,5 +221,12 @@ export class FeedbackService {
     });
 
     return savedResponse;
+  }
+
+  private mapFeedbackEmail(feedback: Feedback) {
+    const submitter = feedback.submitter as UserProfile & { email?: string };
+    if (submitter?.account?.email) {
+      submitter.email = submitter.email ?? submitter.account.email;
+    }
   }
 }
