@@ -105,11 +105,24 @@ export class FeedbackService {
    */
   async findMyFeedbacks(account: Account): Promise<Feedback[]> {
     this.logger.log(`Finding feedbacks for user ${account.id}`);
-    return this.feedbackRepo.find({
+    const feedbacks = await this.feedbackRepo.find({
       where: { submitter: { account: { id: account.id } } },
       order: { created_at: 'DESC' },
-      relations: ['responses', 'submitter'],
+      relations: ['responses', 'submitter', 'submitter.account'],
     });
+
+    // copy related account email onto submitter.email for clients
+    for (const f of feedbacks) {
+      try {
+        if (f.submitter && (f.submitter as any).account && (f.submitter as any).account.email) {
+          (f.submitter as any).email = (f.submitter as any).email || (f.submitter as any).account.email;
+        }
+      } catch (e) {
+        // ignore mapping errors
+      }
+    }
+
+    return feedbacks;
   }
 
   /**
@@ -119,10 +132,20 @@ export class FeedbackService {
    */
   async findAll(): Promise<Feedback[]> {
     this.logger.log('Finding all feedbacks');
-    return this.feedbackRepo.find({
+    const feedbacks = await this.feedbackRepo.find({
       order: { created_at: 'DESC' },
-      relations: ['submitter'], // Load thông tin người gửi
+      relations: ['submitter', 'submitter.account'], // Load thông tin người gửi + account
     });
+
+    for (const f of feedbacks) {
+      try {
+        if (f.submitter && (f.submitter as any).account && (f.submitter as any).account.email) {
+          (f.submitter as any).email = (f.submitter as any).email || (f.submitter as any).account.email;
+        }
+      } catch (e) {}
+    }
+
+    return feedbacks;
   }
 
   /**
@@ -136,7 +159,7 @@ export class FeedbackService {
     this.logger.log(`Finding feedback with id ${id}`);
     const feedback = await this.feedbackRepo.findOne({
       where: { id },
-      relations: ['responses', 'responses.responder', 'submitter'],
+      relations: ['responses', 'responses.responder', 'submitter', 'submitter.account'],
       order: {
         responses: { created_at: 'ASC' },
       },
@@ -145,6 +168,15 @@ export class FeedbackService {
       this.logger.error(`Feedback with id ${id} not found`);
       throw new NotFoundException('Không tìm thấy ticket feedback.');
     }
+    // expose submitter's account email on submitter.email so frontend can read it
+    try {
+      if (feedback.submitter && (feedback.submitter as any).account && (feedback.submitter as any).account.email) {
+        (feedback.submitter as any).email = (feedback.submitter as any).email || (feedback.submitter as any).account.email;
+      }
+    } catch (e) {
+      // ignore
+    }
+
     return feedback;
   }
 
