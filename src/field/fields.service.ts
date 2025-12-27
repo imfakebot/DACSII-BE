@@ -37,7 +37,7 @@ export class FieldsService {
     @InjectRepository(Utility)
     private readonly utilityRepository: Repository<Utility>,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   async create(
     createFieldDto: CreateFieldDto,
@@ -233,7 +233,7 @@ export class FieldsService {
     if (!isAdmin && branchId && branchId !== field.branch.id) {
       throw new ForbiddenException('Quản lý không được phép thay đổi chi nhánh của sân.');
     }
-    
+
     this.fieldRepository.merge(field, fieldData);
 
     if (fieldTypeId) {
@@ -333,7 +333,7 @@ export class FieldsService {
     const images = files.map((file) =>
       this.fieldImageRepository.create({
         image_url: `${baseUrl}/uploads/${file.filename}`,
-        field: field,
+        field: { id: field.id } as Field,
       }),
     );
 
