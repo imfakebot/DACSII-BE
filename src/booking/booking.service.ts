@@ -420,12 +420,18 @@ export class BookingService {
    * @param {string} id - ID của đơn đặt sân.
    * @returns {Promise<Booking | null>} - Thực thể Booking hoặc null nếu không tìm thấy.
    */
-  findOne(id: string) {
+  async findOne(id: string) {
     this.logger.log(`Finding booking with id ${id}`);
-    return this.bookingRepository.findOne({
+    const booking = await this.bookingRepository.findOne({
       where: { id },
       relations: ['userProfile', 'userProfile.account', 'field'],
     });
+    
+    if (booking) {
+      this.logger.log(`[DEBUG findOne] Booking ${id} found with status: "${booking.status}" (type: ${typeof booking.status}, raw value: ${JSON.stringify(booking.status)})`);
+    }
+    
+    return booking;
   }
 
   /**
@@ -438,16 +444,20 @@ export class BookingService {
    */
   async updateStatus(bookingId: string, status: BookingStatus) {
     this.logger.log(`Updating booking ${bookingId} to status ${status}`);
-    const booking = await this.bookingRepository.findOne({
-      where: { id: bookingId },
-    });
-    if (!booking) {
+    
+    // Use query builder to ensure status is updated
+    const result = await this.bookingRepository
+      .createQueryBuilder()
+      .update(Booking)
+      .set({ status: status })
+      .where('id = :id', { id: bookingId })
+      .execute();
+    
+    if (result.affected === 0) {
       this.logger.error(`Booking with ID: ${bookingId} not found`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
-
-    booking.status = status;
-    await this.bookingRepository.save(booking);
+    
     this.logger.log(`Booking ${bookingId} status updated to ${status}`);
   }
 
@@ -715,8 +725,33 @@ export class BookingService {
 
     booking.status = BookingStatus.CHECKED_IN;
     booking.check_in_at = new Date();
+    this.logger.log(`[DEBUG] About to save booking ${booking.id} with status: ${booking.status}`);
+    
+    // Update using query builder to ensure status is saved
+    await this.bookingRepository
+      .createQueryBuilder()
+      .update(Booking)
+      .set({ 
+        status: BookingStatus.CHECKED_IN,
+        check_in_at: new Date()
+      })
+      .where('id = :id', { id: booking.id })
+      .execute();
+    
+    this.logger.log(`[DEBUG] Booking ${booking.id} updated via query builder`);
+    
+    // Reload booking to get fresh data
+    const savedBooking = await this.bookingRepository.findOne({
+      where: { id: booking.id }
+    });
+    
+    if (savedBooking) {
+      this.logger.log(`[DEBUG] Booking ${savedBooking.id} reloaded. Status after save: "${savedBooking.status}"`);
+    }
+    
     this.logger.log(`Booking ${booking.id} checked in successfully`);
-    return this.bookingRepository.save(booking);
+    
+    return savedBooking || booking;
   }
 
   /**

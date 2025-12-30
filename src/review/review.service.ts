@@ -56,17 +56,42 @@ export class ReviewService {
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
+    this.logger.log(`[DEBUG] Found booking ${bookingId} with status: "${booking.status}" (type: ${typeof booking.status})`);
+
     // 2. Kiểm tra quyền sở hữu (User này có phải người đặt không?)
     if (booking.userProfile.id !== userProfile.id) {
       this.logger.warn(`User ${userProfile.id} unauthorized to review booking ${bookingId}.`);
       throw new BadRequestException('Bạn không có quyền đánh giá đơn này.');
     }
 
-    // 3. Kiểm tra trạng thái đơn (Phải đá xong mới được review)
-    if (booking.status !== BookingStatus.COMPLETED) {
-      this.logger.warn(`Booking ${bookingId} not in COMPLETED state for review.`);
+    // 3. Kiểm tra trạng thái đơn (Phải đã check-in hoặc hoàn thành mới được review)
+    // Xử lý trường hợp status rỗng do bug database
+    let actualStatus = booking.status;
+    
+    // Nếu status rỗng nhưng có check_in_at, suy luận status là CHECKED_IN
+    if ((!actualStatus || (actualStatus as any) === '') && booking.check_in_at) {
+      actualStatus = BookingStatus.CHECKED_IN;
+      this.logger.log(`[DEBUG] Status empty but has check_in_at, inferring status as CHECKED_IN`);
+    }
+    
+    const allowedStatuses = [
+      BookingStatus.COMPLETED,
+      BookingStatus.CHECKED_IN,
+      BookingStatus.FINISHED
+    ];
+    
+    // Log để debug
+    this.logger.log(`[DEBUG] Booking ${bookingId} actual status: "${actualStatus}" (type: ${typeof actualStatus})`);
+    this.logger.log(`[DEBUG] Allowed statuses: ${JSON.stringify(allowedStatuses)}`);
+    this.logger.log(`[DEBUG] Status comparison: COMPLETED=${actualStatus === BookingStatus.COMPLETED}, CHECKED_IN=${actualStatus === BookingStatus.CHECKED_IN}, FINISHED=${actualStatus === BookingStatus.FINISHED}`);
+    
+    // So sánh với actualStatus thay vì booking.status
+    const isAllowed = allowedStatuses.includes(actualStatus as BookingStatus);
+    
+    if (!isAllowed) {
+      this.logger.warn(`Booking ${bookingId} status ${actualStatus} not allowed for review.`);
       throw new BadRequestException(
-        'Chỉ có thể đánh giá các đơn đặt sân đã hoàn thành.',
+        'Chỉ có thể đánh giá các đơn đặt sân đã check-in hoặc hoàn thành.',
       );
     }
 

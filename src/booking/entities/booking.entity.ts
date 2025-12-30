@@ -65,6 +65,7 @@ export class Booking {
 
   @ApiProperty({ enum: BookingStatus, example: BookingStatus.PENDING })
   @Column({
+    name: 'status',
     type: 'enum',
     enum: BookingStatus,
     default: BookingStatus.PENDING,
