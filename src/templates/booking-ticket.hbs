@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .ticket { border: 1px solid #000; padding: 20px; }
+        .header { text-align: center; font-size: 24px; font-weight: bold; }
+        .details { margin-top: 20px; }
+        .details p { margin: 5px 0; }
+        .qr-code { text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">Booking Ticket</div>
+        <div class="details">
+            <p><strong>Booking ID:</strong> {{booking.id}}</p>
+            <p><strong>Branch:</strong> {{booking.branch.name}}</p>
+            <p><strong>Field:</strong> {{booking.field.name}}</p>
+            <p><strong>Start Time:</strong> {{booking.startTime}}</p>
+            <p><strong>End Time:</strong> {{booking.endTime}}</p>
+            <p><strong>Customer:</strong> {{booking.user.fullName}}</p>
+        </div>
+        <div class="qr-code">
+            <img src="{{qrCodeUrl}}" alt="QR Code">
+        </div>
+    </div>
+</body>
+</html>

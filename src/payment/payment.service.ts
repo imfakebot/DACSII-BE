@@ -1,4 +1,10 @@
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import vnpayConfig from './config/vnpay.config';
 import * as crypto from 'crypto';
 import qs from 'qs';
@@ -16,6 +22,8 @@ import { NotificationService } from '@/notification/notification.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { EventGateway } from '@/event/event.gateway';
 import * as QRCode from 'qrcode';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * @class PaymentService
@@ -49,6 +57,7 @@ export class PaymentService {
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
+    private readonly httpService: HttpService,
   ) { }
 
   /**
@@ -183,6 +192,12 @@ export class PaymentService {
   async handleIpn(
     dto: VnpayIpnDto,
   ): Promise<{ RspCode: string; Message: string }> {
+    this.logger.log(
+      `[IPN_START] Received VNPAY IPN callback. Raw DTO: ${JSON.stringify(
+        dto,
+      )}`,
+    );
+
     const vnp_Params = { ...dto } as Record<string, string | undefined>;
     const secureHash = String(vnp_Params['vnp_SecureHash'] ?? '');
 
@@ -192,18 +207,33 @@ export class PaymentService {
     const sortedParams = this.sortObject(vnp_Params);
     const secretKey = this.vnpayConfiguration.secretKey;
     if (!secretKey) {
-      throw new Error('VNPAY configuration is missing');
+      this.logger.error('[IPN_ERROR] VNPAY secret key is missing');
+      return {
+        RspCode: '99',
+        Message: 'Internal server error: Missing secret key',
+      };
     }
 
     const signData = qs.stringify(sortedParams, { encode: false });
     const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    if (secureHash !== signed) {
+    const bookingIdFromVnp = String(vnp_Params['vnp_TxnRef'] ?? '');
+    const rspCode = String(vnp_Params['vnp_ResponseCode'] ?? '');
+    const isSignatureValid = secureHash === signed;
+
+    this.logger.log(
+      `[IPN_VALIDATE] BookingID: ${bookingIdFromVnp} | RspCode: ${rspCode} | SignatureValid: ${isSignatureValid}`,
+    );
+
+    if (!isSignatureValid) {
+      this.logger.error(
+        `[IPN_FAIL] Invalid signature for booking ${bookingIdFromVnp}`,
+      );
       return { RspCode: '97', Message: 'Chữ ký không hợp lệ' };
     }
 
-    let bookingId = String(vnp_Params['vnp_TxnRef'] ?? '');
+    let bookingId = bookingIdFromVnp;
     if (bookingId.length === 32) {
       bookingId = `${bookingId.substring(0, 8)}-${bookingId.substring(
         8,
@@ -213,7 +243,6 @@ export class PaymentService {
         20,
       )}-${bookingId.substring(20)}`;
     }
-    const rspCode = String(vnp_Params['vnp_ResponseCode'] ?? '');
     const vnp_Amount = parseInt(String(vnp_Params['vnp_Amount'] ?? '0')) / 100;
 
     const transactionNo =
@@ -239,13 +268,23 @@ export class PaymentService {
       });
 
       if (!payment) {
-        this.logger.warn(`Không tìm thấy dữ liệu cho booking ${bookingId}`);
+        this.logger.warn(
+          `[IPN_FAIL] Payment record not found for booking ${bookingId} with PENDING status. It might have been processed already.`,
+        );
+        // Check if it's already completed to confirm to VNPAY
+        const alreadyCompletedPayment = await this.paymentRepository.findOneBy({
+          booking: { id: bookingId },
+          status: PaymentStatus.COMPLETED,
+        });
+        if (alreadyCompletedPayment) {
+          return { RspCode: '00', Message: 'Confirm Success' }; // Already done
+        }
         return { RspCode: '01', Message: 'Không tìm thấy đơn hàng' };
       }
 
       if (Number(payment.finalAmount) !== vnp_Amount) {
         this.logger.warn(
-          `Số tiền không hợp lệ. DB: ${payment.finalAmount}, VNPAY: ${vnp_Amount}`,
+          `[IPN_FAIL] Amount mismatch for booking ${bookingId}. DB: ${payment.finalAmount}, VNPAY: ${vnp_Amount}`,
         );
         return { RspCode: '04', Message: 'Số tiền không khớp' };
       }
@@ -256,8 +295,8 @@ export class PaymentService {
 
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
-        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''}, ${branchAddressObj.city?.name || ''
-          }`
+        ? `${branchAddressObj.street}, ${branchAddressObj.ward?.name || ''
+          }, ${branchAddressObj.city?.name || ''}`
           .replace(/,\s*,/g, ',')
           .trim()
           .replace(/,\s*$/, '')
@@ -275,6 +314,9 @@ export class PaymentService {
       });
 
       if (rspCode == '00') {
+        this.logger.log(
+          `[IPN_SUCCESS] Processing successful payment for booking ${bookingId}`,
+        );
         // --- GIAO DỊCH THÀNH CÔNG ---
         await this.bookingService.updateStatus(
           bookingId,
@@ -324,8 +366,11 @@ export class PaymentService {
           amount: finalAmountStr,
           time: new Date(),
         });
-        this.logger.log(`Booking ${bookingId} đã được xác nhận`);
+        this.logger.log(`[IPN_SUCCESS] Booking ${bookingId} confirmed.`);
       } else {
+        this.logger.warn(
+          `[IPN_FAIL] Processing FAILED payment for booking ${bookingId}. RspCode: ${rspCode}`,
+        );
         // --- GIAO DỊCH THẤT BẠI ---
         await this.bookingService.updateStatus(
           bookingId,
@@ -351,7 +396,9 @@ export class PaymentService {
             'quantity',
             1,
           );
-          this.logger.log(`Voucher ${payment.voucher.code} đã được hoàn lại`);
+          this.logger.log(
+            `[IPN_INFO] Voucher ${payment.voucher.code} for booking ${bookingId} has been refunded.`,
+          );
         }
 
         await this.sendEmailSafely({
@@ -368,19 +415,18 @@ export class PaymentService {
             reason: 'Giao dịch bị hủy hoặc lỗi từ ngân hàng.',
           },
         });
-        this.logger.log(`Booking ${bookingId} đã bị hủy`);
+        this.logger.log(`[IPN_FAIL] Booking ${bookingId} has been cancelled.`);
       }
 
       return { RspCode: '00', Message: 'Xác nhận thành công' };
     } catch (error) {
       this.logger.error(
-        `[VNPAY IPN ERROR] Lỗi xử lí cho Booking ID ${bookingId}:`,
+        `[VNPAY IPN CRITICAL ERROR] Unhandled error for Booking ID ${bookingId}:`,
         error instanceof Error ? error.stack : JSON.stringify(error),
       );
       return { RspCode: '99', Message: 'Lỗi không xác định' };
     }
   }
-
   /**
    * @method findByBookingId
    * @description Tìm một bản ghi thanh toán dựa trên ID của đơn đặt sân.
@@ -482,6 +528,92 @@ export class PaymentService {
       month: Number(row.month),
       revenue: Number(row.revenue),
     }));
+  }
+
+  /**
+   * Gửi yêu cầu hoàn tiền đến VNPAY.
+   * @param payment Bản ghi thanh toán cần hoàn.
+   * @param actor Người thực hiện hành động (ví dụ: user ID hoặc 'admin').
+   * @param ipAddr Địa chỉ IP của người yêu cầu.
+   * @returns Kết quả từ VNPAY.
+   */
+  async refundVnpayTransaction(
+    payment: Payment,
+    actor: string,
+    ipAddr: string,
+  ): Promise<{ isSuccess: boolean; message: string; data?: any }> {
+    const { tmnCode, secretKey, apiUrl } = this.vnpayConfiguration;
+    if (!secretKey || !apiUrl) {
+      this.logger.error('VNPAY secret key or API URL is missing from config.');
+      throw new InternalServerErrorException('Lỗi cấu hình VNPAY phía server.');
+    }
+
+    const vnp_Params: Record<string, any> = {
+      vnp_RequestId: moment(new Date()).format('HHmmss') + payment.booking.id.substring(0, 8),
+      vnp_Version: '2.1.0',
+      vnp_Command: 'refund',
+      vnp_TmnCode: tmnCode,
+      vnp_TransactionType: '02', // 02: Hoàn toàn phần, 03: Hoàn một phần
+      vnp_TxnRef: payment.booking.id,
+      vnp_Amount: Number(payment.finalAmount) * 100,
+      vnp_TransactionNo: payment.transactionCode,
+      vnp_TransactionDate: moment(payment.completedAt).format('YYYYMMDDHHmmss'),
+      vnp_CreateBy: actor,
+      vnp_CreateDate: moment(new Date()).format('YYYYMMDDHHmmss'),
+      vnp_IpAddr: ipAddr,
+      vnp_OrderInfo: `Hoan tien cho don hang ${payment.booking.id}`,
+    };
+
+    const signData = qs.stringify(this.sortObject(vnp_Params), { encode: false });
+    const hmac = crypto.createHmac('sha512', secretKey);
+    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+    vnp_Params['vnp_SecureHash'] = signed;
+
+    try {
+      this.logger.log(`Gửi yêu cầu hoàn tiền VNPAY cho đơn ${payment.booking.id}`);
+      const response = await firstValueFrom(
+        this.httpService.post<Record<string, any>>(apiUrl, vnp_Params),
+      );
+
+      this.logger.log(`Phản hồi hoàn tiền VNPAY: ${JSON.stringify(response.data)}`);
+      const vnpResponse = response.data;
+      const responseSecureHash = vnpResponse.vnp_SecureHash as string;
+
+      delete vnpResponse.vnp_SecureHash;
+      delete vnpResponse.vnp_SecureHashType;
+
+      const responseSignData = qs.stringify(this.sortObject(vnpResponse), { encode: false });
+      const responseHmac = crypto.createHmac('sha512', secretKey);
+      const responseSigned = responseHmac.update(Buffer.from(responseSignData, 'utf-8')).digest('hex');
+
+      if (responseSecureHash === responseSigned) {
+        const responseCode = vnpResponse.vnp_ResponseCode as string;
+        if (responseCode === '00') {
+          return { isSuccess: true, message: 'Yêu cầu hoàn tiền thành công.', data: vnpResponse };
+        } else {
+          const errorMessage = this.mapVnpayError(responseCode);
+          return { isSuccess: false, message: errorMessage, data: vnpResponse };
+        }
+      } else {
+        return { isSuccess: false, message: 'Chữ ký phản hồi từ VNPAY không hợp lệ.' };
+      }
+    } catch (error) {
+      this.logger.error('Lỗi gọi API hoàn tiền VNPAY:', error instanceof Error ? error.stack : String(error));
+      throw new InternalServerErrorException('Có lỗi xảy ra khi kết nối tới VNPAY để hoàn tiền.');
+    }
+  }
+
+  private mapVnpayError(code: string): string {
+    const errorMap: Record<string, string> = {
+      '02': 'Dữ liệu không hợp lệ. (Merchant không tồn tại hoặc không hoạt động)',
+      '03': 'Giao dịch không tồn tại trong hệ thống VNPAY.',
+      '91': 'Giao dịch không được phép hoàn trả hoặc đã quá hạn hoàn.',
+      '94': 'Giao dịch đã được hoàn trả trước đó.',
+      '95': 'Số tiền hoàn trả không hợp lệ (lớn hơn số tiền gốc).',
+      '97': 'Chữ ký (secure hash) không hợp lệ.',
+      '99': 'Các lỗi khác không xác định.',
+    };
+    return errorMap[code] || `Lỗi không xác định từ VNPAY: ${code}`;
   }
 
   /**

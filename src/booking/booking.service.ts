@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
   Logger,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, MoreThan, Not, Repository } from 'typeorm';
@@ -25,6 +26,11 @@ import { UsersService } from '@/user/users.service';
 import { Role } from '@/auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import moment from 'moment';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as handlebars from 'handlebars';
+import * as qrcode from 'qrcode';
+import { generatePdf } from 'html-pdf-node';
 
 /**
  * @class BookingService
@@ -49,6 +55,56 @@ export class BookingService {
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
   ) { }
+
+  async downloadTicket(bookingId: string): Promise<Buffer> {
+    const booking = await this.bookingRepository.findOne({
+      where: { id: bookingId },
+      relations: ['userProfile', 'field', 'field.branch'],
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Không tìm thấy đơn đặt sân.');
+    }
+
+    const qrCodeUrl = await qrcode.toDataURL(booking.id);
+
+    const templatePath = path.resolve(
+      __dirname,
+      '..',
+      'templates',
+      'booking-ticket.hbs',
+    );
+    const templateContent = await fs.readFile(templatePath, 'utf-8');
+    const template = handlebars.compile(templateContent);
+
+    const html = template({
+      booking: {
+        id: booking.id,
+        startTime: moment(booking.start_time).format('HH:mm DD/MM/YYYY'),
+        endTime: moment(booking.end_time).format('HH:mm DD/MM/YYYY'),
+        user: {
+          fullName: booking.userProfile?.full_name || booking.customerName,
+        },
+        field: {
+          name: booking.field.name,
+        },
+        branch: {
+          name: booking.field.branch.name,
+        },
+      },
+      qrCodeUrl,
+    });
+
+    const options = { format: 'A4' };
+    const file = { content: html };
+
+    return new Promise((resolve, reject) => {
+      generatePdf(file, options, (err: any, buffer: Buffer) => {
+        if (err) return reject(err instanceof Error ? err : new Error(String(err)));
+        resolve(buffer);
+      });
+    });
+  }
 
   /**
    * @method createBooking
@@ -224,58 +280,101 @@ export class BookingService {
     }
   }
 
-  /**
-   * @method cancelBooking
-   * @description Hủy một đơn đặt sân.
-   * Chỉ chủ sở hữu đơn hoặc Admin/Manager mới có thể hủy. Không thể hủy nếu quá sát giờ đá.
-   * Nếu có áp dụng voucher, số lượng voucher sẽ được hoàn lại.
-   * @param {string} bookingId - ID của đơn đặt sân cần hủy.
-   * @param {string} accountId - ID của tài khoản người dùng đang thực hiện hành động.
-   * @param {Role} userRole - Vai trò của người dùng.
-   * @returns {Promise<object>} - Một đối tượng chứa thông báo xác nhận hủy thành công.
-   * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
-   * @throws {ForbiddenException} Nếu người dùng không có quyền hủy đơn này.
-   * @throws {BadRequestException} Nếu đơn đặt sân không thể hủy (đã hủy, quá giờ,...).
-   */
-  async cancelBooking(bookingId: string, accountId: string, userRole: Role) {
+  async cancelBooking(
+    bookingId: string,
+    accountId: string,
+    userRole: Role,
+    ipAddr: string,
+  ) {
     this.logger.log(
       `Attempting to cancel booking ${bookingId} by user ${accountId} with role ${userRole}`,
     );
+
+    // 1. Fetch booking and associated payment outside transaction
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
-      relations: ['userProfile', 'userProfile.account'],
+      relations: [
+        'userProfile',
+        'userProfile.account',
+        'payment',
+        'payment.voucher',
+      ],
     });
 
     if (!booking) {
-      this.logger.warn(`Booking ${bookingId} not found for cancellation`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
-
-    const bookingAccountId =
-      booking.userProfile && booking.userProfile.account
-        ? booking.userProfile.account.id
-        : undefined;
-
-    if (bookingAccountId !== accountId && userRole !== Role.Admin) {
-      this.logger.error(
-        `User ${accountId} does not have permission to cancel booking ${bookingId}`,
+    if (!booking.payment) {
+      throw new InternalServerErrorException(
+        'Lỗi: Không tìm thấy thông tin thanh toán của đơn.',
       );
+    }
+
+    // 2. Permission checks
+    const bookingAccountId = booking.userProfile?.account?.id;
+    const isOwner = bookingAccountId === accountId;
+    const isAdminOrManager =
+      userRole === Role.Admin || userRole === Role.Manager;
+
+    if (!isOwner && !isAdminOrManager) {
       throw new ForbiddenException('Bạn không có quyền hủy đơn này.');
     }
 
+    // 3. Status and Time validation
     if (booking.status === BookingStatus.CANCELLED) {
-      this.logger.warn(`Booking ${bookingId} is already cancelled`);
       throw new BadRequestException('Đơn đặt sân đã được hủy trước đó.');
     }
-
-    const timeDiff = booking.start_time.getTime() - new Date().getTime();
-    if (timeDiff < 60 * 60 * 1000) {
-      this.logger.warn(
-        `Booking ${bookingId} cannot be cancelled due to time limit`,
-      );
-      throw new BadRequestException('Chỉ có thể hủy trước giờ đá 60 phút.');
+    if (booking.status === BookingStatus.FINISHED) {
+      throw new BadRequestException('Không thể hủy đơn đặt sân đã hoàn thành.');
     }
 
+    // Allow Admins/Managers to bypass time limit
+    if (!isAdminOrManager) {
+      const timeDiff = booking.start_time.getTime() - new Date().getTime();
+      const cancelBufferHours = 2; // e.g., 2 hours
+      if (timeDiff < cancelBufferHours * 60 * 60 * 1000) {
+        throw new BadRequestException(
+          `Chỉ có thể hủy trước giờ đá ${cancelBufferHours} tiếng.`,
+        );
+      }
+    }
+
+    let refundMessage = 'Mã giảm giá (nếu có) đã được hoàn lại.';
+
+    // 4. Handle refund API call (if necessary) BEFORE DB transaction
+    if (
+      booking.status === BookingStatus.COMPLETED &&
+      booking.payment.paymentMethod === PaymentMethod.VNPAY
+    ) {
+      if (!booking.payment.transactionCode || !booking.payment.completedAt) {
+        throw new BadRequestException(
+          'Không thể hoàn tiền tự động cho giao dịch này vì thiếu thông tin. Vui lòng liên hệ quản trị viên.',
+        );
+      }
+
+      const refundResult = await this.paymentService.refundVnpayTransaction(
+        booking.payment,
+        accountId, // Actor's ID
+        ipAddr, // User's IP
+      );
+
+      if (!refundResult.isSuccess) {
+        throw new BadRequestException(
+          `Yêu cầu hoàn tiền VNPAY thất bại: ${refundResult.message}`,
+        );
+      }
+      refundMessage = `Một yêu cầu hoàn tiền trị giá ${booking.payment.finalAmount.toLocaleString(
+        'vi-VN',
+      )}đ đã được gửi tới VNPAY. Tiền sẽ được hoàn về tài khoản của bạn trong vài ngày làm việc.`;
+    } else if (
+      booking.status === BookingStatus.COMPLETED &&
+      booking.payment.paymentMethod === PaymentMethod.CASH
+    ) {
+      refundMessage =
+        'Đơn đã được hủy. Hoàn tiền mặt được xử lý thủ công bởi nhân viên.';
+    }
+
+    // 5. DB Transaction for state update
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -283,41 +382,33 @@ export class BookingService {
     try {
       booking.status = BookingStatus.CANCELLED;
       await queryRunner.manager.save(Booking, booking);
-      this.logger.log(`Booking ${bookingId} status updated to CANCELLED`);
 
-      const payment = await queryRunner.manager.findOne(Payment, {
-        where: { booking: { id: booking.id } },
-        relations: ['voucher'],
-      });
+      booking.payment.status = PaymentStatus.FAILED; // Or REFUNDED
+      await queryRunner.manager.save(Payment, booking.payment);
 
-      if (payment) {
-        payment.status = PaymentStatus.FAILED;
-        await queryRunner.manager.save(Payment, payment);
-        this.logger.log(
-          `Payment for booking ${bookingId} status updated to FAILED`,
+      if (booking.payment.voucher) {
+        await queryRunner.manager.increment(
+          Voucher,
+          { id: booking.payment.voucher.id },
+          'quantity',
+          1,
         );
-
-        if (payment.voucher) {
-          await queryRunner.manager.increment(
-            Voucher,
-            { id: payment.voucher.id },
-            'quantity',
-            1,
-          );
-          this.logger.log(`Voucher for booking ${bookingId} has been refunded`);
-        }
-
-        await queryRunner.commitTransaction();
-        this.logger.log(`Booking ${bookingId} cancelled successfully`);
-        return {
-          message:
-            'Hủy đơn đặt sân thành công. Mã giảm giá (nếu có) đã được hoàn lại.',
-        };
+        this.logger.log(`Voucher for booking ${bookingId} has been refunded`);
       }
+
+      await queryRunner.commitTransaction();
+
+      // TODO: Send notification email about cancellation
+
+      this.logger.log(`Booking ${bookingId} cancelled successfully`);
+      return { message: `Hủy đơn đặt sân thành công. ${refundMessage}` };
     } catch (error) {
-      this.logger.error(`Error cancelling booking ${bookingId}:`, error);
       await queryRunner.rollbackTransaction();
-      throw error;
+      this.logger.error(
+        `Error during booking cancellation transaction for ${bookingId}:`,
+        error,
+      );
+      throw new InternalServerErrorException('Lỗi trong quá trình hủy đơn.');
     } finally {
       await queryRunner.release();
     }

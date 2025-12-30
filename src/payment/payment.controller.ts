@@ -54,7 +54,7 @@ export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly bookingService: BookingService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /payment/create_payment_url
@@ -156,7 +156,7 @@ export class PaymentController {
     @Res({ passthrough: true }) res: Response,
   ) {
     this.logger.log(`Received VNPAY return callback with query: ${JSON.stringify(query)}`);
-    
+
     // Gọi service để kiểm tra chữ ký (secure hash) và trạng thái giao dịch
     const result = this.paymentService.verifyReturnUrl(
       query as unknown as Record<string, any>,
@@ -169,10 +169,10 @@ export class PaymentController {
         this.logger.log(`Payment verified successfully, updating booking status for ${query.vnp_TxnRef}`);
         await this.paymentService.handleIpn(query as unknown as VnpayIpnDto);
       } catch (updateError: any) {
-        this.logger.warn(`Failed to update booking status: ${updateError.message}`);
+        this.logger.warn(`Failed to update booking status: ${updateError}`);
         // Vẫn trả về success cho user vì thanh toán đã thành công, IPN sẽ xử lý sau
       }
-      
+
       this.logger.log(`VNPAY return successful for booking ${query.vnp_TxnRef}`);
       res.status(HttpStatus.OK);
       return {

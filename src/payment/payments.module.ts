@@ -8,6 +8,7 @@ import { VouchersModule } from '@/voucher/vouchers.module';
 import { Voucher } from '@/voucher/entities/voucher.entity';
 import { PricingModule } from '@/pricing/pricing.module';
 import { NotificationsModule } from '@/notification/notifications.module';
+import { HttpModule } from '@nestjs/axios';
 
 /**
  * @module PaymentsModule
@@ -24,6 +25,7 @@ import { NotificationsModule } from '@/notification/notifications.module';
     VouchersModule,
     PricingModule,
     NotificationsModule, // Import NotificationsModule để có thể inject NotificationService
+    HttpModule,
   ],
   providers: [PaymentService],
   controllers: [PaymentController],

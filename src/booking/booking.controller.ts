@@ -13,6 +13,7 @@ import {
   Get,
   Query,
   Logger,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -36,6 +37,7 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { CheckInDto } from './dto/check-in.dto';
 import { Booking } from './entities/booking.entity';
+import { Response } from 'express';
 
 
 /**
@@ -57,6 +59,26 @@ export class BookingController {
     private readonly bookingService: BookingService,
     private readonly usersService: UsersService,
   ) { }
+
+  @Get(':id/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Tải vé đặt sân' })
+  @ApiResponse({ status: 200, description: 'Tải vé thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
+  async downloadTicket(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    this.logger.log(`Downloading ticket for booking with id ${id}`);
+    const pdfBuffer = await this.bookingService.downloadTicket(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename=ticket-${id}.pdf`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
+  }
 
   /**
    * @route POST /bookings
@@ -167,7 +189,16 @@ export class BookingController {
     this.logger.log(
       `User ${accountId} (Role: ${userRole}) attempting to cancel booking ${bookingId}`,
     );
-    return this.bookingService.cancelBooking(bookingId, accountId, userRole);
+    // Logic to get IP from request
+    const forwarded = req.headers['x-forwarded-for'];
+    let ip = forwarded
+      ? (typeof forwarded === 'string' ? forwarded : forwarded[0])
+      : req.socket.remoteAddress;
+    if (ip && ip.includes(',')) {
+      ip = ip.split(',')[0].trim();
+    }
+    const clientIp = (ip && ip !== '::1') ? ip : '127.0.0.1';
+    return this.bookingService.cancelBooking(bookingId, accountId, userRole, clientIp);
   }
 
   /**
