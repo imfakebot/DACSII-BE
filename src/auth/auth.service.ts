@@ -377,18 +377,48 @@ export class AuthService {
 
   /**
    * @method logout
-   * Đăng xuất người dùng bằng cách vô hiệu hóa refresh token.
+   * Đăng xuất người dùng bằng cách vô hiệu hóa refresh token và revoke Google OAuth token.
    * @param {string} accountID - ID của tài khoản cần đăng xuất.
    * @returns {Promise<{ message: string }>} - Một thông báo xác nhận đăng xuất thành công.
    */
   async logout(accountID: string): Promise<{ message: string }> {
     this.logger.log(`Logging out user ${accountID}`);
+    
+    // Lấy thông tin user để revoke Google token nếu có
+    const account = await this.userService.findAccountById(accountID);
+    
+    // Revoke Google OAuth token nếu user đăng nhập bằng Google
+    if (account?.google_access_token && account.provider === AuthProvider.GOOGLE) {
+      try {
+        await fetch(`https://oauth2.googleapis.com/revoke?token=${account.google_access_token}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        this.logger.log(`Revoked Google token for user ${accountID}`);
+      } catch (error) {
+        this.logger.warn(`Failed to revoke Google token: ${error}`);
+      }
+    }
+    
     await this.userService.updateAccount(accountID, {
-      // Fix: hashed_refresh_token should be undefined to set to NULL
       hashed_refresh_token: null,
+      google_access_token: null,
     });
 
     return { message: 'Đăng xuất thành công' };
+  }
+
+  /**
+   * @method saveGoogleAccessToken
+   * Lưu Google OAuth access token để có thể revoke khi logout.
+   * @param {string} accountID - ID của tài khoản.
+   * @param {string} accessToken - Google access token.
+   */
+  async saveGoogleAccessToken(accountID: string, accessToken: string): Promise<void> {
+    this.logger.debug(`Saving Google access token for user ${accountID}`);
+    await this.userService.updateAccount(accountID, {
+      google_access_token: accessToken,
+    });
   }
 
   /**
