@@ -208,8 +208,8 @@ export class UsersController {
   /**
    * @route POST /users/create-employee
    * @description Tạo tài khoản nhân viên mới (Manager hoặc Staff).
-   * - Admin có thể tạo Manager.
-   * - Manager có thể tạo Staff.
+   * - Admin có thể tạo Manager hoặc Staff (tùy chọn role từ FE).
+   * - Manager chỉ có thể tạo Staff.
    * Chi nhánh của nhân viên mới sẽ được tự động gán theo chi nhánh của người tạo.
    */
   @Post('create-employee')
@@ -217,7 +217,7 @@ export class UsersController {
   @Roles(Role.Admin, Role.Manager) // Chỉ Admin và Manager được phép
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Tạo tài khoản Manager (bởi Admin) hoặc Staff (bởi Manager)',
+    summary: 'Tạo tài khoản nhân viên (Admin có thể chọn Manager/Staff, Manager chỉ tạo Staff)',
   })
   @ApiResponse({ status: 201, description: 'Tạo nhân viên thành công.' })
   @ApiResponse({ status: 403, description: 'Không có quyền tạo.' })

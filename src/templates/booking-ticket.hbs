@@ -1,28 +1,316 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vé Đặt Sân - {{booking.field.name}}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; }
-        .ticket { border: 1px solid #000; padding: 20px; }
-        .header { text-align: center; font-size: 24px; font-weight: bold; }
-        .details { margin-top: 20px; }
-        .details p { margin: 5px 0; }
-        .qr-code { text-align: center; margin-top: 20px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ticket-container {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .ticket-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .ticket-header h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .ticket-header .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .ticket-body {
+            padding: 2rem;
+        }
+
+        .info-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            gap: 1rem;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            min-width: 140px;
+            color: #64748b;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-value {
+            flex: 1;
+            color: #0f172a;
+            font-size: 0.9375rem;
+            font-weight: 500;
+        }
+
+        .info-value strong {
+            color: #1e293b;
+            font-weight: 700;
+        }
+
+        .field-type {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #475569;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .duration {
+            color: #64748b;
+            font-size: 0.875rem;
+            margin-left: 0.5rem;
+        }
+
+        .total-row {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .total-row .info-label {
+            color: #0f172a;
+            font-size: 1rem;
+        }
+
+        .total-row .info-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .payment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #dcfce7;
+            color: #16a34a;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .qr-section {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        .qr-label {
+            color: #475569;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .qr-code {
+            display: inline-block;
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .qr-code img {
+            display: block;
+            width: 180px;
+            height: 180px;
+        }
+
+        .qr-note {
+            color: #64748b;
+            font-size: 0.8125rem;
+            margin-top: 1rem;
+        }
+
+        .notes-section {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .notes-section h4 {
+            color: #92400e;
+            font-size: 0.9375rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .notes-section ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .notes-section li {
+            color: #78350f;
+            font-size: 0.875rem;
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .notes-section li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .notes-section strong {
+            font-weight: 700;
+        }
+
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .ticket-container {
+                box-shadow: none;
+                border-radius: 0;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="ticket">
-        <div class="header">Booking Ticket</div>
-        <div class="details">
-            <p><strong>Booking ID:</strong> {{booking.id}}</p>
-            <p><strong>Branch:</strong> {{booking.branch.name}}</p>
-            <p><strong>Field:</strong> {{booking.field.name}}</p>
-            <p><strong>Start Time:</strong> {{booking.startTime}}</p>
-            <p><strong>End Time:</strong> {{booking.endTime}}</p>
-            <p><strong>Customer:</strong> {{booking.user.fullName}}</p>
+    <div class="ticket-container">
+        <div class="ticket-header">
+            <h1> Vé Đặt Sân</h1>
+            <div class="status">
+                <span>●</span> Đã xác nhận
+            </div>
         </div>
-        <div class="qr-code">
-            <img src="{{qrCodeUrl}}" alt="QR Code">
+
+        <div class="ticket-body">
+            <div class="info-section">
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">🎫</span> Mã đặt chỗ
+                    </div>
+                    <div class="info-value">{{booking.id}}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">⚽</span> Sân
+                    </div>
+                    <div class="info-value">
+                        <strong>{{booking.field.name}}</strong>
+                        <span class="field-type">Bóng đá</span>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">📍</span> Địa điểm
+                    </div>
+                    <div class="info-value">{{booking.branch.name}}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">🕐</span> Thời gian
+                    </div>
+                    <div class="info-value">
+                        <strong>{{booking.startTime}}</strong>
+                        <span class="duration">đến {{booking.endTime}}</span>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">👤</span> Khách hàng
+                    </div>
+                    <div class="info-value">{{booking.user.fullName}}</div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-label">
+                        <span class="icon">💳</span> Thanh toán
+                    </div>
+                    <div class="info-value">
+                        <span class="payment-badge">
+                            ✓ Đã thanh toán
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <div class="qr-label">Mã QR Check-in</div>
+                <div class="qr-code">
+                    <img src="{{qrCodeUrl}}" alt="QR Code" />
+                </div>
+                <p class="qr-note">Xuất trình mã này khi check-in tại sân</p>
+            </div>
+
+            
         </div>
     </div>
 </body>

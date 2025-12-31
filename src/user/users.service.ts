@@ -561,18 +561,28 @@ export class UsersService {
     }
 
     const requesterRoleName = requester.role.name;
-    let targetRoleName: Role;
+    const targetRoleName: Role = data.role; // Lấy role từ DTO
 
-    // 2. Phân quyền và xác định vai trò của nhân viên mới
+    // 2. Phân quyền: kiểm tra người tạo có quyền tạo vai trò này không
     if (requesterRoleName === String(Role.Admin)) {
-      targetRoleName = Role.Manager;
+      // Admin có thể tạo cả Manager và Staff
+      if (targetRoleName !== Role.Manager && targetRoleName !== Role.Staff) {
+        throw new ForbiddenException(
+          'Admin chỉ có thể tạo tài khoản Manager hoặc Staff.',
+        );
+      }
     } else if (requesterRoleName === String(Role.Manager)) {
+      // Manager chỉ có thể tạo Staff
+      if (targetRoleName !== Role.Staff) {
+        throw new ForbiddenException(
+          'Manager chỉ có thể tạo tài khoản Staff.',
+        );
+      }
       if (!requester.userProfile?.branch?.id) {
         throw new ForbiddenException(
           'Tài khoản của bạn phải được gán vào một chi nhánh để thực hiện hành động này.',
         );
       }
-      targetRoleName = Role.Staff;
     } else {
       throw new ForbiddenException(
         'Bạn không có quyền tạo tài khoản nhân viên.',

@@ -2,12 +2,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
 import { Gender } from '../enum/gender.enum';
+import { Role } from '../../auth/enums/role.enum';
 
 export class CreateEmployeeDto {
   @ApiProperty({
@@ -58,4 +60,15 @@ export class CreateEmployeeDto {
   @IsString()
   @IsOptional()
   branchId?: string;
+
+  @ApiProperty({
+    description: 'Vai trò của nhân viên',
+    enum: [Role.Manager, Role.Staff],
+    example: Role.Staff,
+  })
+  @IsEnum([Role.Manager, Role.Staff], {
+    message: 'Vai trò phải là "branch_manager" hoặc "staff"',
+  })
+  @IsNotEmpty()
+  role!: Role.Manager | Role.Staff;
 }
