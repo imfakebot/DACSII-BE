@@ -125,6 +125,13 @@ export class Account {
   hashed_refresh_token!: string | null;
 
   /**
+   * Google OAuth access token, dùng để revoke khi logout.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  @Exclude()
+  google_access_token?: string | null;
+
+  /**
    * Token dùng cho việc đặt lại mật khẩu, bản hash được lưu để bảo mật.
    */
   @Exclude()

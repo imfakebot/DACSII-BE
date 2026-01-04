@@ -52,6 +52,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   }
 
   /**
+   * Override authorizationParams để inject thêm parameters vào Google OAuth URL
+   * Điều này buộc Google luôn hiển thị account chooser mỗi lần đăng nhập
+   */
+  authorizationParams(): { [key: string]: string } {
+    return {
+      prompt: 'select_account', // Buộc Google hiển thị danh sách tài khoản
+      access_type: 'offline', // Yêu cầu refresh token
+    };
+  }
+
+  /**
    * @method validate
    * @description Được Passport tự động gọi sau khi xác thực với Google thành công.
    *
@@ -90,8 +101,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       const validatedUser = await this.authService.validateOAuthLogin(
         userPayload,
         AuthProvider.GOOGLE,
-      );
-      // Trả về người dùng đã được xác thực, Passport sẽ gắn đối tượng này vào req.user
+      );      
+      // Lưu Google access token để revoke sau khi logout
+      await this.authService.saveGoogleAccessToken(validatedUser.id, accessToken);
+            // Trả về người dùng đã được xác thực, Passport sẽ gắn đối tượng này vào req.user
       done(null, validatedUser);
     } catch (err) {
       done(err, false); // Báo lỗi cho Passport

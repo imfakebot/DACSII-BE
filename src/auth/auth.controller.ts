@@ -247,7 +247,11 @@ export class AuthController {
     const userId = req.user.sub;
     this.logger.log(`User ${userId} logging out`);
     await this.authService.logout(userId);
+    
+    // Clear tất cả cookies liên quan đến auth
     res.clearCookie('refresh_token', { path: '/' });
+    res.clearCookie('access_token', { path: '/' });
+    
     return { message: 'Đăng xuất thành công' };
   }
   /**
