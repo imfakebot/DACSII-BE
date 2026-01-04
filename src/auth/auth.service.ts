@@ -21,6 +21,8 @@ import { AuthProvider } from '@/user/enum/auth-provider.enum';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
 import { Gender } from '@/user/enum/gender.enum';
 import { JwtPayload } from './interface/jwtpayload.interface';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 
 
@@ -45,6 +47,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private readonly httpService: HttpService,
   ) { }
 
   /**
@@ -383,23 +386,30 @@ export class AuthService {
    */
   async logout(accountID: string): Promise<{ message: string }> {
     this.logger.log(`Logging out user ${accountID}`);
-    
+
     // Lấy thông tin user để revoke Google token nếu có
     const account = await this.userService.findAccountById(accountID);
-    
+
     // Revoke Google OAuth token nếu user đăng nhập bằng Google
     if (account?.google_access_token && account.provider === AuthProvider.GOOGLE) {
       try {
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${account.google_access_token}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        });
+        const revokeUrl = this.configService.get<string>('GOOGLE_REVOKE_URL');
+        if (!revokeUrl) {
+          this.logger.error('GOOGLE_REVOKE_URL is not configured');
+          throw new InternalServerErrorException('Lỗi cấu hình Google OAuth');
+        }
+        await firstValueFrom(
+          this.httpService.post(revokeUrl, null, {
+            params: { token: account.google_access_token },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          }),
+        );
         this.logger.log(`Revoked Google token for user ${accountID}`);
       } catch (error) {
-        this.logger.warn(`Failed to revoke Google token: ${error}`);
+        this.logger.warn(`Failed to revoke Google token: `, error);
       }
     }
-    
+
     await this.userService.updateAccount(accountID, {
       hashed_refresh_token: null,
       google_access_token: null,
