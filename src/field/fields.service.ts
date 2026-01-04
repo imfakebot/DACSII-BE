@@ -333,13 +333,11 @@ export class FieldsService {
     const images = files.map((file) =>
       this.fieldImageRepository.create({
         image_url: `${baseUrl}/uploads/${file.filename}`,
-        field: { id: field.id } as Field,
+        field: field,
       }),
     );
 
-    const savedImages = await Promise.all(
-      images.map((image) => this.fieldImageRepository.save(image)),
-    );
+    const savedImages = await this.fieldImageRepository.save(images);
     this.logger.log(
       `Added ${savedImages.length} images to field ${fieldId} successfully`,
     );
