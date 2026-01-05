@@ -51,9 +51,9 @@ export class Account {
    */
   @ApiProperty({ enum: AuthProvider, example: AuthProvider.CREDENTIALS })
   @Column({
-    type: 'enum',
-    enum: AuthProvider,
-    default: AuthProvider.CREDENTIALS,
+    type: 'varchar',
+    length: 50,
+    default: 'local',
   })
   provider!: AuthProvider;
 
@@ -62,9 +62,9 @@ export class Account {
    */
   @ApiProperty({ enum: AccountStatus, example: AccountStatus.ACTIVE })
   @Column({
-    type: 'enum',
-    enum: AccountStatus,
-    default: AccountStatus.ACTIVE,
+    type: 'varchar',
+    length: 20,
+    default: 'active',
   })
   status!: AccountStatus;
 
@@ -107,14 +107,14 @@ export class Account {
    * Mã xác thực tạm thời được gửi qua email để hoàn tất đăng ký.
    */
   @Exclude()
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   verification_code!: string | null;
 
   /**
    * Dấu thời gian khi mã xác thực hết hạn.
    */
   @Exclude()
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   verification_code_expires_at!: Date | null;
 
   /**
@@ -127,7 +127,7 @@ export class Account {
   /**
    * Google OAuth access token, dùng để revoke khi logout.
    */
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ name: 'google_access_token', type: 'text', nullable: true })
   @Exclude()
   google_access_token?: string | null;
 
