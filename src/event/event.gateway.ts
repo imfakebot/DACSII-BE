@@ -34,7 +34,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService, // <--- Inject UsersService
-  ) {}
+  ) { }
 
   /**
    * 1. XỬ LÝ KẾT NỐI (AUTHENTICATION)
@@ -57,7 +57,12 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Verify token
-      const secret = this.configService.get<string>('JWT_SECRET');
+      const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
+      if (!secret) {
+        this.logger.error('JWT_ACCESS_SECRET is not defined in configuration.');
+        client.disconnect();
+        return;
+      }
       const payload: AuthenticatedUser = await this.jwtService.verifyAsync(
         token,
         { secret },
