@@ -56,6 +56,13 @@ export class BookingService {
     private readonly userService: UsersService,
   ) { }
 
+  /**
+   * @method downloadTicket
+   * @description Tạo file PDF vé đặt sân bao gồm mã QR và thông tin chi tiết.
+   * @param {string} bookingId - ID của đơn đặt sân.
+   * @returns {Promise<Buffer>} - Buffer chứa dữ liệu file PDF.
+   * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
+   */
   async downloadTicket(bookingId: string): Promise<Buffer> {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
@@ -66,7 +73,7 @@ export class BookingService {
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
-    const qrCodeUrl = await qrcode.toDataURL(booking.id);
+    const qrCodeUrl = await qrcode.toDataURL(booking.code);
 
     const templatePath = path.resolve(
       __dirname,
@@ -80,6 +87,7 @@ export class BookingService {
     const html = template({
       booking: {
         id: booking.id,
+        code: booking.code,
         startTime: moment(booking.start_time).format('HH:mm DD/MM/YYYY'),
         endTime: moment(booking.end_time).format('HH:mm DD/MM/YYYY'),
         user: {
