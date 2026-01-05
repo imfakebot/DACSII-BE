@@ -4,9 +4,11 @@ import {
   JoinColumn,
   ManyToOne,
   OneToOne,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   CreateDateColumn,
+  BeforeInsert,
 } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { PaymentStatus } from '../enums/payment-status.enum';
 import { PaymentMethod } from '../enums/payment-method.enum';
 import { Booking } from '@/booking/entities/booking.entity';
@@ -23,8 +25,8 @@ export class Payment {
    * ID duy nhất của giao dịch, định dạng UUID.
    */
   @ApiProperty({ description: 'ID duy nhất của giao dịch', format: 'uuid' })
-  @PrimaryGeneratedColumn('uuid')
-  id?: string;
+  @PrimaryColumn()
+  id!: string;
 
   /**
    * Số tiền gốc của đơn hàng (chưa trừ voucher).
@@ -126,4 +128,11 @@ export class Payment {
   @ManyToOne(() => Voucher, { nullable: true }) // Cho phép không có voucher
   @JoinColumn({ name: 'voucher_id' })
   voucher!: Voucher;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = uuidv4();
+    }
+  }
 }

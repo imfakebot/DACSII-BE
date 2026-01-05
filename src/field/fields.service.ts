@@ -18,6 +18,7 @@ import { Branch } from '@/branch/entities/branch.entity';
 import { UserProfile } from '../user/entities/users-profile.entity';
 import { Role } from '@/auth/enums/role.enum';
 import { Utility } from '../utility/entities/utility.entity';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @class FieldsService
@@ -332,6 +333,7 @@ export class FieldsService {
 
     const images = files.map((file) =>
       this.fieldImageRepository.create({
+        id: uuidv4(),
         image_url: `${baseUrl}/uploads/${file.filename}`,
         field: field,
       }),

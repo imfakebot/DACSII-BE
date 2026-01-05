@@ -1,4 +1,5 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, BeforeInsert } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Field } from './field.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -48,4 +49,11 @@ export class FieldImage {
   @ManyToOne(() => Field, (field) => field.images, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'field_id' })
   field!: Field;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = uuidv4();
+    }
+  }
 }

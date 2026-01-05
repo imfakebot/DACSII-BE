@@ -6,8 +6,10 @@ import {
   OneToOne,
   CreateDateColumn,
   UpdateDateColumn,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
+  BeforeInsert,
 } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from '../../user/entities/users-profile.entity';
 import { Field } from '../../field/entities/field.entity';
 import { Payment } from '../../payment/entities/payment.entity';
@@ -22,7 +24,7 @@ export class Booking {
    * Đổi từ @Column primary sang @PrimaryGeneratedColumn để tiện lợi hơn.
    */
   @ApiProperty({ format: 'uuid' })
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn()
   id!: string;
 
   @ApiProperty({
@@ -131,4 +133,11 @@ export class Booking {
   @ApiProperty()
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = uuidv4();
+    }
+  }
 }

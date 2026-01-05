@@ -648,6 +648,7 @@ export class BookingService {
         end_time: end,
         total_price: pricingResult.pricing.total_price,
         status: BookingStatus.COMPLETED,
+        code: this.generateBookingCode(),
         bookingDate: new Date(),
         field: { id: dto.fieldId } as Field,
         userProfile: userProfile || undefined,
