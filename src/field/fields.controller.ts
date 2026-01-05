@@ -37,6 +37,8 @@ import { Field } from './entities/field.entity';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
 import { SkipThrottle } from '@nestjs/throttler';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 
 /**
  * @controller FieldsController
@@ -192,7 +194,20 @@ export class FieldsController {
   @Roles(Role.Admin, Role.Manager)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Tải lên hình ảnh cho một sân bóng' })
-  @UseInterceptors(FilesInterceptor('images', 10))
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const randomName = Array(32)
+            .fill(null)
+            .map(() => Math.round(Math.random() * 16).toString(16))
+            .join('');
+          cb(null, `${randomName}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
   @ApiResponse({ status: 201, description: 'Tải ảnh lên thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   async uploadImages(
