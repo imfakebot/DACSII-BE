@@ -75,7 +75,6 @@ export class ReviewService {
     }
     
     const allowedStatuses = [
-      BookingStatus.COMPLETED,
       BookingStatus.CHECKED_IN,
       BookingStatus.FINISHED
     ];
@@ -83,7 +82,7 @@ export class ReviewService {
     // Log để debug
     this.logger.log(`[DEBUG] Booking ${bookingId} actual status: "${actualStatus}" (type: ${typeof actualStatus})`);
     this.logger.log(`[DEBUG] Allowed statuses: ${JSON.stringify(allowedStatuses)}`);
-    this.logger.log(`[DEBUG] Status comparison: COMPLETED=${actualStatus === BookingStatus.COMPLETED}, CHECKED_IN=${actualStatus === BookingStatus.CHECKED_IN}, FINISHED=${actualStatus === BookingStatus.FINISHED}`);
+    this.logger.log(`[DEBUG] Status comparison: CHECKED_IN=${actualStatus === BookingStatus.CHECKED_IN}, FINISHED=${actualStatus === BookingStatus.FINISHED}`);
     
     // So sánh với actualStatus thay vì booking.status
     const isAllowed = allowedStatuses.includes(actualStatus as BookingStatus);
