@@ -181,7 +181,7 @@ export class BranchService {
    */
   async findAll(): Promise<Branch[]> {
     return this.branchRepository.find({
-      relations: ['address', 'address.ward', 'address.city', 'manager'],
+      relations: ['address', 'address.ward', 'address.city', 'manager', 'manager.account'],
     });
   }
 

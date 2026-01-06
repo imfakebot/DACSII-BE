@@ -8,13 +8,14 @@ import { Account } from './entities/account.entity';
 import { UserProfile } from './entities/users-profile.entity';
 import { Role } from './entities/role.entity';
 import { Address } from '../location/entities/address.entity';
+import { Branch } from '@/branch/entities/branch.entity';
 import { UsersController } from './users.controller';
 import { NotificationsModule } from '@/notification/notifications.module';
 import { BranchModule } from '@/branch/branch.module'; // Giả định BranchModule tồn tại và export BranchModule
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Account, UserProfile, Role, Address]),
+    TypeOrmModule.forFeature([Account, UserProfile, Role, Address, Branch]),
     // Sử dụng forwardRef để phá vỡ circular dependency với NotificationsModule
     // Lý do: NotificationsModule import UsersModule, và UsersModule có thể cần NotificationsModule trong tương lai.
     forwardRef(() => BranchModule), // Thêm forwardRef cho BranchModule để giải quyết các phụ thuộc vòng tiềm ẩn

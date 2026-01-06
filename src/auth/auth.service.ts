@@ -304,7 +304,7 @@ export class AuthService {
             ? ((user.userProfile as { is_profile_complete?: boolean })
               .is_profile_complete ?? false)
             : false,
-        branch_id: bracnhId,
+        branch: { branchId: bracnhId },
       },
     };
   }
