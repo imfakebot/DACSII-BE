@@ -76,6 +76,8 @@ export class UsersService {
     @InjectRepository(Account) private accountRepository: Repository<Account>,
     @InjectRepository(UserProfile)
     private userProfileRepository: Repository<UserProfile>,
+    @InjectRepository(Branch)
+    private branchRepository: Repository<Branch>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -384,6 +386,18 @@ export class UsersService {
     this.logger.log(`Updating last login for account id: ${accountId}`);
     await this.accountRepository.update(accountId, {
       last_login: new Date(),
+    });
+  }
+
+  /**
+   * Tìm branch mà một UserProfile đang quản lý (dành cho branch_manager).
+   * @param userProfileId ID của UserProfile (manager_id trong Branch).
+   * @returns Promise giải quyết thành Branch hoặc null nếu không tìm thấy.
+   */
+  async findBranchByManagerProfileId(userProfileId: string): Promise<Branch | null> {
+    this.logger.log(`Finding branch for manager profile id: ${userProfileId}`);
+    return this.branchRepository.findOne({
+      where: { manager_id: userProfileId },
     });
   }
 

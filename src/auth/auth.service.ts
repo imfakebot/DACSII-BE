@@ -226,15 +226,24 @@ export class AuthService {
   async login(user: AuthenticatedUser | Account) {
     this.logger.log(`Logging in user ${user.email}`);
     const userProfile = (user as Account).userProfile;
-    const bracnhId = userProfile?.branch?.id;
-
     const roleName = (user.role as unknown as { name: string }).name;
+    
+    // Lấy branch_id: với Staff thì từ userProfile.branch, với Manager thì từ Branch table
+    let branchId: string | undefined = userProfile?.branch?.id || undefined;
+    
+    // Nếu là branch_manager và chưa có branchId, tìm branch mà họ quản lý
+    if (!branchId && userProfile && roleName === 'branch_manager') {
+      // userProfile.id là manager_id trong Branch table
+      const managedBranch = await this.userService.findBranchByManagerProfileId(userProfile.id);
+      branchId = managedBranch?.id || undefined;
+      this.logger.log(`Branch manager ${user.email} manages branch: ${branchId}`);
+    }
 
     const payload: JwtPayload & { branch_id?: string } = {
       email: user.email,
       sub: user.id,
       role: roleName,
-      branch_id: bracnhId,
+      branch_id: branchId,
     };
 
     const accessTokenSecret =
@@ -292,7 +301,7 @@ export class AuthService {
             ? ((user.userProfile as { is_profile_complete?: boolean })
               .is_profile_complete ?? false)
             : false,
-        branch_id: bracnhId,
+        branch_id: branchId,
       },
     };
   }
