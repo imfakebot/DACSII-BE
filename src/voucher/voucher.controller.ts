@@ -11,6 +11,8 @@ import {
   Param,
   ParseUUIDPipe,
   Logger,
+  Req,
+  BadRequestException, // Import BadRequestException
 } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -26,6 +28,8 @@ import { RolesGuard } from '../auth/guards/role.guard';
 import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { Voucher } from './entities/voucher.entity';
+import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Keep this import
+import { Request } from 'express'; // Import Request from express
 
 /**
  * @class VoucherController
@@ -98,14 +102,16 @@ export class VoucherController {
   }
 
   /**
-   * (Public) Endpoint để kiểm tra tính hợp lệ của voucher.
-   * Không yêu cầu đăng nhập, bất kỳ ai cũng có thể gọi.
+   * (User) Endpoint để kiểm tra tính hợp lệ của voucher.
+   * Yêu cầu đăng nhập.
    * @param {string} code - Mã voucher cần kiểm tra.
    * @param {number} orderValue - Giá trị đơn hàng hiện tại để xét điều kiện.
    * @returns {Promise<object>} Kết quả kiểm tra và thông tin giảm giá.
    */
   @Get('check')
-  @ApiOperation({ summary: '(Public) Kiểm tra mã giảm giá' })
+  @UseGuards(JwtAuthGuard) // Add authentication guard
+  @ApiBearerAuth('JWT-auth') // Add ApiBearerAuth decorator
+  @ApiOperation({ summary: '(User) Kiểm tra mã giảm giá' }) // Update summary
   @ApiQuery({
     name: 'code',
     type: String,
@@ -134,9 +140,18 @@ export class VoucherController {
   check(
     @Query('code') code: string,
     @Query('orderValue', ParseFloatPipe) orderValue: number,
+    @Req() req: Request & { user: AuthenticatedUser }, // Corrected type for req
   ): Promise<object> {
-    this.logger.log(`Checking voucher code "${code}" for order value: ${orderValue}`);
-    return this.voucherService.checkVoucher(code, Number(orderValue));
+    this.logger.log(
+      `Checking voucher code "${code}" for order value: ${orderValue} by user ${req.user.userProfileId}`,
+    );
+    const userProfileId = req.user.userProfileId; // Get userProfileId from authenticated user
+    // Ensure userProfileId is available, otherwise throw an error or handle accordingly
+    if (!userProfileId) {
+      this.logger.warn(`User ${req.user.sub} has no userProfileId in JWT, cannot check private vouchers.`);
+      throw new BadRequestException('Thông tin người dùng không đầy đủ để kiểm tra voucher.');
+    }
+    return this.voucherService.checkVoucher(code, Number(orderValue), userProfileId);
   }
 
   @Delete(':id')

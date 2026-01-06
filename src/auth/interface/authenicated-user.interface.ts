@@ -13,6 +13,7 @@ import { Role } from '../enums/role.enum';
  * @property {string} email - Email của người dùng.
  * @property {Role} role - Đối tượng vai trò của người dùng (ví dụ: `{ id: '...', name: 'User' }`).
  * @property {boolean} [is_profile_complete] - Cờ báo hiệu hồ sơ người dùng đã hoàn chỉnh hay chưa.
+ * @property {string} [userProfileId] - ID của hồ sơ người dùng (UserProfile), để dễ dàng truy cập.
  */
 export interface AuthenticatedUser {
   userProfile?: UserProfile;
@@ -22,4 +23,5 @@ export interface AuthenticatedUser {
   role: Role;
   is_profile_complete?: boolean;
   branch_id?: string | null;
+  userProfileId?: string; // Add this line
 }

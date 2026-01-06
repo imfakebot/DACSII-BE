@@ -15,6 +15,7 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { HttpModule } from '@nestjs/axios';
+import { VouchersModule } from '@/voucher/vouchers.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { HttpModule } from '@nestjs/axios';
     JwtModule.register({}),
     ConfigModule.forFeature(googleOauthConfig),
     HttpModule,
+    VouchersModule, // Add this line
   ],
   controllers: [AuthController],
   providers: [

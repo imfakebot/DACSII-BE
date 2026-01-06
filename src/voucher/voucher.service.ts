@@ -6,8 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Voucher } from './entities/voucher.entity';
-import { LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
+import { UserProfile } from '@/user/entities/users-profile.entity';
+import { Booking } from '@/booking/entities/booking.entity';
 
 /**
  * @class VoucherService
@@ -20,6 +22,9 @@ export class VoucherService {
   constructor(
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
+    // Inject BookingRepository to check user's booking history
+    @InjectRepository(Booking)
+    private readonly bookingRepository: Repository<Booking>,
   ) {}
 
   /**
@@ -29,7 +34,7 @@ export class VoucherService {
    * @returns {Promise<Voucher>} Voucher vừa được tạo.
    * @throws {BadRequestException} Nếu mã voucher đã tồn tại.
    */
-  async create(dto: CreateVoucherDto) {
+  async create(dto: CreateVoucherDto): Promise<Voucher> {
     this.logger.log(`Creating new voucher with DTO: ${JSON.stringify(dto)}`);
     const exists = await this.voucherRepository.findOne({
       where: { code: dto.code },
@@ -46,6 +51,78 @@ export class VoucherService {
   }
 
   /**
+   * (System) Tạo một voucher "xin lỗi" cho người dùng khi đơn của họ bị hủy bởi nhân viên.
+   * @param userProfile - Hồ sơ người dùng nhận voucher.
+   */
+  async createApologyVoucher(userProfile: UserProfile): Promise<void> {
+    this.logger.log(`Creating apology voucher for user ${userProfile.id}`);
+    try {
+      const voucherCode = `APOLOGY-${userProfile.id.slice(
+        -6,
+      )}-${Date.now()}`;
+      const validTo = new Date();
+      validTo.setDate(validTo.getDate() + 30); // Voucher có hạn 30 ngày
+
+      const apologyVoucherDto: CreateVoucherDto = {
+        code: voucherCode,
+        discountPercentage: 20, // Giảm 20%
+        maxDiscountAmount: 50000, // Tối đa 50,000đ
+        minOrderValue: 0, // Không cần giá trị tối thiểu
+        quantity: 1, // Chỉ 1 lần sử dụng
+        validFrom: new Date().toISOString(),
+        validTo: validTo.toISOString(),
+        userProfileId: userProfile.id, // Gán cho người dùng cụ thể
+      };
+
+      await this.create(apologyVoucherDto);
+      this.logger.log(
+        `Apology voucher ${voucherCode} created for user ${userProfile.id}`,
+      );
+      // TODO: Gửi thông báo cho người dùng
+    } catch (error) {
+      this.logger.error(
+        `Failed to create apology voucher for user ${userProfile.id}`,
+        error,
+      );
+    }
+  }
+
+  /**
+   * (System) Tạo voucher chào mừng cho người dùng mới đăng ký.
+   * @param userProfile - Hồ sơ người dùng để tạo voucher.
+   */
+  async createWelcomeVoucher(userProfile: UserProfile): Promise<void> {
+    this.logger.log(`Creating welcome voucher for new user ${userProfile.id}.`);
+    try {
+      const voucherCode = `WELCOME-${userProfile.id.slice(-6)}`;
+      const validTo = new Date();
+      validTo.setDate(validTo.getDate() + 30); // Voucher có hạn 30 ngày
+
+      const welcomeVoucherDto: CreateVoucherDto = {
+        code: voucherCode,
+        discountPercentage: 15, // Giảm 15%
+        maxDiscountAmount: 40000, // Tối đa 40,000đ
+        minOrderValue: 0,
+        quantity: 1,
+        validFrom: new Date().toISOString(),
+        validTo: validTo.toISOString(),
+        userProfileId: userProfile.id,
+      };
+
+      await this.create(welcomeVoucherDto);
+      this.logger.log(
+        `Welcome voucher ${voucherCode} created for user ${userProfile.id}`,
+      );
+      // TODO: Gửi thông báo cho người dùng
+    } catch (error) {
+      this.logger.error(
+        `Failed to create welcome voucher for user ${userProfile.id}`,
+        error,
+      );
+    }
+  }
+
+  /**
    * (Public) Lấy danh sách các voucher hợp lệ cho một giá trị đơn hàng cụ thể.
    * @param orderValue Giá trị của đơn hàng để kiểm tra điều kiện minOrderValue.
    * @returns Danh sách các voucher có thể áp dụng.
@@ -59,6 +136,7 @@ export class VoucherService {
         validFrom: LessThanOrEqual(now),
         validTo: MoreThan(now),
         minOrderValue: LessThanOrEqual(orderValue),
+        userProfileId: IsNull(), // Chỉ lấy các voucher công khai
       },
       order: {
         // Ưu tiên sắp xếp, ví dụ: voucher giảm nhiều tiền hơn lên trước
@@ -77,19 +155,33 @@ export class VoucherService {
    * - Còn hạn sử dụng
    * - Còn số lượng
    * - Đạt giá trị đơn hàng tối thiểu
+   * - Có đúng là của người dùng không (nếu là voucher cá nhân)
    * @param {string} code - Mã voucher cần kiểm tra.
    * @param {number} orderValue - Giá trị của đơn hàng để kiểm tra điều kiện.
+   * @param {string} userId - ID của người dùng đang áp dụng.
    * @returns {Promise<object>} Một object chứa kết quả kiểm tra và số tiền được giảm.
    * @throws {NotFoundException} Nếu voucher không tồn tại.
    * @throws {BadRequestException} Nếu voucher không hợp lệ (hết hạn, hết lượt, không đủ điều kiện,...).
    */
-  async checkVoucher(code: string, orderValue: number) {
-    this.logger.log(`Checking voucher code "${code}" for order value: ${orderValue}`);
+  async checkVoucher(code: string, orderValue: number, userProfileId: string) {
+    this.logger.log(
+      `Checking voucher code "${code}" for order value: ${orderValue} by user ${userProfileId}`,
+    );
     const voucher = await this.voucherRepository.findOne({ where: { code } });
 
     if (!voucher) {
       this.logger.warn(`Voucher "${code}" not found.`);
       throw new NotFoundException('Voucher không tồn tại');
+    }
+
+    // Kiểm tra xem voucher có phải của riêng ai không
+    if (voucher.userProfileId && voucher.userProfileId !== userProfileId) {
+      this.logger.warn(
+        `User ${userProfileId} trying to use a private voucher of user ${voucher.userProfileId}`,
+      );
+      throw new BadRequestException(
+        'Bạn không thể sử dụng mã giảm giá này.',
+      );
     }
 
     const now = new Date();
@@ -107,7 +199,11 @@ export class VoucherService {
     }
 
     if (orderValue < Number(voucher.minOrderValue)) {
-      this.logger.warn(`Voucher "${code}" minimum order value not met. Required: ${voucher.minOrderValue}, actual: ${orderValue}`);
+      this.logger.warn(
+        `Voucher "${code}" minimum order value not met. Required: ${
+          voucher.minOrderValue
+        }, actual: ${orderValue}`,
+      );
       throw new BadRequestException(
         `Đơn hàng phải tối thiểu ${Number(
           voucher.minOrderValue,
@@ -135,7 +231,9 @@ export class VoucherService {
     if (discountAmount > orderValue) {
       discountAmount = orderValue;
     }
-    this.logger.log(`Voucher "${code}" applied, discount amount: ${discountAmount}.`);
+    this.logger.log(
+      `Voucher "${code}" applied, discount amount: ${discountAmount}.`,
+    );
     return {
       isValid: true,
       code: voucher.code,

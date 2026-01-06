@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsDateString,
   Min,
+  IsUUID,
 } from 'class-validator';
 
 /**
@@ -120,4 +121,17 @@ export class CreateVoucherDto {
   @IsNumber()
   @Min(1)
   quantity!: number;
+
+  /**
+   * ID của người dùng được chỉ định voucher.
+   * Nếu để trống, voucher sẽ là public.
+   */
+  @ApiPropertyOptional({
+    description:
+      'ID của người dùng được chỉ định voucher. Nếu để trống, voucher sẽ là public.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  userProfileId?: string;
 }

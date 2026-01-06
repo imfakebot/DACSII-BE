@@ -31,6 +31,7 @@ import * as path from 'path';
 import * as handlebars from 'handlebars';
 import * as qrcode from 'qrcode';
 import { generatePdf } from 'html-pdf-node';
+import { VoucherService } from '@/voucher/voucher.service';
 
 /**
  * @class BookingService
@@ -54,6 +55,7 @@ export class BookingService {
     private readonly paymentService: PaymentService,
     private readonly dataSource: DataSource,
     private readonly userService: UsersService,
+    private readonly voucherService: VoucherService,
   ) { }
 
   /**
@@ -133,7 +135,7 @@ export class BookingService {
   async createBooking(
     createBookingDto: CreateBookingDto,
     userProfile: UserProfile,
-    ip: string
+    ip: string,
   ) {
     this.logger.log(
       `Creating booking for user ${userProfile.id} with DTO: ${JSON.stringify(
@@ -191,6 +193,12 @@ export class BookingService {
         });
 
         if (!voucher) throw new NotFoundException('Mã giảm giá không tồn tại');
+
+        // Check ownership for private vouchers
+        if (voucher.userProfileId && voucher.userProfileId !== userProfile.id) {
+          throw new BadRequestException('Bạn không thể sử dụng mã giảm giá này.');
+        }
+
         if (voucher.quantity <= 0)
           throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
 
@@ -406,7 +414,12 @@ export class BookingService {
 
       await queryRunner.commitTransaction();
 
-      // TODO: Send notification email about cancellation
+      // After successful cancellation, issue an apology voucher if cancelled by staff
+      if (isAdminOrManager && !isOwner && booking.userProfile) {
+        this.logger.log(`Issuing apology voucher to user ${booking.userProfile.id} for booking ${booking.id}`);
+        await this.voucherService.createApologyVoucher(booking.userProfile);
+        // TODO: Send notification to user about the apology voucher
+      }
 
       this.logger.log(`Booking ${bookingId} cancelled successfully`);
       return { message: `Hủy đơn đặt sân thành công. ${refundMessage}` };

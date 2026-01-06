@@ -1,13 +1,16 @@
 import { Payment } from '@/payment/entities/payment.entity';
+import { UserProfile } from '@/user/entities/users-profile.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-  DeleteDateColumn,
 } from 'typeorm';
 
 @Entity({ name: 'vouchers' })
@@ -77,6 +80,18 @@ export class Voucher {
   @ApiProperty({ description: 'Số lượng voucher', example: 100 })
   @Column({ type: 'int' })
   quantity!: number;
+
+  @ApiProperty({
+    description: 'ID của người dùng được cấp voucher (nếu có)',
+    required: false,
+    format: 'uuid',
+  })
+  @Column({ name: 'user_profile_id', type: 'varchar', length: 36, nullable: true })
+  userProfileId!: string | null;
+
+  @ManyToOne(() => UserProfile, { nullable: true })
+  @JoinColumn({ name: 'user_profile_id' })
+  userProfile!: UserProfile | null;
 
   @ApiProperty({ description: 'Ngày tạo' })
   @CreateDateColumn({ name: 'created_at' })

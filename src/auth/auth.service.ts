@@ -23,6 +23,7 @@ import { Gender } from '@/user/enum/gender.enum';
 import { JwtPayload } from './interface/jwtpayload.interface';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { VoucherService } from '@/voucher/voucher.service';
 
 
 
@@ -48,6 +49,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private readonly httpService: HttpService,
+    private readonly voucherService: VoucherService,
   ) { }
 
   /**
@@ -170,6 +172,14 @@ export class AuthService {
     await this.userService.verifyAccount(account.id);
     this.logger.log(`Account ${email} verified successfully`);
 
+    // Sau khi đăng ký thành công, tạo voucher chào mừng
+    const userProfile = await this.userService.findProfileByAccountId(
+      account.id,
+    );
+    if (userProfile) {
+      await this.voucherService.createWelcomeVoucher(userProfile);
+    }
+
     return { message: 'Tài khoản của bạn đã được xác thực thành công.' };
   }
 
@@ -226,15 +236,17 @@ export class AuthService {
   async login(user: AuthenticatedUser | Account) {
     this.logger.log(`Logging in user ${user.email}`);
     const userProfile = (user as Account).userProfile;
-    const bracnhId = userProfile?.branch?.id;
+    const bracnhId = userProfile?.branch?.id ?? undefined; // Fix: change null to undefined
+    const userProfileId = userProfile?.id; // Add this line
 
     const roleName = (user.role as unknown as { name: string }).name;
 
-    const payload: JwtPayload & { branch_id?: string } = {
+    const payload: JwtPayload & { branch_id?: string; userProfileId?: string } = {
       email: user.email,
       sub: user.id,
       role: roleName,
       branch_id: bracnhId,
+      userProfileId: userProfileId, // Add this line
     };
 
     const accessTokenSecret =
@@ -458,14 +470,16 @@ export class AuthService {
   async createAccessToken(user: AuthenticatedUser | Account): Promise<string> {
     this.logger.debug(`Creating new access token for user ${user.id}`);
     const userProfile = (user as Account).userProfile;
-    const branchId = userProfile?.branch?.id || null;
+    const branchId = userProfile?.branch?.id ?? undefined; // Fix: change null to undefined
+    const userProfileId = userProfile?.id; // Add this line
     const roleName = (user.role as unknown as { name: string }).name;
 
-    const payload = {
+    const payload: JwtPayload & { branch_id?: string; userProfileId?: string } = {
       email: user.email,
       sub: user.id,
       role: roleName,
       branch_id: branchId,
+      userProfileId: userProfileId, // Add this line
     };
 
     const accessTokenSecret =
