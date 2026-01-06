@@ -236,8 +236,8 @@ export class AuthService {
   async login(user: AuthenticatedUser | Account) {
     this.logger.log(`Logging in user ${user.email}`);
     const userProfile = (user as Account).userProfile;
-    const bracnhId = userProfile?.branch?.id ?? undefined; // Fix: change null to undefined
-    const userProfileId = userProfile?.id; // Add this line
+    const bracnhId = userProfile?.branch?.id ?? undefined;
+    const userProfileId = userProfile?.id;
 
     const roleName = (user.role as unknown as { name: string }).name;
 
