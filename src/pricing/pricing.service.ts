@@ -14,6 +14,7 @@ import { CheckPriceDto } from './dto/check-price.dto';
 import { BookingStatus } from '../booking/enums/booking-status.enum';
 import moment from 'moment-timezone';
 import { Branch } from '@/branch/entities/branch.entity';
+import { UpdateTimeSlotDto } from './dto/update-time-slot.dto';
 
 /**
  * @class PricingService
@@ -186,5 +187,49 @@ export class PricingService {
         `Chi nhánh này đóng cửa lúc ${branch.close_time}. Vui lòng chọn giờ kết thúc sớm hơn.`,
       );
     }
+  }
+
+  /**
+   * Lấy tất cả các khung giờ.
+   *
+   * @returns {Promise<TimeSlot[]>} Danh sách tất cả các khung giờ.
+   */
+  async getAllTimeSlots(): Promise<TimeSlot[]> {
+    this.logger.log('Fetching all time slots.');
+    return this.timeSlotRepository.find({ relations: ['fieldType'] });
+  }
+
+  /**
+   * Cập nhật thông tin của một khung giờ.
+   *
+   * @param {number} id - ID của khung giờ cần cập nhật.
+   * @param {UpdateTimeSlotDto} dto - DTO chứa thông tin cập nhật.
+   * @returns {Promise<TimeSlot>} Khung giờ đã được cập nhật.
+   * @throws {NotFoundException} Nếu không tìm thấy khung giờ.
+   */
+  async updateTimeSlot(id: number, dto: UpdateTimeSlotDto): Promise<TimeSlot> {
+    this.logger.log(`Updating time slot with ID ${id} with data: ${JSON.stringify(dto)}`);
+    const timeSlot = await this.timeSlotRepository.findOne({ where: { id } });
+
+    if (!timeSlot) {
+      this.logger.warn(`Time slot with ID ${id} not found.`);
+      throw new NotFoundException(`Khung giờ với ID ${id} không tồn tại.`);
+    }
+
+    // Cập nhật các trường nếu chúng được cung cấp trong DTO
+    if (dto.price) {
+      timeSlot.price = dto.price;
+    }
+    if (dto.start_time) {
+      timeSlot.start_time = dto.start_time;
+    }
+    if (dto.end_time) {
+      timeSlot.end_time = dto.end_time;
+    }
+    if (dto.is_peak_hour !== undefined) {
+      timeSlot.is_peak_hour = dto.is_peak_hour;
+    }
+
+    return this.timeSlotRepository.save(timeSlot);
   }
 }

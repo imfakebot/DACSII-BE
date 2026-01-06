@@ -56,6 +56,13 @@ export class BookingService {
     private readonly userService: UsersService,
   ) { }
 
+  /**
+   * @method downloadTicket
+   * @description Tạo file PDF vé đặt sân bao gồm mã QR và thông tin chi tiết.
+   * @param {string} bookingId - ID của đơn đặt sân.
+   * @returns {Promise<Buffer>} - Buffer chứa dữ liệu file PDF.
+   * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
+   */
   async downloadTicket(bookingId: string): Promise<Buffer> {
     const booking = await this.bookingRepository.findOne({
       where: { id: bookingId },
@@ -66,7 +73,7 @@ export class BookingService {
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
 
-    const qrCodeUrl = await qrcode.toDataURL(booking.id);
+    const qrCodeUrl = await qrcode.toDataURL(booking.code);
 
     const templatePath = path.resolve(
       __dirname,
@@ -80,6 +87,7 @@ export class BookingService {
     const html = template({
       booking: {
         id: booking.id,
+        code: booking.code,
         startTime: moment(booking.start_time).format('HH:mm DD/MM/YYYY'),
         endTime: moment(booking.end_time).format('HH:mm DD/MM/YYYY'),
         user: {
@@ -426,11 +434,11 @@ export class BookingService {
       where: { id },
       relations: ['userProfile', 'userProfile.account', 'field'],
     });
-    
+
     if (booking) {
       this.logger.log(`[DEBUG findOne] Booking ${id} found with status: "${booking.status}" (type: ${typeof booking.status}, raw value: ${JSON.stringify(booking.status)})`);
     }
-    
+
     return booking;
   }
 
@@ -444,7 +452,7 @@ export class BookingService {
    */
   async updateStatus(bookingId: string, status: BookingStatus) {
     this.logger.log(`Updating booking ${bookingId} to status ${status}`);
-    
+
     // Use query builder to ensure status is updated
     const result = await this.bookingRepository
       .createQueryBuilder()
@@ -452,12 +460,12 @@ export class BookingService {
       .set({ status: status })
       .where('id = :id', { id: bookingId })
       .execute();
-    
+
     if (result.affected === 0) {
       this.logger.error(`Booking with ID: ${bookingId} not found`);
       throw new NotFoundException('Không tìm thấy đơn đặt sân.');
     }
-    
+
     this.logger.log(`Booking ${bookingId} status updated to ${status}`);
   }
 
@@ -727,31 +735,31 @@ export class BookingService {
     booking.status = BookingStatus.CHECKED_IN;
     booking.check_in_at = new Date();
     this.logger.log(`[DEBUG] About to save booking ${booking.id} with status: ${booking.status}`);
-    
+
     // Update using query builder to ensure status is saved
     await this.bookingRepository
       .createQueryBuilder()
       .update(Booking)
-      .set({ 
+      .set({
         status: BookingStatus.CHECKED_IN,
         check_in_at: new Date()
       })
       .where('id = :id', { id: booking.id })
       .execute();
-    
+
     this.logger.log(`[DEBUG] Booking ${booking.id} updated via query builder`);
-    
+
     // Reload booking to get fresh data
     const savedBooking = await this.bookingRepository.findOne({
       where: { id: booking.id }
     });
-    
+
     if (savedBooking) {
       this.logger.log(`[DEBUG] Booking ${savedBooking.id} reloaded. Status after save: "${savedBooking.status}"`);
     }
-    
+
     this.logger.log(`Booking ${booking.id} checked in successfully`);
-    
+
     return savedBooking || booking;
   }
 
