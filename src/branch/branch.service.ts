@@ -237,22 +237,64 @@ export class BranchService {
    * @returns {Promise<Branch>} The updated branch.
    */
   async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
-    // For simplicity, this update will not handle changing the address or manager for now.
-    // That would require a more complex transaction.
     const branch = await this.findOne(id);
-    const { street, wardId, cityId, manager_id, ...branchData } =
+    const { street, wardId, cityId, manager_id, latitude, longitude, ...branchData } =
       updateBranchDto;
 
-    if (street || wardId || cityId) {
-      //Logic to update address would go here. Involving geocoding again.
-      this.logger.warn(
-        'Updating address is not fully implemented in this path.',
-      );
+    // Update address if any address field is provided
+    if (street !== undefined || wardId !== undefined || cityId !== undefined || latitude !== undefined || longitude !== undefined) {
+      const address = branch.address;
+      if (address) {
+        // Update street if provided
+        if (street !== undefined) {
+          address.street = street;
+        }
+        
+        // Update ward if provided
+        if (wardId !== undefined) {
+          const ward = await this.wardRepository.findOne({ where: { id: wardId } });
+          if (ward) {
+            address.ward = ward;
+          }
+        }
+        
+        // Update city if provided
+        if (cityId !== undefined) {
+          const city = await this.cityRepository.findOne({ where: { id: cityId } });
+          if (city) {
+            address.city = city;
+          }
+        }
+        
+        // Update coordinates if provided
+        if (latitude !== undefined) {
+          address.latitude = latitude;
+        }
+        if (longitude !== undefined) {
+          address.longitude = longitude;
+        }
+        
+        await this.addressRepository.save(address);
+        this.logger.log(`Address updated for branch ${id}`);
+      }
     }
-    if (manager_id) {
-      this.logger.warn(
-        'Updating manager is not fully implemented in this path.',
-      );
+
+    // Update manager if provided
+    if (manager_id !== undefined) {
+      if (manager_id === null) {
+        // Remove manager assignment
+        branch.manager = undefined as any;
+        branch.manager_id = null as any;
+      } else {
+        const managerProfile = await this.userProfileRepository.findOne({
+          where: { id: manager_id },
+          relations: ['account', 'account.role'],
+        });
+        if (managerProfile) {
+          branch.manager = managerProfile;
+          branch.manager_id = manager_id;
+        }
+      }
     }
 
     this.branchRepository.merge(branch, branchData);
