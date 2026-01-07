@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { FieldType } from './entities/field-types.entity';
 import { CreateFieldTypeDto } from './dto/create-field-type.dto';
 import { UpdateFieldTypeDto } from './dto/update-field-type.dto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class FieldTypeService {
@@ -22,7 +23,10 @@ export class FieldTypeService {
         throw new ConflictException('Loại sân này đã tồn tại.');
     }
 
-    const newFieldType = this.fieldTypeRepository.create(createFieldTypeDto);
+    const newFieldType = this.fieldTypeRepository.create({
+      ...createFieldTypeDto,
+      id: crypto.randomUUID(),
+    });
     return this.fieldTypeRepository.save(newFieldType);
   }
 
