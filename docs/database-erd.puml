@@ -3,254 +3,291 @@
 hide circle
 skinparam linetype ortho
 
-' --- NHÓM 1: ĐỊA CHÍNH (LOCATION) ---
-package "Location Module" {
-  entity "cities" {
-    *id : int <<PK>>
-    --
-    name : varchar
-    type : varchar
-  }
+' --- CORE TABLES DEFINITION ---
 
-  entity "wards" {
-    *id : int <<PK>>
-    --
-    name : varchar
-    type : varchar
-    *city_id : int <<FK>>
-  }
-
-  entity "addresses" {
-    *id : varchar <<PK>>
-    --
-    street : varchar
-    latitude : decimal
-    longitude : decimal
-    *ward_id : int <<FK>>
-    *cityId : int <<FK>>
-  }
+' User & Role Management
+entity "roles" as roles {
+  * **id** : int <<PK>>
+  --
+  name : varchar(50) <<UK>>
 }
 
-' --- NHÓM 2: NGƯỜI DÙNG & PHÂN QUYỀN (AUTH) ---
-package "Auth Module" {
-  entity "roles" {
-    *id : int <<PK>>
-    --
-    name : varchar
-  }
-
-  entity "accounts" {
-    *id : varchar <<PK>>
-    --
-    email : varchar
-    password_hash : varchar
-    status : varchar
-    *user_profile_id : varchar <<FK>>
-    *role_id : int <<FK>>
-  }
-
-  entity "user_profiles" {
-    *id : varchar <<PK>>
-    --
-    full_name : varchar
-    phone_number : varchar
-    avatar_url : text
-    branch_id : varchar <<FK>>
-  }
+entity "accounts" as accounts {
+  * **id** : varchar(36) <<PK>>
+  --
+  email : varchar(255) <<UK>>
+  password_hash : varchar(255) <<Exclude>>
+  provider : enum('credentials', 'google')
+  status : enum('active','suspended','deleted')
+  is_verified : boolean
+  last_login : datetime
+  two_factor_enabled : boolean
+  two_factor_secret : varchar(255) <<Exclude>>
+  two_factor_recovery_codes : text <<Exclude>>
+  verification_code : varchar(100) <<Exclude>>
+  verification_code_expires_at : datetime <<Exclude>>
+  hashed_refresh_token : varchar(255) <<Exclude>>
+  google_access_token : text <<Exclude>>
+  password_reset_token : varchar(255) <<Exclude>>
+  password_reset_expires : datetime <<Exclude>>
+  created_at : datetime
+  updated_at : datetime
+  --
+  * //user_profile_id** : varchar(36) <<FK>>//
+  * //role_id** : int <<FK>>//
 }
 
-' --- NHÓM 3: CHI NHÁNH & SÂN BÃI (FACILITY) ---
-package "Facility Module" {
-  entity "branches" {
-    *id : varchar <<PK>>
-    --
-    name : varchar
-    open_time : time
-    close_time : time
-    status : tinyint
-    *address_id : varchar <<FK>>
-    *manager_id : varchar <<FK>>
-  }
-
-  entity "field_types" {
-    *id : varchar <<PK>>
-    --
-    name : varchar
-    description : text
-  }
-
-  entity "fields" {
-    *id : varchar <<PK>>
-    --
-    name : varchar
-    status : tinyint
-    *branch_id : varchar <<FK>>
-    *field_type_id : varchar <<FK>>
-  }
-
-  entity "field_images" {
-    *id : varchar <<PK>>
-    --
-    image_url : text
-    is_cover : tinyint
-    *field_id : varchar <<FK>>
-  }
-
-  entity "time_slots" {
-    *id : int <<PK>>
-    --
-    start_time : time
-    end_time : time
-    price : decimal
-    is_peak_hour : tinyint
-    *field_type_id : varchar <<FK>>
-  }
+entity "user_profiles" as user_profiles {
+  * **id** : varchar(36) <<PK>>
+  --
+  full_name : varchar(255)
+  date_of_birth : date
+  gender : enum('male','female','other')
+  phone_number : varchar(255) <<UK>>
+  avatar_url : text
+  bio : text
+  is_profile_complete : boolean
+  created_at : datetime
+  updated_at : datetime
+  --
+  * //branch_id** : varchar(36) <<FK>>//
 }
 
-' --- NHÓM 4: DỊCH VỤ & TIỆN ÍCH (CANTEEN/UTILITY) ---
-package "Utility & Canteen Module" {
-  entity "utilities" {
-    *id : int <<PK>>
-    --
-    name : varchar
-    price : decimal
-    type : enum('amenity','product')
-  }
-
-  entity "field_utilities" {
-    *field_id : varchar <<PK, FK>>
-    *utility_id : int <<PK, FK>>
-  }
-
-  entity "utility_sales" {
-    *id : varchar <<PK>>
-    --
-    quantity : int
-    total_price : decimal
-    *utility_id : int <<FK>>
-    *branch_id : varchar <<FK>>
-    *booking_id : varchar <<FK>>
-    *sold_by_id : varchar <<FK>>
-  }
+' Location Management
+entity "cities" as cities {
+  * **id** : int <<PK>>
+  --
+  name : varchar(255)
+  type : varchar(255)
 }
 
-' --- NHÓM 5: ĐẶT SÂN & THANH TOÁN (CORE) ---
-package "Booking Core" {
-  entity "bookings" {
-    *id : varchar <<PK>>
-    --
-    code : varchar
-    booking_date : date
-    start_time : datetime
-    end_time : datetime
-    total_price : decimal
-    status : enum
-    check_in_at : timestamp
-    *user_profile_id : varchar <<FK>>
-    *field_id : varchar <<FK>>
-  }
-
-  entity "vouchers" {
-    *id : varchar <<PK>>
-    --
-    code : varchar
-    discount_amount : decimal
-    discount_percentage : int
-  }
-
-  entity "payments" {
-    *id : varchar <<PK>>
-    --
-    amount : decimal
-    final_amount : decimal
-    payment_method : enum
-    status : enum
-    transaction_code : varchar
-    *booking_id : varchar <<FK>>
-    voucher_id : varchar <<FK>>
-  }
+entity "wards" as wards {
+  * **id** : int <<PK>>
+  --
+  type : varchar(255)
+  name : varchar(255)
+  --
+  * //city_id** : int <<FK>>//
 }
 
-' --- NHÓM 6: TƯƠNG TÁC (INTERACTION) ---
-package "Interaction Module" {
-  entity "reviews" {
-    *id : varchar <<PK>>
-    --
-    rating : int
-    comment : text
-    *booking_id : varchar <<FK, Unique>>
-    *field_id : varchar <<FK>>
-    *user_profile_id : varchar <<FK>>
-  }
-
-  entity "feedbacks" {
-    *id : varchar <<PK>>
-    --
-    title : varchar
-    status : varchar
-    *submitter_id : varchar <<FK>>
-    assignee_id : varchar <<FK>>
-  }
-
-  entity "feedback_responses" {
-    *id : varchar <<PK>>
-    --
-    content : text
-    *feedback_id : varchar <<FK>>
-    *responder_id : varchar <<FK>>
-  }
-
-  entity "notifications" {
-    *id : varchar <<PK>>
-    --
-    title : varchar
-    content : text
-    *recipient_id : varchar <<FK>>
-  }
+entity "addresses" as addresses {
+  * **id** : varchar(36) <<PK>>
+  --
+  street : varchar(255)
+  latitude : decimal(10,8)
+  longitude : decimal(11,8)
+  --
+  * //city_id** : int <<FK>>//
+  * //ward_id** : int <<FK>>//
 }
 
-' --- QUAN HỆ (RELATIONSHIPS) ---
+' Branch & Field Management
+entity "branches" as branches {
+  * **id** : varchar(36) <<PK>>
+  --
+  name : varchar(150)
+  phone_number : varchar(15)
+  description : text
+  status : tinyint(1)
+  open_time : time
+  close_time : time
+  created_at : datetime
+  updated_at : datetime
+  --
+  * //address_id** : varchar(36) <<FK>>//
+  * //manager_id** : varchar(36) <<FK>>//
+  * //created_by_id** : varchar(36) <<FK>>//
+}
 
-' Location Relationships
-cities ||..|{ wards
-cities ||..|{ addresses
-wards ||..|{ addresses
+entity "field_types" as field_types {
+  * **id** : varchar(36) <<PK>>
+  --
+  name : varchar(50) <<UK>>
+  description : text
+}
 
-' Auth Relationships
-roles ||..|{ accounts
-user_profiles ||..|| accounts : "1-1"
-branches |o..|{ user_profiles : "Employee Of"
+entity "fields" as fields {
+  * **id** : varchar(36) <<PK>>
+  --
+  name : varchar(150)
+  description : text
+  status : tinyint(1)
+  created_at : datetime
+  updated_at : datetime
+  deleted_at : datetime
+  --
+  * //branch_id** : varchar(36) <<FK>>//
+  * //field_type_id** : varchar(36) <<FK>>//
+}
 
-' Facility Relationships
-addresses ||..|| branches : "Located At"
-user_profiles ||..|{ branches : "Manages"
-branches ||..|{ fields
-field_types ||..|{ fields
-field_types ||..|{ time_slots
-fields ||..|{ field_images
+entity "field_images" as field_images {
+  * **id** : varchar(36) <<PK>>
+  --
+  image_url : text
+  is_cover : boolean
+  --
+  * //field_id** : varchar(36) <<FK>>//
+}
 
-' Utility Relationships
-fields ||..|{ field_utilities
-utilities ||..|{ field_utilities
-utilities ||..|{ utility_sales
-branches ||..|{ utility_sales
-bookings |o..|{ utility_sales
-user_profiles ||..|{ utility_sales : "Sold By"
+entity "utilities" as utilities {
+  * **id** : int <<PK>>
+  --
+  name : varchar(100) <<UK>>
+  icon_url : text
+  price : decimal(10,2)
+  type : enum('amenity','product')
+}
 
-' Booking Relationships
-user_profiles ||..|{ bookings : "Makes"
-fields ||..|{ bookings
-bookings ||..|| payments : "1-1"
-vouchers |o..|{ payments
+' Pricing
+entity "time_slots" as time_slots {
+  * **id** : int <<PK>>
+  --
+  start_time : time
+  end_time : time
+  price : decimal(10,2)
+  is_peak_hour : boolean
+  --
+  * //field_type_id** : varchar(36) <<FK>>//
+}
 
-' Interaction Relationships
-bookings ||..|| reviews : "1-1"
-fields ||..|{ reviews
-user_profiles ||..|{ reviews
-user_profiles ||..|{ feedbacks : "Submits"
-user_profiles ||..|{ feedbacks : "Assigned"
-feedbacks ||..|{ feedback_responses
-user_profiles ||..|{ feedback_responses
-user_profiles ||..|{ notifications
+' Booking & Payment
+entity "bookings" as bookings {
+  * **id** : varchar(36) <<PK>>
+  --
+  code : varchar(20) <<UK>>
+  start_time : datetime
+  end_time : datetime
+  total_price : decimal(10,2)
+  status : enum('pending','confirmed','completed','cancelled','checked_in','finished')
+  check_in_at : datetime
+  booking_date : date
+  customer_name : varchar(100)
+  customer_phone : varchar(20)
+  created_at : datetime
+  updated_at : datetime
+  --
+  * //user_profile_id** : varchar(36) <<FK>>//
+  * //field_id** : varchar(36) <<FK>>//
+}
+
+entity "vouchers" as vouchers {
+  * **id** : varchar(36) <<PK>>
+  --
+  code : varchar(50) <<UK>>
+  discount_amount : decimal(10,2)
+  discount_percentage : int
+  max_discount_amount : decimal(10,2)
+  min_order_value : decimal(10,2)
+  valid_from : datetime
+  valid_to : datetime
+  quantity : int
+  created_at : datetime
+  updated_at : datetime
+  deleted_at : datetime
+  --
+  * //user_profile_id** : varchar(36) <<FK>>//
+}
+
+entity "payments" as payments {
+  * **id** : varchar(36) <<PK>>
+  --
+  amount : decimal(10,2)
+  final_amount : decimal(10,2)
+  status : enum('pending','completed','failed')
+  payment_method : enum('cash','momo','vnpay','banking')
+  transaction_code : varchar(100)
+  completed_at : datetime
+  created_at : datetime
+  bank_code : varchar(255)
+  --
+  * //booking_id** : varchar(36) <<FK>>//
+  * //voucher_id** : varchar(36) <<FK>>//
+}
+
+' Feedback & Reviews
+entity "feedbacks" as feedbacks {
+  * **id** : varchar(36) <<PK>>
+  --
+  title : varchar(255)
+  category : varchar(255)
+  status : enum('open','in_progress','closed')
+  created_at : datetime
+  --
+  * //submitter_id** : varchar(36) <<FK>>//
+  * //assignee_id** : varchar(36) <<FK>>//
+}
+
+entity "feedback_responses" as feedback_responses {
+  * **id** : varchar(36) <<PK>>
+  --
+  content : text
+  created_at : datetime
+  --
+  * //feedback_id** : varchar(36) <<FK>>//
+  * //responder_id** : varchar(36) <<FK>>//
+}
+
+entity "reviews" as reviews {
+  * **id** : varchar(36) <<PK>>
+  --
+  rating : int
+  comment : text
+  created_at : datetime
+  --
+  * //booking_id** : varchar(36) <<FK, UK>>//
+  * //field_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : varchar(36) <<FK>>//
+}
+
+' Join Tables
+entity "field_utilities" as field_utilities {
+  * //field_id** : varchar(36) <<FK>>//
+  * //utility_id** : int <<FK>>//
+}
+
+
+' --- CORE RELATIONSHIPS ---
+
+' User, Role & Profile
+roles ||--o{ accounts : "has"
+user_profiles ||..|| accounts : "has identity"
+user_profiles }o--o| branches : "are staff in" ' Assuming staff can belong to a branch
+user_profiles }o--o{ branches : "created by"
+user_profiles }o--o| branches : "is manager of"
+
+' Location & Address
+cities ||--o{ wards : "contains"
+cities ||--o{ addresses : "has"
+wards ||--o{ addresses : "has"
+
+' Branch, Address & Field
+addresses ||..|| branches : "located at"
+branches ||--o{ fields : "contains"
+field_types ||--o{ fields : "are of type"
+fields ||--o{ field_images : "has"
+
+' Field & Utilities (Many-to-Many)
+fields }o--o{ field_utilities
+utilities }o--o{ field_utilities
+
+' Pricing
+field_types ||--o{ time_slots : "has pricing"
+
+' Booking, Payment & Voucher
+user_profiles }o..o{ bookings : "makes"
+fields ||--o{ bookings : "is for"
+bookings ||..|| payments : "results in"
+vouchers }o..o| payments : "applies to"
+user_profiles ||--o{ vouchers : "owns"
+
+' Feedback & Reviews
+user_profiles ||--o{ feedbacks : "submits"
+user_profiles ||--o{ feedbacks : "assigned to"
+feedbacks ||--o{ feedback_responses : "has"
+user_profiles ||--o{ feedback_responses : "responds to"
+bookings ||--|| reviews : "has"
+fields ||--o{ reviews : "has"
+user_profiles ||--o{ reviews : "writes"
+
 
 @enduml
