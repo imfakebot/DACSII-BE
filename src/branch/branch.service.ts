@@ -49,7 +49,7 @@ export class BranchService {
     private readonly userProfileRepository: Repository<UserProfile>,
     private readonly geocodingService: GeocodingService,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * @method create
@@ -249,7 +249,7 @@ export class BranchService {
         if (street !== undefined) {
           address.street = street;
         }
-        
+
         // Update ward if provided
         if (wardId !== undefined) {
           const ward = await this.wardRepository.findOne({ where: { id: wardId } });
@@ -257,7 +257,7 @@ export class BranchService {
             address.ward = ward;
           }
         }
-        
+
         // Update city if provided
         if (cityId !== undefined) {
           const city = await this.cityRepository.findOne({ where: { id: cityId } });
@@ -265,7 +265,7 @@ export class BranchService {
             address.city = city;
           }
         }
-        
+
         // Update coordinates if provided
         if (latitude !== undefined) {
           address.latitude = latitude;
@@ -273,7 +273,7 @@ export class BranchService {
         if (longitude !== undefined) {
           address.longitude = longitude;
         }
-        
+
         await this.addressRepository.save(address);
         this.logger.log(`Address updated for branch ${id}`);
       }
@@ -283,8 +283,9 @@ export class BranchService {
     if (manager_id !== undefined) {
       if (manager_id === null) {
         // Remove manager assignment
-        branch.manager = undefined as any;
-        branch.manager_id = null as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        branch.manager = null as any;
+        branch.manager_id = null;
       } else {
         const managerProfile = await this.userProfileRepository.findOne({
           where: { id: manager_id },
