@@ -370,6 +370,7 @@ export class BookingService {
 
       const refundResult = await this.paymentService.refundVnpayTransaction(
         booking.payment,
+        booking.id,
         accountId, // Actor's ID
         ipAddr, // User's IP
       );

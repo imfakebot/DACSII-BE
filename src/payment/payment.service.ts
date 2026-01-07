@@ -539,6 +539,7 @@ export class PaymentService {
    */
   async refundVnpayTransaction(
     payment: Payment,
+    bookingId: string,
     actor: string,
     ipAddr: string,
   ): Promise<{ isSuccess: boolean; message: string; data?: any }> {
@@ -549,42 +550,91 @@ export class PaymentService {
     }
 
     const vnp_Params: Record<string, any> = {
-      vnp_RequestId: moment(new Date()).format('HHmmss') + payment.booking.id.substring(0, 8),
+      vnp_RequestId: moment(new Date()).format('HHmmss') + bookingId.substring(0, 8),
       vnp_Version: '2.1.0',
       vnp_Command: 'refund',
       vnp_TmnCode: tmnCode,
       vnp_TransactionType: '02', // 02: Hoàn toàn phần, 03: Hoàn một phần
-      vnp_TxnRef: payment.booking.id,
+      vnp_TxnRef: bookingId,
       vnp_Amount: Number(payment.finalAmount) * 100,
       vnp_TransactionNo: payment.transactionCode,
       vnp_TransactionDate: moment(payment.completedAt).format('YYYYMMDDHHmmss'),
       vnp_CreateBy: actor,
       vnp_CreateDate: moment(new Date()).format('YYYYMMDDHHmmss'),
       vnp_IpAddr: ipAddr,
-      vnp_OrderInfo: `Hoan tien cho don hang ${payment.booking.id}`,
+      vnp_OrderInfo: `Hoan tien cho don hang ${bookingId}`,
     };
 
-    const signData = qs.stringify(this.sortObject(vnp_Params), { encode: false });
+    // VNPAY API requires a specific order for hashing, joined by '|'
+    const rawSignatureData = [
+      vnp_Params.vnp_RequestId,
+      vnp_Params.vnp_Version,
+      vnp_Params.vnp_Command,
+      vnp_Params.vnp_TmnCode,
+      vnp_Params.vnp_TransactionType,
+      vnp_Params.vnp_TxnRef,
+      vnp_Params.vnp_Amount,
+      vnp_Params.vnp_TransactionNo,
+      vnp_Params.vnp_TransactionDate,
+      vnp_Params.vnp_CreateBy,
+      vnp_Params.vnp_CreateDate,
+      vnp_Params.vnp_IpAddr,
+      vnp_Params.vnp_OrderInfo,
+    ].join('|');
+
     const hmac = crypto.createHmac('sha512', secretKey);
-    const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
+    const signed = hmac.update(Buffer.from(rawSignatureData, 'utf-8')).digest('hex');
     vnp_Params['vnp_SecureHash'] = signed;
 
     try {
-      this.logger.log(`Gửi yêu cầu hoàn tiền VNPAY cho đơn ${payment.booking.id}`);
+      this.logger.log(`Gửi yêu cầu hoàn tiền VNPAY cho đơn ${bookingId}`);
       const response = await firstValueFrom(
         this.httpService.post<Record<string, any>>(apiUrl, vnp_Params),
       );
 
       this.logger.log(`Phản hồi hoàn tiền VNPAY: ${JSON.stringify(response.data)}`);
       const vnpResponse = response.data;
-      const responseSecureHash = vnpResponse.vnp_SecureHash as string;
 
+      // First, check if VNPAY returned a signature at all. Error responses often don't.
+      if (!vnpResponse.vnp_SecureHash) {
+        if (vnpResponse.vnp_ResponseCode !== '00') {
+          const errorMessage = this.mapVnpayError(vnpResponse.vnp_ResponseCode);
+          return { isSuccess: false, message: errorMessage, data: vnpResponse };
+        }
+        // If code is '00' but has no hash, treat it as a failure.
+        return { isSuccess: false, message: 'Phản hồi từ VNPAY không chứa chữ ký bảo mật.' };
+      }
+
+      const responseSecureHash = vnpResponse.vnp_SecureHash as string;
       delete vnpResponse.vnp_SecureHash;
       delete vnpResponse.vnp_SecureHashType;
 
-      const responseSignData = qs.stringify(this.sortObject(vnpResponse), { encode: false });
+      // VNPAY API requires a specific order for hashing the response, joined by '|'
+      const rawResponseSignatureData = [
+        vnpResponse.vnp_ResponseId,
+        vnpResponse.vnp_Command,
+        vnpResponse.vnp_ResponseCode,
+        vnpResponse.vnp_Message,
+        vnpResponse.vnp_TmnCode,
+        vnpResponse.vnp_TxnRef,
+        vnpResponse.vnp_Amount,
+        vnpResponse.vnp_BankCode,
+        vnpResponse.vnp_PayDate,
+        vnpResponse.vnp_TransactionNo,
+        vnpResponse.vnp_TransactionType,
+        vnpResponse.vnp_TransactionStatus,
+        vnpResponse.vnp_OrderInfo,
+      ].join('|');
+
       const responseHmac = crypto.createHmac('sha512', secretKey);
-      const responseSigned = responseHmac.update(Buffer.from(responseSignData, 'utf-8')).digest('hex');
+      const responseSigned = responseHmac.update(Buffer.from(rawResponseSignatureData, 'utf-8')).digest('hex');
+
+      // --- DEBUG LOGGING ---
+      this.logger.debug(`[REFUND SIG CHECK] Raw VNPAY Response (full): ${JSON.stringify(response.data)}`);
+      this.logger.debug(`[REFUND SIG CHECK] String to Sign: ${rawResponseSignatureData}`);
+      this.logger.debug(`[REFUND SIG CHECK] Our Signature: ${responseSigned}`);
+      this.logger.debug(`[REFUND SIG CHECK] VNPAY's Signature: ${responseSecureHash}`);
+      // --- END DEBUG LOGGING ---
 
       if (responseSecureHash === responseSigned) {
         const responseCode = vnpResponse.vnp_ResponseCode as string;
