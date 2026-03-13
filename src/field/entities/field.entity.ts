@@ -95,4 +95,18 @@ export class Field {
 
   @OneToMany(() => Review, (review) => review.field)
   reviews!: Review[];
+
+  @ApiProperty({
+    description: 'Điểm đánh giá trung bình',
+    example: 4.5,
+    required: false,
+  })
+  averageRating?: number;
+
+  @ApiProperty({
+    description: 'Tổng số lượt đánh giá',
+    example: 10,
+    required: false,
+  })
+  reviewCount?: number;
 }

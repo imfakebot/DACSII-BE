@@ -129,7 +129,25 @@ export class FieldsService {
       .leftJoinAndSelect('field.branch', 'branch')
       .leftJoinAndSelect('branch.address', 'address')
       .leftJoinAndSelect('address.ward', 'ward')
-      .leftJoinAndSelect('address.city', 'city');
+      .leftJoinAndSelect('address.city', 'city')
+      // Sử dụng Subquery để tính điểm trung bình (tránh lỗi nhân dòng khi join với images)
+      .addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COALESCE(AVG(r.rating), 0)', 'avg')
+            .from('reviews', 'r')
+            .where('r.field_id = field.id'),
+        'field_averageRating',
+      )
+      // Sử dụng Subquery để đếm số lượng đánh giá
+      .addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COUNT(r.id)', 'count')
+            .from('reviews', 'r')
+            .where('r.field_id = field.id'),
+        'field_reviewCount',
+      );
 
     if (branchId) {
       query.andWhere('branch.id = :branchId', { branchId });
@@ -175,7 +193,19 @@ export class FieldsService {
       query.orderBy('field.createdAt', 'DESC');
     }
 
-    const fields = await query.getMany();
+    const { entities, raw } = await query.getRawAndEntities();
+
+    const fields = entities.map((entity) => {
+      const rawItem = raw.find((r) => r.field_id === entity.id);
+      entity.averageRating = rawItem?.field_averageRating
+        ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
+        : 0;
+      entity.reviewCount = rawItem?.field_reviewCount
+        ? parseInt(rawItem.field_reviewCount)
+        : 0;
+      return entity;
+    });
+
     this.logger.log(`Found ${fields.length} fields`);
     return fields;
   }
