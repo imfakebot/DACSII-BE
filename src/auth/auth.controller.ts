@@ -147,9 +147,23 @@ export class AuthController {
   async googleAuthRedirect(
     @User() user: AuthenticatedUser,
     @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
   ) {
     this.logger.log(`Google callback successful for user ${user.email}`);
     const loginData = await this.authService.login(user);
+
+    const platform = (req.query.platform as string) || 'web';
+    this.logger.log(`Google callback platform: ${platform}`);
+
+    if (platform === 'mobile') {
+      // Nếu là mobile, thay vì trả về script, chúng ta sẽ trả về JSON chứa access token và thông tin user. Refresh token vẫn được gửi qua cookie.
+      const mobileDeeplink = this.configService.get<string>('MOBILE_DEEPLINK_URL');
+      if (!mobileDeeplink) {
+        throw new InternalServerErrorException('Lỗi cấu hình MOBILE_DEEPLINK_URL');
+      }
+      const deepLink = `${mobileDeeplink}?accessToken=${loginData.accessToken}&refreshToken=${loginData.refreshToken}`;
+      return res.redirect(deepLink);
+    }
 
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
     if (!frontendURL) {
@@ -247,11 +261,11 @@ export class AuthController {
     const userId = req.user.sub;
     this.logger.log(`User ${userId} logging out`);
     await this.authService.logout(userId);
-    
+
     // Clear tất cả cookies liên quan đến auth
     res.clearCookie('refresh_token', { path: '/' });
     res.clearCookie('access_token', { path: '/' });
-    
+
     return { message: 'Đăng xuất thành công' };
   }
   /**

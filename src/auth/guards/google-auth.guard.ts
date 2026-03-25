@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 
 /**
  * @guard GoogleAuthGuard
@@ -18,4 +19,10 @@ import { AuthGuard } from '@nestjs/passport';
  * ```
  */
 @Injectable()
-export class GoogleAuthGuard extends AuthGuard('google') {}
+export class GoogleAuthGuard extends AuthGuard('google') {
+    getAuthenticateOptions(context: ExecutionContext) {
+        const request: Request = context.switchToHttp().getRequest();
+        const platform = (request.query.platform as string) || 'web'; // Ép kiểu về string để đảm bảo type-safe
+        return { state: platform };
+    }
+}
