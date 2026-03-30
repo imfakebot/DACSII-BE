@@ -506,7 +506,10 @@ export class AuthService {
    * @param {string} email - Email của người dùng yêu cầu đặt lại mật khẩu.
    * @returns {Promise<{ message: string }>} - Một thông báo chung để tránh tiết lộ email nào đã được đăng ký (time-safe response).
    */
-  async forgotPassword(email: string): Promise<{ message: string }> {
+  async forgotPassword(
+    email: string,
+    returnUrl?: string,
+  ): Promise<{ message: string }> {
     this.logger.log(`Forgot password request for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (
@@ -539,7 +542,11 @@ export class AuthService {
 
     // 4. Tạo URL và gửi email
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
-    const resetUrl = `${frontendURL}/reset-password?token=${resetToken}`;
+    const baseUrl = returnUrl || `${frontendURL}/reset-password`;
+    
+    const resetUrl = baseUrl.includes('?') 
+      ? `${baseUrl}&token=${resetToken}` 
+      : `${baseUrl}?token=${resetToken}`;
 
     this.logger.log(`Sending password reset email to ${email}`);
     await this.mailerService.sendMail({

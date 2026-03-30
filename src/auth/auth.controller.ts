@@ -281,11 +281,15 @@ export class AuthController {
     status: 200,
     description: 'Luôn trả về thông báo thành công để tránh dò email.',
   })
+  @ApiBody({ type: ForgotPasswordDto })
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     this.logger.log(
       `Forgot password requested for email ${forgotPasswordDto.email}`,
     );
-    return this.authService.forgotPassword(forgotPasswordDto.email);
+    return this.authService.forgotPassword(
+      forgotPasswordDto.email,
+      forgotPasswordDto.returnUrl,
+    );
   }
 
   /**

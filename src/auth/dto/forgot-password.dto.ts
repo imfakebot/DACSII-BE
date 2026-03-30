@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 /**
  * @class ForgotPasswordDto
@@ -20,4 +20,18 @@ export class ForgotPasswordDto {
   @IsEmail({}, { message: 'Email không hợp lệ.' })
   @IsNotEmpty({ message: 'Email không được để trống.' })
   email!: string;
+
+  /**
+   * URL tùy chọn dùng để làm deep link cho Mobile App.
+   * @ApiPropertyOptional - Cung cấp ví dụ và mô tả cho tài liệu Swagger.
+   * @IsOptional - Trường này không bắt buộc.
+   * @IsString - Đảm bảo giá trị phải là chuỗi.
+   */
+  @ApiPropertyOptional({
+    description: 'URL hoặc Scheme tuỳ chọn để chuyển hướng (Dành cho Mobile App deep link). Ví dụ: dacsii://reset-password',
+    example: 'dacsii://reset-password',
+  })
+  @IsOptional()
+  @IsString({ message: 'returnUrl phải là chuỗi hợp lệ.' })
+  returnUrl?: string;
 }
