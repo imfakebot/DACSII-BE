@@ -93,6 +93,7 @@ export class Field {
   })
   utilities!: Utility[];
 
+  @ApiProperty({ type: () => [Review] })
   @OneToMany(() => Review, (review) => review.field)
   reviews!: Review[];
 

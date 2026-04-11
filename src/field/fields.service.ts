@@ -192,8 +192,7 @@ export class FieldsService {
     } else {
       query.orderBy('field.createdAt', 'DESC');
     }
-
-    const { entities, raw } = await query.getRawAndEntities();
+    const { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
 
     const fields = entities.map((entity) => {
       const rawItem = raw.find((r) => r.field_id === entity.id);
@@ -212,22 +211,53 @@ export class FieldsService {
 
   async findOne(id: string): Promise<Field> {
     this.logger.log(`Finding field with ID: ${id}`);
-    const field = await this.fieldRepository.findOne({
-      where: { id },
-      relations: [
-        'fieldType',
-        'images',
-        'utilities',
-        'branch',
-        'branch.address',
-        'branch.manager',
-      ],
-    });
+    const query = this.fieldRepository.createQueryBuilder('field');
+
+    query
+      .leftJoinAndSelect('field.fieldType', 'fieldType')
+      .leftJoinAndSelect('field.images', 'images')
+      .leftJoinAndSelect('field.utilities', 'utilities')
+      .leftJoinAndSelect('field.branch', 'branch')
+      .leftJoinAndSelect('branch.address', 'address')
+      .leftJoinAndSelect('address.ward', 'ward')
+      .leftJoinAndSelect('address.city', 'city')
+      .leftJoinAndSelect('branch.manager', 'manager')
+      .leftJoinAndSelect('field.reviews', 'reviews')
+      .leftJoinAndSelect('reviews.userProfile', 'userProfile')
+      .addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COALESCE(AVG(r.rating), 0)', 'avg')
+            .from('reviews', 'r')
+            .where('r.field_id = field.id'),
+        'field_averageRating',
+      )
+      .addSelect(
+        (subQuery) =>
+          subQuery
+            .select('COUNT(r.id)', 'count')
+            .from('reviews', 'r')
+            .where('r.field_id = field.id'),
+        'field_reviewCount',
+      )
+      .where('field.id = :id', { id });
+
+    const { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
+    const field = entities[0];
 
     if (!field) {
       this.logger.error(`Field with ID ${id} not found`);
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
+
+    const rawItem = raw.find((r) => r.field_id === field.id);
+    field.averageRating = rawItem?.field_averageRating
+      ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
+      : 0;
+    field.reviewCount = rawItem?.field_reviewCount
+      ? parseInt(rawItem.field_reviewCount)
+      : 0;
+
     return field;
   }
 
