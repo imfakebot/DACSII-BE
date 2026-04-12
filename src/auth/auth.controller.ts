@@ -391,4 +391,47 @@ export class AuthController {
       user: loginData.user,
     };
   }
+
+  /**
+   * @route POST /auth/google/mobile
+   * @description Luồng đăng nhập Google DÀNH RIÊNG cho Native Mobile App (Android/iOS).
+   * App sẽ tự lấy `idToken` qua Google Sign-In SDK (Popup) và gửi thẳng lên đây.
+   * Không cần dùng Redirect hay Deep Link.
+   * @param {string} idToken - Token lấy từ Google Credential Manager bên Android
+   */
+  @Post('google/mobile')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đăng nhập Google Native cho Mobile (Nhận idToken)' })
+  @ApiResponse({ status: 200, description: 'Trả về accessToken và thông tin user' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { idToken: { type: 'string', description: 'Token từ Android' } },
+    },
+  })
+  async googleAuthNative(
+    @Body('idToken') idToken: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.logger.log(`Received Native Google idToken from Mobile`);
+
+    // 1. Gọi AuthService để verify cái idToken này với Google 
+    // (Hàm này Sếp xem lại tin nhắn trước tui gửi nhé, xài thư viện google-auth-library)
+    const loginData = await this.authService.verifyGoogleAndroidToken(idToken);
+
+    // 2. Trả refresh_token qua Cookie (hoặc ném luôn vào body nếu Android không xài cookie)
+    res.cookie('refresh_token', loginData.refreshToken, {
+      httpOnly: true,
+      secure: this.configService.get('NODE_ENV') === 'production',
+      sameSite: 'strict',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      path: '/',
+    });
+
+    // 3. Trả thẳng Access Token cho Android (Android dùng Retrofit hứng phát một)
+    return {
+      accessToken: loginData.accessToken,
+      user: loginData.user,
+    };
+  }
 }

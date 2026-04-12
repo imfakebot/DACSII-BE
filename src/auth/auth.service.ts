@@ -13,6 +13,7 @@ import { RegisterUserDto } from './dto/register-user.dto';
 import { createHash, randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { OAuth2Client } from 'google-auth-library';
 import * as bcrypt from 'bcrypt';
 import { Account } from '@/user/entities/account.entity';
 import { StringValue } from 'ms';
@@ -36,6 +37,8 @@ import { VoucherService } from '@/voucher/voucher.service';
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly googleClient: OAuth2Client;
+  private readonly googleClientId: string;
   /**
    * @constructor
    * @param {UsersService} userService - Service để tương tác với dữ liệu người dùng.
@@ -50,7 +53,15 @@ export class AuthService {
     private configService: ConfigService,
     private readonly httpService: HttpService,
     private readonly voucherService: VoucherService,
-  ) { }
+  ) {
+    this.googleClientId = this.configService.get<string>('GOOGLE_WEB_CLIENT_ID') as string;
+    if (this.googleClientId) {
+      this.googleClient = new OAuth2Client(this.googleClientId);
+    } else {
+      this.logger.error('GOOGLE_WEB_CLIENT_ID is not configured');
+      throw new InternalServerErrorException('Lỗi cấu hình Google OAuth: GOOGLE_WEB_CLIENT_ID is missing');
+    }
+  }
 
   /**
    * @method initiateRegistration
@@ -543,9 +554,9 @@ export class AuthService {
     // 4. Tạo URL và gửi email
     const frontendURL = this.configService.get<string>('FRONTEND_URL');
     const baseUrl = returnUrl || `${frontendURL}/reset-password`;
-    
-    const resetUrl = baseUrl.includes('?') 
-      ? `${baseUrl}&token=${resetToken}` 
+
+    const resetUrl = baseUrl.includes('?')
+      ? `${baseUrl}&token=${resetToken}`
       : `${baseUrl}?token=${resetToken}`;
 
     this.logger.log(`Sending password reset email to ${email}`);
@@ -703,5 +714,49 @@ export class AuthService {
 
     this.logger.log(`2FA login successful for ${email}`);
     return this.login(account);
+  }
+
+  /**
+   * Xác thực idToken từ Native Mobile (Android/iOS)
+   * Phân tích Token -> Lấy thông tin -> Tìm/Tạo User -> Trả về Access & Refresh Token
+   */
+  async verifyGoogleAndroidToken(idToken: string) {
+    this.logger.log('Verifying Google Android token');
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.googleClientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        this.logger.warn('Google token payload is missing email');
+        throw new UnauthorizedException('Token không hợp lệ.');
+      }
+
+      const email = payload.email;
+      const fullName = payload.name as string;
+      const avatarUrl = payload.picture as string;
+
+      let user = await this.userService.findAccountByEmail(email, [
+        'userProfile',
+        'role',
+      ]);
+      if (!user) {
+        this.logger.log(`Creating new user for Google Android login: ${email}`);
+        user = await this.userService.createOAuthUser({
+          email,
+          fullName,
+          provider: AuthProvider.GOOGLE,
+          avatarUrl,
+        });
+      }
+
+      this.logger.log(`Google Android verification successful for ${email}`);
+      return this.login(user);
+    } catch (e) {
+      this.logger.error('Error occurred while verifying Google token', e);
+      throw new InternalServerErrorException('Lỗi xác thực token Google.');
+    }
   }
 }

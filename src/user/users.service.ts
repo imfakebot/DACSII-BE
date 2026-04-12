@@ -45,6 +45,7 @@ type CreateOAuthUserPayload = {
   email: string;
   fullName: string;
   provider: AuthProvider;
+  avatarUrl?: string | null;
 };
 
 /**
