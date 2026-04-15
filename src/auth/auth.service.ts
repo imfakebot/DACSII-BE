@@ -58,8 +58,8 @@ export class AuthService {
     if (this.googleClientId) {
       this.googleClient = new OAuth2Client(this.googleClientId);
     } else {
-      this.logger.error('GOOGLE_WEB_CLIENT_ID is not configured');
-      throw new InternalServerErrorException('Lỗi cấu hình Google OAuth: GOOGLE_WEB_CLIENT_ID is missing');
+      this.logger.error('GOOGLE_CLIENT_ID is not configured');
+      throw new InternalServerErrorException('Lỗi cấu hình Google OAuth: GOOGLE_CLIENT_ID is missing');
     }
   }
 
