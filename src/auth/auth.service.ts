@@ -54,7 +54,7 @@ export class AuthService {
     private readonly httpService: HttpService,
     private readonly voucherService: VoucherService,
   ) {
-    this.googleClientId = this.configService.get<string>('GOOGLE_WEB_CLIENT_ID') as string;
+    this.googleClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') as string;
     if (this.googleClientId) {
       this.googleClient = new OAuth2Client(this.googleClientId);
     } else {
