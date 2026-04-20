@@ -129,8 +129,14 @@ export class PaymentService {
    * @returns {object} - Một đối tượng chứa kết quả xác thực.
    */
   verifyReturnUrl(vnp_Params: Record<string, any>) {
-    const vnp_Params_Data = { ...vnp_Params };
-    const secureHash = vnp_Params['vnp_SecureHash'] as string;
+    const vnp_Params_Data: Record<string, string> = {};
+    for (const key in vnp_Params) {
+      if (key.startsWith('vnp_')) {
+        vnp_Params_Data[key] = String(vnp_Params[key]);
+      }
+    }
+
+    const secureHash = vnp_Params_Data['vnp_SecureHash'];
 
     delete vnp_Params_Data['vnp_SecureHash'];
     delete vnp_Params_Data['vnp_SecureHashType'];
@@ -145,12 +151,12 @@ export class PaymentService {
     const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    const orderId = vnp_Params_Data['vnp_TxnRef'] as string;
+    const orderId = vnp_Params_Data['vnp_TxnRef'];
     const amount = vnp_Params_Data['vnp_Amount']
-      ? parseInt(String(vnp_Params_Data['vnp_Amount'])) / 100
+      ? parseInt(vnp_Params_Data['vnp_Amount']) / 100
       : 0;
-    const responseCode = vnp_Params_Data['vnp_ResponseCode'] as string;
-    const payDate = vnp_Params_Data['vnp_PayDate'] as string;
+    const responseCode = vnp_Params_Data['vnp_ResponseCode'];
+    const payDate = vnp_Params_Data['vnp_PayDate'];
 
     if (secureHash === signed) {
       if (responseCode === '00') {
@@ -198,8 +204,15 @@ export class PaymentService {
       )}`,
     );
 
-    const vnp_Params = { ...dto } as Record<string, string | undefined>;
-    const secureHash = String(vnp_Params['vnp_SecureHash'] ?? '');
+    const vnp_Params: Record<string, string> = {};
+    const rawDto = dto as unknown as Record<string, unknown>;
+    for (const key in rawDto) {
+      if (key.startsWith('vnp_')) {
+        vnp_Params[key] = String(rawDto[key]);
+      }
+    }
+
+    const secureHash = vnp_Params['vnp_SecureHash'] || '';
 
     delete vnp_Params['vnp_SecureHash'];
     delete vnp_Params['vnp_SecureHashType'];
@@ -218,8 +231,8 @@ export class PaymentService {
     const hmac = crypto.createHmac('sha512', secretKey ?? '');
     const signed = hmac.update(Buffer.from(signData, 'utf-8')).digest('hex');
 
-    const bookingIdFromVnp = String(vnp_Params['vnp_TxnRef'] ?? '');
-    const rspCode = String(vnp_Params['vnp_ResponseCode'] ?? '');
+    const bookingIdFromVnp = vnp_Params['vnp_TxnRef'] || '';
+    const rspCode = vnp_Params['vnp_ResponseCode'] || '';
     const isSignatureValid = secureHash === signed;
 
     this.logger.log(
@@ -243,13 +256,13 @@ export class PaymentService {
         20,
       )}-${bookingId.substring(20)}`;
     }
-    const vnp_Amount = parseInt(String(vnp_Params['vnp_Amount'] ?? '0')) / 100;
+    const vnp_Amount = parseInt(vnp_Params['vnp_Amount'] || '0') / 100;
 
     const transactionNo =
       vnp_Params['vnp_TransactionNo'] ||
-      (vnp_Params['vnp_BankTranNo'] as string);
-    const bankCode = vnp_Params['vnp_BankCode'] as string;
-    const payDate = vnp_Params['vnp_PayDate'] as string;
+      vnp_Params['vnp_BankTranNo'];
+    const bankCode = vnp_Params['vnp_BankCode'];
+    const payDate = vnp_Params['vnp_PayDate'];
 
     try {
       const payment = await this.paymentRepository.findOne({
@@ -598,6 +611,7 @@ export class PaymentService {
       // First, check if VNPAY returned a signature at all. Error responses often don't.
       if (!vnpResponse.vnp_SecureHash) {
         if (vnpResponse.vnp_ResponseCode !== '00') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
           const errorMessage = this.mapVnpayError(vnpResponse.vnp_ResponseCode);
           return { isSuccess: false, message: errorMessage, data: vnpResponse };
         }

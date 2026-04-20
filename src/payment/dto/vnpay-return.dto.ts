@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional } from 'class-validator';
 
 /**
@@ -128,4 +128,11 @@ export class VnpayReturnDto {
   })
   @IsOptional()
   vnp_SecureHashType?: string;
+
+  @ApiPropertyOptional({
+    description: 'Nền tảng thực hiện thanh toán (Dùng để điều hướng sau khi thanh toán xong)',
+    enum: ['web', 'mobile'], // Swagger sẽ hiện dropdown chỉ cho phép chọn 2 giá trị này
+    example: 'mobile'
+  })
+  platform?: string;
 }
