@@ -85,7 +85,7 @@ export class ReviewService {
     this.logger.log(`[DEBUG] Status comparison: CHECKED_IN=${actualStatus === BookingStatus.CHECKED_IN}, FINISHED=${actualStatus === BookingStatus.FINISHED}`);
     
     // So sánh với actualStatus thay vì booking.status
-    const isAllowed = allowedStatuses.includes(actualStatus as BookingStatus);
+    const isAllowed = allowedStatuses.includes(actualStatus);
     
     if (!isAllowed) {
       this.logger.warn(`Booking ${bookingId} status ${actualStatus} not allowed for review.`);

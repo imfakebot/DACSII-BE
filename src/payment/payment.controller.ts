@@ -34,6 +34,7 @@ import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
 import { SkipThrottle } from '@nestjs/throttler';
 import { VnpayReturnDto } from './dto/vnpay-return.dto';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * @controller PaymentController
@@ -50,10 +51,12 @@ export class PaymentController {
    * @constructor
    * @param {PaymentService} paymentService - Service xử lý logic thanh toán.
    * @param {BookingService} bookingService - Service để truy vấn thông tin đặt sân.
+   * @param {ConfigService} configService - Service để lấy thông tin cấu hình.
    */
   constructor(
     private readonly paymentService: PaymentService,
     private readonly bookingService: BookingService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -138,22 +141,18 @@ export class PaymentController {
   /**
    * @route GET /payment/vnpay_return
    * @description Endpoint mà VNPAY chuyển hướng người dùng về sau khi hoàn tất thanh toán.
-   * Xác thực chữ ký (checksum), hiển thị kết quả giao dịch cho người dùng và CẬP NHẬT trạng thái booking.
+   * Xác thực chữ ký (checksum), điều hướng người dùng về frontend với kết quả giao dịch.
    */
   @Get('vnpay_return')
   @ApiOperation({ summary: '(VNPAY) Xử lý URL trả về cho phía Client' })
   @SkipThrottle()
   @ApiResponse({
-    status: 200,
-    description: 'Giao dịch thành công (phía client).',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Giao dịch thất bại hoặc chữ ký không hợp lệ.',
+    status: 302,
+    description: 'Điều hướng về frontend với kết quả thanh toán.',
   })
   async vnpayReturn(
     @Query() query: VnpayReturnDto,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     this.logger.log(`Received VNPAY return callback with query: ${JSON.stringify(query)}`);
 
@@ -162,30 +161,29 @@ export class PaymentController {
       query as unknown as Record<string, any>,
     );
 
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    const bookingId = query.vnp_TxnRef;
+
+    // Tìm thông tin booking để lấy mã ngắn (code)
+    const booking = await this.bookingService.findOne(bookingId);
+    const bookingCode = booking?.code || bookingId;
+
     // Nếu verify thành công, cập nhật trạng thái booking và payment
     if (result.isSuccess) {
       try {
-        // Gọi handleIpn để cập nhật database (tương tự logic IPN)
-        this.logger.log(`Payment verified successfully, updating booking status for ${query.vnp_TxnRef}`);
-        await this.paymentService.handleIpn(query as unknown as VnpayIpnDto);
+        // Gọi handleIpn để cập nhật database (không await để redirect ngay)
+        this.logger.log(`Payment verified successfully, triggering background update for ${bookingId}`);
+        void this.paymentService.handleIpn(query as unknown as VnpayIpnDto);
       } catch (updateError: any) {
-        this.logger.warn(`Failed to update booking status: ${updateError}`);
-        // Vẫn trả về success cho user vì thanh toán đã thành công, IPN sẽ xử lý sau
+        this.logger.warn(`Failed to trigger background update for ${bookingId}: ${updateError}`);
       }
 
-      this.logger.log(`VNPAY return successful for booking ${query.vnp_TxnRef}`);
-      res.status(HttpStatus.OK);
-      return {
-        message: 'Thanh toán thành công',
-        data: result,
-      };
+      this.logger.log(`VNPAY return successful for booking ${bookingId}, redirecting to frontend...`);
+      // Truyền cả UUID và Mã ngắn sang FE
+      return res.redirect(`${frontendUrl}/payment-success?bookingId=${bookingId}&code=${bookingCode}`);
     } else {
-      this.logger.warn(`VNPAY return failed for booking ${query.vnp_TxnRef}. Error: ${result.message}`);
-      res.status(HttpStatus.BAD_REQUEST);
-      return {
-        message: 'Thanh toán thất bại',
-        data: result,
-      };
+      this.logger.warn(`VNPAY return failed for booking ${bookingId}. Error: ${result.message}`);
+      return res.redirect(`${frontendUrl}/payment-failed?bookingId=${bookingId}&code=${bookingCode}&message=${encodeURIComponent(result.message)}`);
     }
   }
 

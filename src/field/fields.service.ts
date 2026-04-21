@@ -19,6 +19,7 @@ import { UserProfile } from '../user/entities/users-profile.entity';
 import { Role } from '@/auth/enums/role.enum';
 import { Utility } from '../utility/entities/utility.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
 
 /**
  * @class FieldsService

@@ -3,136 +3,65 @@ import { IsNotEmpty, IsOptional } from 'class-validator';
 
 /**
  * @class VnpayReturnDto
- * @description Data Transfer Object (DTO) để nhận và xác thực các tham số query do VNPAY
- * gửi về URL trả về (vnp_ReturnUrl) phía client sau khi người dùng hoàn tất giao dịch.
- * Các thuộc tính trong DTO này tương ứng với các tham số do VNPAY định nghĩa.
+ * @description Data Transfer Object (DTO) nhận tham số từ VNPAY.
+ * Các trường vnp_ là bắt buộc để đảm bảo an toàn giao dịch.
  */
 export class VnpayReturnDto {
-  /**
-   * Số tiền thanh toán, đơn vị: đồng. VNPAY trả về giá trị nhân 100.
-   * @example '10000000' (tương đương 100,000 VNĐ)
-   */
-  @ApiProperty({
-    description: 'Số tiền thanh toán (đơn vị: VNĐ * 100)',
-    example: '10000000',
-  })
+  @ApiProperty({ description: 'Số tiền thanh toán (VNĐ * 100)' })
   @IsNotEmpty()
   vnp_Amount!: string;
 
-  /**
-   * Mã ngân hàng hoặc ví điện tử thanh toán.
-   * @example 'NCB'
-   */
-  @ApiProperty({ description: 'Mã ngân hàng', example: 'NCB' })
   @IsOptional()
-  vnp_BankCode!: string;
+  vnp_BankCode?: string;
 
-  /**
-   * Mã giao dịch của ngân hàng (nếu có).
-   */
-  @ApiProperty({
-    description: 'Mã giao dịch tại ngân hàng',
-    example: 'VNP12345',
-  })
   @IsOptional()
-  vnp_BankTranNo!: string;
+  vnp_BankTranNo?: string;
 
-  /**
-   * Loại thẻ đã sử dụng (ATM, VISA, MASTERCARD, v.v.).
-   */
-  @ApiProperty({ description: 'Loại thẻ', example: 'ATM' })
   @IsOptional()
-  vnp_CardType!: string;
+  vnp_CardType?: string;
 
-  /**
-   * Nội dung thanh toán đã gửi cho VNPAY.
-   */
-  @ApiProperty({
-    description: 'Nội dung thanh toán',
-    example: 'Thanh toan don hang ...',
-  })
   @IsOptional()
-  vnp_OrderInfo!: string;
+  vnp_OrderInfo?: string;
 
-  /**
-   * Thời gian hoàn tất thanh toán, định dạng YYYYMMDDHHmmss.
-   */
-  @ApiProperty({
-    description: 'Ngày thanh toán (YYYYMMDDHHmmss)',
-    example: '20231120103000',
-  })
   @IsOptional()
-  vnp_PayDate!: string;
+  vnp_PayDate?: string;
 
-  /**
-   * Mã phản hồi của VNPAY. '00' là thành công.
-   */
-  @ApiProperty({ description: 'Mã phản hồi (00 là thành công)', example: '00' })
+  @ApiProperty({ description: 'Mã phản hồi' })
   @IsNotEmpty()
   vnp_ResponseCode!: string;
 
-  /**
-   * Mã định danh của website/merchant tại VNPAY (TmnCode).
-   */
-  @ApiProperty({
-    description: 'Mã định danh website (Terminal ID)',
-    example: 'CODE123',
-  })
+  @ApiProperty({ description: 'Terminal ID' })
   @IsNotEmpty()
   vnp_TmnCode!: string;
 
-  /**
-   * Mã giao dịch duy nhất do VNPAY tạo ra.
-   */
-  @ApiProperty({
-    description: 'Mã giao dịch ghi nhận tại hệ thống VNPAY',
-    example: '14234523',
-  })
+  @ApiProperty({ description: 'Mã giao dịch VNPAY' })
   @IsNotEmpty()
   vnp_TransactionNo!: string;
 
-  /**
-   * Trạng thái giao dịch chi tiết của VNPAY. '00' là thành công.
-   */
-  @ApiProperty({ description: 'Trạng thái giao dịch', example: '00' })
   @IsOptional()
-  vnp_TransactionStatus!: string;
+  vnp_TransactionStatus?: string;
 
-  /**
-   * Mã tham chiếu của đơn hàng phía merchant, chính là ID của đơn đặt sân (Booking ID).
-   */
-  @ApiProperty({
-    description: 'Mã tham chiếu đơn hàng (Booking ID)',
-    example: 'uuid-cua-ban',
-  })
+  @ApiProperty({ description: 'Booking ID (từ VNPAY)' })
   @IsNotEmpty()
   vnp_TxnRef!: string;
 
   /**
-   * Chữ ký bảo mật do VNPAY tạo ra để xác thực tính toàn vẹn của dữ liệu.
+   * @description ID đơn hàng bổ sung (Nếu cần dùng cho mục đích khác)
    */
-  @ApiProperty({
-    description: 'Chữ ký bảo mật để kiểm tra toàn vẹn dữ liệu',
-    example: 'a1b2c3d4...',
-  })
+  @IsOptional()
+  bookingId?: string;
+
+  @ApiProperty({ description: 'Chữ ký bảo mật' })
   @IsNotEmpty()
   vnp_SecureHash!: string;
 
-  /**
-   * Loại thuật toán hash được sử dụng để tạo chữ ký (mặc định là SHA256, VNPAY mới là SHA512).
-   */
-  @ApiProperty({
-    description: 'Loại thuật toán mã hóa (SHA256)',
-    example: 'SHA256',
-    required: false,
-  })
   @IsOptional()
   vnp_SecureHashType?: string;
 
   @ApiPropertyOptional({
-    description: 'Nền tảng thực hiện thanh toán (Dùng để điều hướng sau khi thanh toán xong)',
-    enum: ['web', 'mobile'], // Swagger sẽ hiện dropdown chỉ cho phép chọn 2 giá trị này
-    example: 'mobile'
+    description: 'Nền tảng thực hiện thanh toán',
+    enum: ['web', 'mobile'],
   })
+  @IsOptional()
   platform?: string;
 }

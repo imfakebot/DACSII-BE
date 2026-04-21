@@ -302,9 +302,14 @@ export class PaymentService {
         return { RspCode: '04', Message: 'Số tiền không khớp' };
       }
 
-      const userEmail = payment.booking.userProfile.account.email;
+      const userEmail = payment.booking.userProfile.account?.email;
       const fullName = payment.booking.userProfile.full_name;
       const fieldName = payment.booking.field.name;
+      const bookingCode = payment.booking.code; // Mã ngắn để người dùng dễ nhớ
+
+      if (!userEmail) {
+        this.logger.error(`[IPN_ERROR] Cannot find email for user profile ${payment.booking.userProfile.id}`);
+      }
 
       const branchAddressObj = payment.booking.field.branch?.address;
       const fieldAddress = branchAddressObj
@@ -349,28 +354,35 @@ export class PaymentService {
           recipientId: payment.booking.userProfile.id,
         });
 
-        const qrCodeImage = await this.generateQRCode(bookingId);
+        const qrCodeBuffer = await QRCode.toBuffer(bookingCode);
 
-        await this.sendEmailSafely({
-          to: userEmail,
-          subject: 'Xác nhận đặt sân thành công',
-          template: './booking-success',
-          context: {
-            full_name: fullName,
-            fieldName: fieldName,
-            fieldAddress: fieldAddress,
-            startTime: startTime,
-            endTime: endTime,
-            finalAmount: finalAmountStr,
-            bookingId: bookingId,
-            qrCode: qrCodeImage,
-            frontendUrl:
-              this.vnpayConfiguration.returnUrl?.split(
-                '/payment/vnpay_return',
-              )[0] ?? '',
-            currentYear: new Date().getFullYear(),
-          },
-        });
+        if (userEmail) {
+          this.logger.log(`[IPN_INFO] Attempting to send success email to: ${userEmail}`);
+          // KHÔNG await để gửi mail chạy ngầm
+          void this.sendEmailSafely({
+            to: userEmail,
+            subject: 'Xác nhận đặt sân thành công',
+            template: './booking-success',
+            context: {
+              full_name: fullName,
+              fieldName: fieldName,
+              fieldAddress: fieldAddress,
+              startTime: startTime,
+              endTime: endTime,
+              finalAmount: finalAmountStr,
+              bookingCode: bookingCode,
+              frontendUrl: this.vnpayConfiguration.frontendUrl || 'http://localhost:3000',
+              currentYear: new Date().getFullYear(),
+            },
+            attachments: [
+              {
+                filename: 'qrcode.png',
+                content: qrCodeBuffer,
+                cid: 'qrcode', // Tham chiếu trong template bằng src="cid:qrcode"
+              },
+            ],
+          });
+        }
 
         this.eventGateWay.notifyAdminsNewFeedback({
           message: `Có đơn đặt sân mới!`,
@@ -414,20 +426,23 @@ export class PaymentService {
           );
         }
 
-        await this.sendEmailSafely({
-          to: userEmail,
-          subject: 'Thông báo giao dịch đặt sân thất bại',
-          template: './booking-failed',
-          context: {
-            full_name: fullName,
-            fieldName: fieldName,
-            startTime: startTime,
-            endTime: endTime,
-            finalAmount: finalAmountStr,
-            bookingId: bookingId,
-            reason: 'Giao dịch bị hủy hoặc lỗi từ ngân hàng.',
-          },
-        });
+        if (userEmail) {
+          // KHÔNG await để gửi mail chạy ngầm
+          void this.sendEmailSafely({
+            to: userEmail,
+            subject: 'Thông báo giao dịch đặt sân thất bại',
+            template: './booking-failed',
+            context: {
+              full_name: fullName,
+              fieldName: fieldName,
+              startTime: startTime,
+              endTime: endTime,
+              finalAmount: finalAmountStr,
+              bookingId: bookingId,
+              reason: 'Giao dịch bị hủy hoặc lỗi từ ngân hàng.',
+            },
+          });
+        }
         this.logger.log(`[IPN_FAIL] Booking ${bookingId} has been cancelled.`);
       }
 
@@ -737,6 +752,7 @@ export class PaymentService {
     subject: string;
     template: string;
     context: object;
+    attachments?: any[];
   }) {
     try {
       await this.mailerService.sendMail(mailOptions);

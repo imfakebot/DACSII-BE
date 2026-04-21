@@ -19,4 +19,5 @@ export default registerAs('vnpay', () => ({
   apiUrl: process.env.VNP_API_URL,
   returnUrl: process.env.VNP_RETURN_URL,
   ipnUrl: process.env.VNP_IPN_URL,
+  frontendUrl: process.env.FRONTEND_URL,
 }));

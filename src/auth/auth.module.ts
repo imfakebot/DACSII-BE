@@ -24,7 +24,7 @@ import { VouchersModule } from '@/voucher/vouchers.module';
     JwtModule.register({}),
     ConfigModule.forFeature(googleOauthConfig),
     HttpModule,
-    VouchersModule, // Add this line
+    VouchersModule,
   ],
   controllers: [AuthController],
   providers: [

@@ -106,7 +106,7 @@
             <p>Cảm ơn bạn đã tin tưởng và đặt sân. Yêu cầu của bạn đã được xác nhận thành công với các thông tin chi tiết dưới đây:</p>
             <div class="booking-details">
                 <h3>Chi Tiết Đặt Sân</h3>
-                <p><strong>Mã đặt sân:</strong> {{bookingId}}</p>
+                <p><strong>Mã vé (Check-in):</strong> <span style="font-size: 18px; color: #d9534f; font-weight: bold;">{{bookingCode}}</span></p>
                 <p><strong>Sân bóng:</strong> {{fieldName}}</p>
                 <p><strong>Địa chỉ:</strong> {{fieldAddress}}</p>
                 <p><strong>Thời gian:</strong> {{startTime}} - {{endTime}}</p>
@@ -114,12 +114,12 @@
             </div>
 
             <div style="text-align: center; margin: 20px 0;">
-                <p>Dưới đây là mã vé điện tử của bạn. Vui lòng đưa mã này cho nhân viên khi đến sân:</p>
+                <p>Vui lòng đưa mã QR hoặc mã vé dưới đây cho nhân viên khi đến sân:</p>
 
-                <img src="{{qrCode}}" alt="QR Code Check-in"
+                <img src="cid:qrcode" alt="QR Code Check-in"
                     style="width: 200px; height: 200px; border: 1px solid #ddd;" />
 
-                <p>Mã đặt sân: <b>{{bookingId}}</b></p>
+                <p>Mã vé: <b style="font-size: 20px; color: #28A745;">{{bookingCode}}</b></p>
             </div>
 
             <p>Vui lòng có mặt tại sân trước giờ đặt khoảng 5-10 phút để chuẩn bị. Chúc bạn có một trận đấu vui vẻ!</p>

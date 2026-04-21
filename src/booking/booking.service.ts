@@ -438,7 +438,7 @@ export class BookingService {
 
   /**
    * @method findOne
-   * @description Tìm một đơn đặt sân bằng ID, kèm theo thông tin người dùng và sân.
+   * @description Tìm một đơn đặt sân bằng ID, kèm theo thông tin người dùng, sân và địa chỉ chi nhánh.
    * @param {string} id - ID của đơn đặt sân.
    * @returns {Promise<Booking | null>} - Thực thể Booking hoặc null nếu không tìm thấy.
    */
@@ -446,11 +446,19 @@ export class BookingService {
     this.logger.log(`Finding booking with id ${id}`);
     const booking = await this.bookingRepository.findOne({
       where: { id },
-      relations: ['userProfile', 'userProfile.account', 'field'],
+      relations: [
+        'userProfile',
+        'userProfile.account',
+        'field',
+        'field.branch',
+        'field.branch.address',
+        'field.branch.address.ward',
+        'field.branch.address.city',
+      ],
     });
 
     if (booking) {
-      this.logger.log(`[DEBUG findOne] Booking ${id} found with status: "${booking.status}" (type: ${typeof booking.status}, raw value: ${JSON.stringify(booking.status)})`);
+      this.logger.log(`[DEBUG findOne] Booking ${id} found with status: "${booking.status}"`);
     }
 
     return booking;
@@ -502,6 +510,10 @@ export class BookingService {
     const query = this.bookingRepository
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.field', 'field')
+      .leftJoinAndSelect('field.branch', 'branch')
+      .leftJoinAndSelect('branch.address', 'address')
+      .leftJoinAndSelect('address.ward', 'ward')
+      .leftJoinAndSelect('address.city', 'city')
       .leftJoinAndSelect('field.images', 'images')
       .leftJoin('booking.userProfile', 'userProfile')
       .leftJoin('userProfile.account', 'account')
@@ -548,6 +560,9 @@ export class BookingService {
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.field', 'field')
       .leftJoinAndSelect('field.branch', 'branch')
+      .leftJoinAndSelect('branch.address', 'address')
+      .leftJoinAndSelect('address.ward', 'ward')
+      .leftJoinAndSelect('address.city', 'city')
       .leftJoinAndSelect('field.images', 'images')
       .leftJoin('booking.userProfile', 'userProfile')
       .leftJoin('userProfile.account', 'account')
@@ -593,6 +608,10 @@ export class BookingService {
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.userProfile', 'user')
       .leftJoinAndSelect('booking.field', 'field')
+      .leftJoinAndSelect('field.branch', 'branch')
+      .leftJoinAndSelect('branch.address', 'address')
+      .leftJoinAndSelect('address.ward', 'ward')
+      .leftJoinAndSelect('address.city', 'city')
       .orderBy('booking.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -636,7 +655,7 @@ export class BookingService {
     try {
       const field = await this.fieldRepository.findOne({
         where: { id: dto.fieldId },
-        relations: ['branch'],
+        relations: ['branch', 'branch.address', 'branch.address.ward', 'branch.address.city'],
       });
       if (!field) {
         throw new NotFoundException('Sân không tồn tại.');
@@ -672,7 +691,7 @@ export class BookingService {
         status: BookingStatus.COMPLETED,
         code: this.generateBookingCode(),
         bookingDate: new Date(),
-        field: { id: dto.fieldId } as Field,
+        field: field, // Use the full field object with relations
         userProfile: userProfile || undefined,
         customerName:
           dto.customerName ||
@@ -696,7 +715,9 @@ export class BookingService {
       this.logger.log(
         `Booking ${savedBooking.id} created successfully by admin ${user.id}`,
       );
-      return savedBooking;
+      
+      // Reload to get all relations for the response
+      return await this.findOne(savedBooking.id);
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
