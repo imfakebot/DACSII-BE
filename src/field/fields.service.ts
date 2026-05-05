@@ -81,10 +81,9 @@ export class FieldsService {
           longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
           ward_name: branch.address.ward?.name || '',
           city_name: branch.address.city?.name || '',
-        } : (null as any),
-      };
-    }
-
+          } : null,
+          };
+          }
     if (field.images) {
       dto.images = field.images.map(img => this.mapImageToDto(img));
     } else {

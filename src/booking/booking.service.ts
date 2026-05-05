@@ -35,8 +35,7 @@ import { generatePdf } from 'html-pdf-node';
 import { VoucherService } from '@/voucher/voucher.service';
 
 import { BookingDto, BookingFieldDto, BookingPaginatedResponseDto } from './dto/booking.dto';
-import { PaginationMetaDto } from '@/common/dto/pagination-meta.dto';
-import { FieldScheduleResponseDto, SlotScheduleDto } from './dto/field-schedule-response.dto';
+import { FieldScheduleResponseDto } from './dto/field-schedule-response.dto';
 
 /**
  * @class BookingService
@@ -121,7 +120,7 @@ export class BookingService {
             longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
             ward_name: branch.address.ward?.name || '',
             city_name: branch.address.city?.name || '',
-          } : (null as any),
+          } : null,
         };
       }
       dto.field = fieldDto;

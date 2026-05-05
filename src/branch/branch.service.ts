@@ -339,7 +339,7 @@ export class BranchService {
     if (manager_id !== undefined) {
       if (manager_id === null) {
         // Remove manager assignment
-        branchEntity.manager = null as any;
+        branchEntity.manager = null;
         branchEntity.manager_id = null;
       } else {
         const managerProfile = await this.userProfileRepository.findOne({

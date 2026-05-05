@@ -14,7 +14,7 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { Role } from '@/auth/enums/role.enum';
-import { ReviewDto, ReviewPaginatedResponseDto } from './dto/review.dto';
+import { ReviewDto, ReviewPaginatedResponseDto, ReviewPaginationMetaDto } from './dto/review.dto';
 
 /**
  * @class ReviewService
@@ -178,14 +178,15 @@ export class ReviewService {
     
     const response = new ReviewPaginatedResponseDto();
     response.data = review.map(r => this.mapToDto(r));
-    response.meta = {
-      total,
-      page,
-      limit,
-      lastPage: Math.ceil(total / limit),
-    };
-    // Include averageRating in meta
-    (response.meta as any).averageRating = parseFloat(averageRating.toFixed(1));
+    
+    const meta = new ReviewPaginationMetaDto();
+    meta.total = total;
+    meta.page = page;
+    meta.limit = limit;
+    meta.lastPage = Math.ceil(total / limit);
+    meta.averageRating = parseFloat(averageRating.toFixed(1));
+    
+    response.meta = meta;
 
     return response;
   }
@@ -221,12 +222,15 @@ export class ReviewService {
     
     const response = new ReviewPaginatedResponseDto();
     response.data = data.map(r => this.mapToDto(r));
-    response.meta = {
-      total,
-      page,
-      limit,
-      lastPage: Math.ceil(total / limit),
-    };
+    
+    const meta = new ReviewPaginationMetaDto();
+    meta.total = total;
+    meta.page = page;
+    meta.limit = limit;
+    meta.lastPage = Math.ceil(total / limit);
+    meta.averageRating = 0;
+    
+    response.meta = meta;
 
     return response;
   }

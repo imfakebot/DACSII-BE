@@ -25,9 +25,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Role } from '@/auth/enums/role.enum';
 import { Roles } from '@/auth/decorator/roles.decorator';
-import { Utility } from '@/utility/entities/utility.entity';
-
 import { UtilityDto } from '@/utility/dto/utility.dto';
+
 
 /**
  * @controller UtilityController

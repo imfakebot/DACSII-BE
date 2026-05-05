@@ -14,9 +14,6 @@ export class UserResponseDto {
   @ApiProperty({ example: 'CUSTOMER' })
   role!: string;
 
-  @ApiProperty({ example: 'active' })
-  status!: string;
-
   @ApiProperty({ example: true })
   is_profile_complete!: boolean;
 

@@ -18,10 +18,15 @@ export class NotificationDto {
   createdAt!: Date;
 }
 
+export class NotificationPaginationMetaDto extends PaginationMetaDto {
+  @ApiProperty({ example: 5 })
+  unreadCount!: number;
+}
+
 export class NotificationPaginatedResponseDto {
   @ApiProperty({ type: [NotificationDto] })
   data!: NotificationDto[];
 
-  @ApiProperty({ type: PaginationMetaDto })
-  meta!: PaginationMetaDto;
+  @ApiProperty({ type: NotificationPaginationMetaDto })
+  meta!: NotificationPaginationMetaDto;
 }

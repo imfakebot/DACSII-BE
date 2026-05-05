@@ -94,7 +94,6 @@ export class UsersService {
     dto.id = account.id;
     dto.email = account.email;
     dto.provider = account.provider;
-    dto.status = account.status;
     dto.is_verified = account.is_verified;
     dto.last_login = account.last_login;
     dto.created_at = account.created_at;

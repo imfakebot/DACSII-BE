@@ -33,7 +33,6 @@ import { AuthenticatedRequest } from '../auth/interface/authenticated-request.in
 import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/role.guard';
-import { Field } from './entities/field.entity';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
 import { SkipThrottle } from '@nestjs/throttler';

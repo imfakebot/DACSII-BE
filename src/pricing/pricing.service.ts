@@ -104,7 +104,7 @@ export class PricingService {
       .getOne();
 
     if (conflictingBooking) {
-      this.logger.warn(`Conflicting booking found for field ${fieldId} between ${start} and ${end}.`);
+      this.logger.warn(`Conflicting booking found for field ${fieldId} between ${start.toISOString()} and ${end.toISOString()}.`);
       throw new ConflictException(
         `Khung giờ bạn chọn (${start.toLocaleTimeString('vi-VN')} - ${end.toLocaleTimeString('vi-VN')}) đã bị trùng với một lịch đặt khác.`,
       );
@@ -163,7 +163,7 @@ export class PricingService {
   }
 
   private validateOperatingHour(start: Date, end: Date, branch: Branch) {
-    this.logger.debug(`Validating operating hours for branch ${branch.id}. Start: ${start}, End: ${end}.`);
+    this.logger.debug(`Validating operating hours for branch ${branch.id}. Start: ${start.toISOString()}, End: ${end.toISOString()}.`);
     // 1. Parse giờ mở/đóng cửa của Branch (Lưu dạng '05:00:00')
     const [openH, openM] = branch.open_time.split(':').map(Number);
     const [closeH, closeM] = branch.close_time.split(':').map(Number);

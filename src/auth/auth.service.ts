@@ -311,7 +311,6 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: roleName,
-        status: (user as Account).status || AccountStatus.ACTIVE,
         is_profile_complete:
           user.userProfile &&
             typeof user.userProfile === 'object' &&
@@ -383,7 +382,7 @@ export class AuthService {
   async refreshTokens(userID: string): Promise<TokenResponseDto> {
     this.logger.log(`Refreshing tokens for user ${userID}`);
     // Tải tài khoản cùng với vai trò để tạo token
-    const account = await this.userService.findAccountById(userID, [
+    const account: any = await this.userService.findAccountById(userID, [
       'role',
       'userProfile',
       'userProfile.branch',
@@ -692,7 +691,7 @@ export class AuthService {
    */
   async loginComplete(email: string, code: string): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Completing 2FA login for ${email}`);
-    const account = await this.userService.findAccountByEmail(email, [
+    const account: any = await this.userService.findAccountByEmail(email, [
       'role',
       'userProfile',
       'userProfile.branch',

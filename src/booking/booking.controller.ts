@@ -36,7 +36,6 @@ import { User } from '@/auth/decorator/users.decorator';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { CheckInDto } from './dto/check-in.dto';
-import { Booking } from './entities/booking.entity';
 import { Response } from 'express';
 
 

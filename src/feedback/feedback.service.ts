@@ -10,6 +10,7 @@ import { EventGateway } from '@/event/event.gateway';
 import { Role } from '@/auth/enums/role.enum';
 import { FeedbackStatus } from './enums/feedback-status.enum';
 import { UserProfile } from '@/user/entities/users-profile.entity';
+import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
 
 import { FeedbackDto, FeedbackResponseDto } from './dto/feedback.dto';
 
@@ -80,16 +81,19 @@ export class FeedbackService {
     return dto;
   }
 
-  private mapProfileToDto(profile: UserProfile): any {
-    return {
-      id: profile.id,
-      full_name: profile.full_name,
-      avatar_url: profile.avatar_url,
-      phone_number: profile.phone_number,
-      is_profile_complete: profile.is_profile_complete,
-      created_at: profile.created_at,
-      updated_at: profile.updated_at,
-    };
+  private mapProfileToDto(profile: UserProfile): UserProfileResponseDto {
+    const dto = new UserProfileResponseDto();
+    dto.id = profile.id;
+    dto.full_name = profile.full_name;
+    dto.avatar_url = profile.avatar_url;
+    dto.phone_number = profile.phone_number;
+    dto.is_profile_complete = profile.is_profile_complete;
+    dto.created_at = profile.created_at;
+    dto.updated_at = profile.updated_at;
+    dto.date_of_birth = profile.date_of_birth;
+    dto.gender = profile.gender;
+    dto.bio = profile.bio;
+    return dto;
   }
 
   /**

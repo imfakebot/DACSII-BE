@@ -67,8 +67,8 @@ export class BranchResponseDto {
   @ApiProperty({ description: 'Thời điểm cập nhật lần cuối' })
   updated_at!: Date;
 
-  @ApiProperty({ type: AddressResponseDto })
-  address!: AddressResponseDto;
+  @ApiProperty({ type: AddressResponseDto, required: false })
+  address!: AddressResponseDto | null;
 
   @ApiProperty({ type: UserProfileResponseDto, required: false })
   manager?: UserProfileResponseDto;

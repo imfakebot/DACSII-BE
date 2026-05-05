@@ -98,15 +98,11 @@ export class NotificationService {
     response.data = data.map(n => this.mapToDto(n));
     response.meta = {
       total,
-      // Note: PaginationMetaDto doesn't have unreadCount, but we can include it in the response object if needed
-      // For now keeping it consistent with the schema.
       page,
       limit,
       lastPage: Math.ceil(total / limit),
+      unreadCount,
     };
-    
-    // We can cast to any to include unreadCount if frontend expects it
-    (response.meta as any).unreadCount = unreadCount;
 
     return response;
   }

@@ -20,7 +20,6 @@ import { Roles } from '../auth/decorator/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/role.guard';
-import { TimeSlot } from './entities/time-slot.entity';
 
 import { TimeSlotDto } from './dto/pricing.dto';
 

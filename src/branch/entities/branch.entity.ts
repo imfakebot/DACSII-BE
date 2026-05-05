@@ -148,17 +148,17 @@ export class Branch {
   /**
    * Mối quan hệ N-1 với UserProfile. Mỗi chi nhánh được quản lý bởi một người dùng.
    */
-  @ApiProperty({ type: () => UserProfile })
+  @ApiProperty({ type: () => UserProfile, required: false })
   @ManyToOne(() => UserProfile)
   @JoinColumn({ name: 'manager_id' })
-  manager!: UserProfile;
+  manager!: UserProfile | null;
 
   /**
    * Mối quan hệ N-1 với UserProfile. Mỗi chi nhánh được tạo bởi một người dùng.
    */
   @ManyToOne(() => UserProfile)
   @JoinColumn({ name: 'created_by_id' })
-  created_by!: UserProfile;
+  created_by!: UserProfile | null;
 
   /**
    * Mối quan hệ 1-N với Field. Một chi nhánh có thể có nhiều sân bóng.

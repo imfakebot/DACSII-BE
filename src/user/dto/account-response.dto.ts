@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { AccountStatus } from '../enum/account-status.enum';
 import { AuthProvider } from '../enum/auth-provider.enum';
 import { UserProfileResponseDto } from './user-profile-response.dto';
 import { Role } from '../entities/role.entity';
@@ -13,9 +12,6 @@ export class AccountResponseDto {
 
   @ApiProperty({ enum: AuthProvider })
   provider!: AuthProvider;
-
-  @ApiProperty({ enum: AccountStatus })
-  status!: AccountStatus;
 
   @ApiProperty()
   is_verified!: boolean;

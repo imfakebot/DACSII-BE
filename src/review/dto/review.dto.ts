@@ -19,10 +19,15 @@ export class ReviewDto {
   userProfile!: UserProfileResponseDto;
 }
 
+export class ReviewPaginationMetaDto extends PaginationMetaDto {
+  @ApiProperty({ example: 4.5 })
+  averageRating!: number;
+}
+
 export class ReviewPaginatedResponseDto {
   @ApiProperty({ type: [ReviewDto] })
   data!: ReviewDto[];
 
-  @ApiProperty({ type: PaginationMetaDto })
-  meta!: PaginationMetaDto;
+  @ApiProperty({ type: ReviewPaginationMetaDto })
+  meta!: ReviewPaginationMetaDto;
 }
