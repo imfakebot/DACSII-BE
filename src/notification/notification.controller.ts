@@ -20,6 +20,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { NotificationPaginatedResponseDto } from './dto/notification.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
+
 /**
  * @controller NotificationController
  * @description Xử lý các yêu cầu HTTP liên quan đến thông báo của người dùng.
@@ -47,7 +50,7 @@ export class NotificationController {
    * @param {AuthenticatedRequest} req - Request đã được xác thực.
    * @param {number} page - Số trang.
    * @param {number} limit - Số lượng thông báo trên mỗi trang.
-   * @returns {Promise<object>} - Danh sách thông báo và thông tin meta (phân trang, số thông báo chưa đọc).
+   * @returns {Promise<NotificationPaginatedResponseDto>} - Danh sách thông báo và thông tin meta (phân trang, số thông báo chưa đọc).
    */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách thông báo của tôi' })
@@ -65,6 +68,7 @@ export class NotificationController {
   })
   @ApiResponse({
     status: 200,
+    type: NotificationPaginatedResponseDto,
     description: 'Trả về danh sách thông báo thành công.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -73,7 +77,7 @@ export class NotificationController {
     @Req() req: AuthenticatedRequest,
     @Query('page') page = 1,
     @Query('limit') limit = 10,
-  ) {
+  ): Promise<NotificationPaginatedResponseDto> {
     const accountId = req.user.sub;
     this.logger.log(`Finding all notifications for user ${accountId}`);
     const userProfile =
@@ -94,14 +98,14 @@ export class NotificationController {
    * @route PATCH /notification/read-all
    * @description Đánh dấu tất cả thông báo chưa đọc của người dùng thành đã đọc.
    * @param {AuthenticatedRequest} req - Request đã được xác thực.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận.
+   * @returns {Promise<MessageResponseDto>} - Thông báo xác nhận.
    */
   @Patch('read-all')
   @ApiOperation({ summary: 'Đánh dấu tất cả thông báo là đã đọc' })
-  @ApiResponse({ status: 200, description: 'Đánh dấu thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Đánh dấu thành công.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy hồ sơ người dùng.' })
-  async markAllAsRead(@Req() req: AuthenticatedRequest) {
+  async markAllAsRead(@Req() req: AuthenticatedRequest): Promise<MessageResponseDto> {
     const accountId = req.user.sub;
     this.logger.log(`Marking all notifications as read for user ${accountId}`);
     const userProfile =

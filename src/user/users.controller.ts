@@ -34,6 +34,10 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 
+import { AccountResponseDto, AccountPaginatedResponseDto } from './dto/account-response.dto';
+import { UserProfileResponseDto } from './dto/user-profile-response.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
+
 /**
  * @controller UsersController
  * @description Xử lý các yêu cầu liên quan đến thông tin người dùng.
@@ -52,7 +56,7 @@ export class UsersController {
    * @route GET /users/me
    * @description Lấy thông tin chi tiết của tài khoản và hồ sơ của người dùng đang đăng nhập.
    * @param {string} accountID - ID của tài khoản, được trích xuất từ JWT payload bởi decorator `@User`.
-   * @returns {Promise<Account>} - Thông tin tài khoản và hồ sơ liên quan.
+   * @returns {Promise<AccountResponseDto>} - Thông tin tài khoản và hồ sơ liên quan.
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -60,7 +64,8 @@ export class UsersController {
   @ApiOperation({
     summary: 'Lấy thông tin hồ sơ của người dùng đang đăng nhập',
   })
-  getProfile(@User('sub') accountID: string) {
+  @ApiResponse({ status: 200, type: AccountResponseDto })
+  getProfile(@User('sub') accountID: string): Promise<AccountResponseDto | null> {
     this.logger.log(`Fetching profile for user ${accountID}`);
     return this.usersService.findAccountById(accountID, [
       'userProfile',
@@ -73,19 +78,19 @@ export class UsersController {
    * @description Cập nhật thông tin hồ sơ cho người dùng đang đăng nhập.
    * @param {AuthenticatedUser} user - Đối tượng người dùng đã xác thực, được inject bởi decorator `@User`.
    * @param {UpdateUserProfileDto} updateUserProfileDto - DTO chứa các thông tin cần cập nhật.
-   * @returns {Promise<UserProfile>} - Hồ sơ người dùng sau khi đã được cập nhật.
+   * @returns {Promise<MessageResponseDto>} - Một thông báo thành công.
    */
   @Put('me/profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cập nhật hồ sơ của người dùng đang đăng nhập' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Cập nhật thành công.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy người dùng.' })
   async updateProfile(
     @User() user: AuthenticatedUser,
     @Body() updateUserProfileDto: UpdateUserProfileDto,
-  ) {
+  ): Promise<MessageResponseDto> {
     this.logger.log(
       `Updating profile for user ${user.id} with DTO: ${JSON.stringify(
         updateUserProfileDto,
@@ -99,18 +104,18 @@ export class UsersController {
    * @description Cập nhật ảnh đại diện cho người dùng đang đăng nhập.
    * @param {string} accountId - ID của tài khoản người dùng.
    * @param {Express.Multer.File} file - Đối tượng file đã được upload.
-   * @returns {Promise<object>} - Thông tin hồ sơ người dùng sau khi cập nhật.
+   * @returns {Promise<UserProfileResponseDto>} - Thông tin hồ sơ người dùng sau khi cập nhật.
    */
   @Patch('me/avatar')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('avatar')) // 'avatar' là tên field trong FormData
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cập nhật ảnh đại diện' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công.' })
+  @ApiResponse({ status: 200, type: UserProfileResponseDto, description: 'Cập nhật thành công.' })
   async uploadAvatar(
     @User('id') accountId: string,
     @UploadedFile() file: Express.Multer.File,
-  ) {
+  ): Promise<UserProfileResponseDto> {
     this.logger.log(`Uploading avatar for user ${accountId}`);
     if (!file) {
       throw new BadRequestException('Bạn phải cung cấp một file ảnh.');
@@ -126,7 +131,7 @@ export class UsersController {
    * @description Thay đổi mật khẩu cho người dùng đang đăng nhập.
    * @param {AuthenticatedUser} user - Đối tượng người dùng đã xác thực.
    * @param {ChangePasswordDto} changePasswordDto - DTO chứa mật khẩu cũ và mới.
-   * @returns {Promise<{ message: string }>} - Thông báo thành công.
+   * @returns {Promise<MessageResponseDto>} - Thông báo thành công.
    */
   @Patch('me/password')
   @UseGuards(JwtAuthGuard)
@@ -134,16 +139,16 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Thay đổi mật khẩu của người dùng đang đăng nhập' })
   @ApiBody({ type: ChangePasswordDto })
-  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Đổi mật khẩu thành công.' })
   @ApiResponse({ status: 400, description: 'Mật khẩu mới không hợp lệ.' })
   @ApiResponse({ status: 401, description: 'Mật khẩu cũ không chính xác.' })
   async changePassword(
     @User() user: AuthenticatedUser,
     @Body() changePasswordDto: ChangePasswordDto,
-  ): Promise<{ message: string }> {
+  ): Promise<MessageResponseDto> {
     this.logger.log(`Changing password for user ${user.id}`);
     if (changePasswordDto.oldPassword === changePasswordDto.newPassword) {
-      throw new Error('Mật khẩu mới không được trùng với mật khẩu cũ.');
+      throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu cũ.');
     }
     return this.usersService.changePassword(
       user.id,
@@ -156,15 +161,15 @@ export class UsersController {
    * @route GET /users/admin/all
    * @description (Admin) Lấy danh sách tất cả người dùng trong hệ thống với phân trang.
    * @param {number} [page=1] - Số trang hiện tại.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách người dùng và tổng số lượng.
+   * @returns {Promise<AccountPaginatedResponseDto>} - Một đối tượng chứa danh sách người dùng và tổng số lượng.
    */
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
-  @ApiResponse({ status: 200, description: 'Trả về danh sách người dùng.' })
-  async GetUsers(@Query('page') page = 1) {
+  @ApiResponse({ status: 200, type: AccountPaginatedResponseDto, description: 'Trả về danh sách người dùng.' })
+  async GetUsers(@Query('page') page = 1): Promise<AccountPaginatedResponseDto> {
     this.logger.log(`Fetching all users for page ${page}`);
     return await this.usersService.findAllUser(Number(page), 10);
   }
@@ -173,16 +178,16 @@ export class UsersController {
    * @route PATCH /users/admin/:id/ban
    * @description (Admin) Khóa (treo) tài khoản của một người dùng.
    * @param {string} id - ID của tài khoản cần khóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận khóa thành công.
+   * @returns {Promise<MessageResponseDto>} - Thông báo xác nhận khóa thành công.
    */
   @Patch('admin/:id/ban')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Khóa tài khoản người dùng' })
-  @ApiResponse({ status: 200, description: 'Khóa tài khoản thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Khóa tài khoản thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
-  async banUser(@Param('id') id: string) {
+  async banUser(@Param('id') id: string): Promise<MessageResponseDto> {
     this.logger.log(`Banning user ${id}`);
     return await this.usersService.banUser(id);
   }
@@ -191,16 +196,16 @@ export class UsersController {
    * @route PATCH /users/admin/:id/unban
    * @description (Admin) Mở khóa tài khoản của một người dùng.
    * @param {string} id - ID của tài khoản cần mở khóa.
-   * @returns {Promise<{ message: string }>} - Thông báo xác nhận mở khóa thành công.
+   * @returns {Promise<MessageResponseDto>} - Thông báo xác nhận mở khóa thành công.
    */
   @Patch('admin/:id/unban')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Mở khóa tài khoản người dùng' })
-  @ApiResponse({ status: 200, description: 'Mở khóa tài khoản thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Mở khóa tài khoản thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tài khoản.' })
-  async unbanUser(@Param('id') id: string) {
+  async unbanUser(@Param('id') id: string): Promise<MessageResponseDto> {
     this.logger.log(`Unbanning user ${id}`);
     return await this.usersService.unbanUser(id);
   }
@@ -211,6 +216,7 @@ export class UsersController {
    * - Admin có thể tạo Manager hoặc Staff (tùy chọn role từ FE).
    * - Manager chỉ có thể tạo Staff.
    * Chi nhánh của nhân viên mới sẽ được tự động gán theo chi nhánh của người tạo.
+   * @returns {Promise<AccountResponseDto>}
    */
   @Post('create-employee')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -219,26 +225,20 @@ export class UsersController {
   @ApiOperation({
     summary: 'Tạo tài khoản nhân viên (Admin có thể chọn Manager/Staff, Manager chỉ tạo Staff)',
   })
-  @ApiResponse({ status: 201, description: 'Tạo nhân viên thành công.' })
+  @ApiResponse({ status: 201, type: AccountResponseDto, description: 'Tạo nhân viên thành công.' })
   @ApiResponse({ status: 403, description: 'Không có quyền tạo.' })
   async createEmployee(
     @User() user: AuthenticatedUser,
     @Body() createEmployeeDto: CreateEmployeeDto,
-  ) {
+  ): Promise<AccountResponseDto> {
     this.logger.log(
       `User ${user.id} is creating an employee with DTO: ${JSON.stringify(
         createEmployeeDto,
       )}`,
     );
-    const newAccount = await this.usersService.createEmployee(
+    return await this.usersService.createEmployee(
       user.id,
       createEmployeeDto,
     );
-    if (newAccount) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password_hash, ...result } = newAccount;
-      return result;
-    }
-    return newAccount;
   }
 }

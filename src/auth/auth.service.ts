@@ -25,6 +25,9 @@ import { JwtPayload } from './interface/jwtpayload.interface';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { VoucherService } from '@/voucher/voucher.service';
+import { AuthMessageResponseDto } from './dto/auth-message-response.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
+import { TokenResponseDto } from './dto/token-response.dto';
 
 
 
@@ -68,12 +71,12 @@ export class AuthService {
    * Tạo một tài khoản chưa được xác thực và gửi mã xác thực qua email.
    * Nếu email đã tồn tại nhưng chưa xác thực, nó sẽ cập nhật mã xác thực mới.
    * @param {RegisterUserDto} registerDto - DTO chứa thông tin đăng ký của người dùng.
-   * @returns {Promise<{ message: string }>} - Một thông báo xác nhận đã gửi email.
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo xác nhận đã gửi email.
    * @throws {ConflictException} Nếu email đã được sử dụng bởi một tài khoản đã được xác thực.
    */
   async initiateRegistration(
     registerDto: RegisterUserDto,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthMessageResponseDto> {
     const { email, full_name, password, phone_number, gender } = registerDto;
     this.logger.log(`Initiating registration for email: ${email}`);
     const existingAccount = await this.userService.findAccountByEmail(email);
@@ -157,13 +160,13 @@ export class AuthService {
    * Cập nhật trạng thái tài khoản thành đã xác thực nếu mã hợp lệ.
    * @param {string} email - Email của tài khoản cần xác thực.
    * @param {string} code - Mã xác thực được gửi từ người dùng.
-   * @returns {Promise<{ message: string }>} - Một thông báo xác thực thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo xác thực thành công.
    * @throws {ConflictException} Nếu mã không hợp lệ, hết hạn, hoặc tài khoản không tồn tại.
    */
   async completeRegistration(
     email: string,
     code: string,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthMessageResponseDto> {
     this.logger.log(`Completing registration for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (!account || account.is_verified) {
@@ -241,10 +244,10 @@ export class AuthService {
    * Phương thức này được gọi sau khi `validateUser` hoặc `validateOAuthLogin` thành công.
    * Nó tạo ra cả access token và refresh token, sau đó lưu bản hash của refresh token vào CSDL.
    * @param {AuthenticatedUser | Account} user - Đối tượng người dùng đã được xác thực.
-   * @returns {Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string; role: string; is_profile_complete: boolean; } }>} - Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin cơ bản của người dùng.
+   * @returns {Promise<LoginResponseDto & { refreshToken: string }>} - Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin cơ bản của người dùng.
    * @throws {InternalServerErrorException} Nếu thiếu các biến môi trường cấu hình JWT.
    */
-  async login(user: AuthenticatedUser | Account) {
+  async login(user: AuthenticatedUser | Account): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Logging in user ${user.email}`);
     const userProfile = (user as Account).userProfile;
     const bracnhId = userProfile?.branch?.id ?? undefined;
@@ -308,6 +311,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: roleName,
+        status: (user as Account).status || AccountStatus.ACTIVE,
         is_profile_complete:
           user.userProfile &&
             typeof user.userProfile === 'object' &&
@@ -373,10 +377,10 @@ export class AuthService {
    * Xác thực người dùng và tạo ra một access token mới.
    * Logic kiểm tra refresh token đã được JwtRefreshGuard xử lý.
    * @param {string} userID - ID người dùng lấy từ payload của refresh token đã được xác thực.
-   * @returns {Promise<{ accessToken: string }>} - Một đối tượng chứa `accessToken` mới.
+   * @returns {Promise<TokenResponseDto>} - Một đối tượng chứa `accessToken` mới.
    * @throws {ForbiddenException} Nếu tài khoản không tồn tại.
    */
-  async refreshTokens(userID: string): Promise<{ accessToken: string }> {
+  async refreshTokens(userID: string): Promise<TokenResponseDto> {
     this.logger.log(`Refreshing tokens for user ${userID}`);
     // Tải tài khoản cùng với vai trò để tạo token
     const account = await this.userService.findAccountById(userID, [
@@ -405,13 +409,18 @@ export class AuthService {
    * @method logout
    * Đăng xuất người dùng bằng cách vô hiệu hóa refresh token và revoke Google OAuth token.
    * @param {string} accountID - ID của tài khoản cần đăng xuất.
-   * @returns {Promise<{ message: string }>} - Một thông báo xác nhận đăng xuất thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo xác nhận đăng xuất thành công.
    */
-  async logout(accountID: string): Promise<{ message: string }> {
+  async logout(accountID: string): Promise<AuthMessageResponseDto> {
     this.logger.log(`Logging out user ${accountID}`);
 
     // Lấy thông tin user để revoke Google token nếu có
-    const account = await this.userService.findAccountById(accountID);
+    const accountDto = await this.userService.findAccountById(accountID);
+    if (!accountDto) {
+      return { message: 'Đăng xuất thành công' };
+    }
+
+    const account = await this.userService.findAccountByEmail(accountDto.email);
 
     // Revoke Google OAuth token nếu user đăng nhập bằng Google
     if (account?.google_access_token && account.provider === AuthProvider.GOOGLE) {
@@ -515,12 +524,12 @@ export class AuthService {
    * Xử lý yêu cầu quên mật khẩu.
    * Tạo một token đặt lại mật khẩu, lưu bản hash vào CSDL và gửi email chứa token cho người dùng.
    * @param {string} email - Email của người dùng yêu cầu đặt lại mật khẩu.
-   * @returns {Promise<{ message: string }>} - Một thông báo chung để tránh tiết lộ email nào đã được đăng ký (time-safe response).
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo chung để tránh tiết lộ email nào đã được đăng ký (time-safe response).
    */
   async forgotPassword(
     email: string,
     returnUrl?: string,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthMessageResponseDto> {
     this.logger.log(`Forgot password request for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (
@@ -584,13 +593,13 @@ export class AuthService {
    * vô hiệu hóa token đã sử dụng.
    * @param {string} token - Token đặt lại mật khẩu mà người dùng cung cấp (bản gốc, chưa hash).
    * @param {string} newPassword - Mật khẩu mới mà người dùng muốn đặt.
-   * @returns {Promise<{ message: string }>} - Một đối tượng chứa thông báo xác nhận mật khẩu đã được cập nhật thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Một đối tượng chứa thông báo xác nhận mật khẩu đã được cập nhật thành công.
    * @throws {BadRequestException} Nếu token không hợp lệ hoặc đã hết hạn.
    */
   async resetPassword(
     token: string,
     newPassword: string,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthMessageResponseDto> {
     this.logger.log('Resetting password');
     // 1. Hash token nhận được từ client để so sánh với CSDL
     const hashedToken = createHash('sha256').update(token).digest('hex');
@@ -625,13 +634,13 @@ export class AuthService {
    * Xác thực email và mật khẩu, sau đó gửi mã OTP qua email nếu thông tin đăng nhập hợp lệ.
    * @param {string} email - Email của người dùng.
    * @param {string} pass - Mật khẩu của người dùng.
-   * @returns {Promise<{ message: string }>} - Một thông báo xác nhận đã gửi mã OTP.
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo xác nhận đã gửi mã OTP.
    * @throws {UnauthorizedException} Nếu email hoặc mật khẩu không chính xác.
    */
   async loginInitiate(
     email: string,
     pass: string,
-  ): Promise<{ message: string }> {
+  ): Promise<AuthMessageResponseDto> {
     this.logger.log(`Initiating 2FA login for ${email}`);
     // 1. Dùng lại validateUser để kiểm tra mật khẩu
     const account = await this.validateUser(email, pass);
@@ -678,10 +687,10 @@ export class AuthService {
    * Xác thực mã OTP, sau đó tạo và trả về token truy cập và token làm mới nếu mã hợp lệ.
    * @param {string} email - Email của người dùng.
    * @param {string} code - Mã OTP người dùng cung cấp.
-   * @returns {Promise<object>} - Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin người dùng.
+   * @returns {Promise<LoginResponseDto & { refreshToken: string }>} - Một đối tượng chứa `accessToken`, `refreshToken`, và thông tin người dùng.
    * @throws {UnauthorizedException} Nếu tài khoản không tồn tại, mã OTP không hợp lệ hoặc đã hết hạn.
    */
-  async loginComplete(email: string, code: string) {
+  async loginComplete(email: string, code: string): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Completing 2FA login for ${email}`);
     const account = await this.userService.findAccountByEmail(email, [
       'role',
@@ -720,7 +729,7 @@ export class AuthService {
    * Xác thực idToken từ Native Mobile (Android/iOS)
    * Phân tích Token -> Lấy thông tin -> Tìm/Tạo User -> Trả về Access & Refresh Token
    */
-  async verifyGoogleAndroidToken(idToken: string) {
+  async verifyGoogleAndroidToken(idToken: string): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log('Verifying Google Android token');
     try {
       const ticket = await this.googleClient.verifyIdToken({

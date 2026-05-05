@@ -22,6 +22,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { TimeSlot } from './entities/time-slot.entity';
 
+import { TimeSlotDto } from './dto/pricing.dto';
+
 /**
  * @controller PricingController
  * @description Xử lý các yêu cầu liên quan đến việc tính giá và kiểm tra tính khả dụng của sân.
@@ -45,7 +47,7 @@ export class PricingController {
     description: 'Kiểm tra thành công.',
     type: CheckPriceResponseDto,
   })
-  checkPrice(@Body() checkPriceDto: CheckPriceDto) {
+  checkPrice(@Body() checkPriceDto: CheckPriceDto): Promise<CheckPriceResponseDto> {
     this.logger.log(
       `Checking price and availability for DTO: ${JSON.stringify(
         checkPriceDto,
@@ -59,9 +61,9 @@ export class PricingController {
   @ApiResponse({
     status: 200,
     description: 'Danh sách các khung giờ.',
-    type: [TimeSlot],
+    type: [TimeSlotDto],
   })
-  getTimeSlots(): Promise<TimeSlot[]> {
+  getTimeSlots(): Promise<TimeSlotDto[]> {
     this.logger.log('Received request to get all time slots.');
     return this.pricingService.getAllTimeSlots();
   }
@@ -73,14 +75,14 @@ export class PricingController {
   @ApiResponse({
     status: 200,
     description: 'Cập nhật khung giờ thành công.',
-    type: TimeSlot,
+    type: TimeSlotDto,
   })
   @ApiResponse({ status: 404, description: 'Khung giờ không tồn tại.' })
   @ApiResponse({ status: 403, description: 'Không có quyền truy cập.' })
   updateTimeSlot(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateTimeSlotDto: UpdateTimeSlotDto,
-  ): Promise<TimeSlot> {
+  ): Promise<TimeSlotDto> {
     this.logger.log(`Received request to update time slot with ID: ${id}`);
     return this.pricingService.updateTimeSlot(id, updateTimeSlotDto);
   }

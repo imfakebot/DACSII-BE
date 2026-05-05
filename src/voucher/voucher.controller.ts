@@ -31,6 +31,8 @@ import { Voucher } from './entities/voucher.entity';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Keep this import
 import { Request } from 'express'; // Import Request from express
 
+import { VoucherDto, VoucherCheckResponseDto } from './dto/voucher.dto';
+
 /**
  * @class VoucherController
  * @description Xử lý các request liên quan đến mã giảm giá (voucher).
@@ -45,7 +47,7 @@ export class VoucherController {
    * (Admin) Endpoint để tạo một voucher mới.
    * Yêu cầu quyền Admin.
    * @param {CreateVoucherDto} dto - Dữ liệu để tạo voucher.
-   * @returns {Promise<Voucher>} Voucher vừa được tạo.
+   * @returns {Promise<VoucherDto>} Voucher vừa được tạo.
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,6 +56,7 @@ export class VoucherController {
   @ApiOperation({ summary: '(Admin) Tạo mã giảm giá mới' })
   @ApiResponse({
     status: HttpStatus.CREATED,
+    type: VoucherDto,
     description: 'Tạo voucher thành công.',
   })
   @ApiResponse({
@@ -68,7 +71,7 @@ export class VoucherController {
     status: HttpStatus.FORBIDDEN,
     description: 'Không có quyền Admin.',
   })
-  create(@Body() dto: CreateVoucherDto) {
+  create(@Body() dto: CreateVoucherDto): Promise<VoucherDto> {
     this.logger.log(`Admin creating new voucher with DTO: ${JSON.stringify(dto)}`);
     return this.voucherService.create(dto);
   }
@@ -92,11 +95,11 @@ export class VoucherController {
   @ApiResponse({
     status: 200,
     description: 'Danh sách các voucher hợp lệ.',
-    type: [Voucher],
+    type: [VoucherDto],
   })
   findAvailable(
     @Query('orderValue', ParseFloatPipe) orderValue: number,
-  ): Promise<Voucher[]> {
+  ): Promise<VoucherDto[]> {
     this.logger.log(`Fetching available vouchers for order value: ${orderValue}`);
     return this.voucherService.findAvailableVouchers(orderValue);
   }
@@ -106,7 +109,7 @@ export class VoucherController {
    * Yêu cầu đăng nhập.
    * @param {string} code - Mã voucher cần kiểm tra.
    * @param {number} orderValue - Giá trị đơn hàng hiện tại để xét điều kiện.
-   * @returns {Promise<object>} Kết quả kiểm tra và thông tin giảm giá.
+   * @returns {Promise<VoucherCheckResponseDto>} Kết quả kiểm tra và thông tin giảm giá.
    */
   @Get('check')
   @UseGuards(JwtAuthGuard) // Add authentication guard
@@ -126,6 +129,7 @@ export class VoucherController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
+    type: VoucherCheckResponseDto,
     description: 'Trả về kết quả kiểm tra voucher.',
   })
   @ApiResponse({
@@ -141,7 +145,7 @@ export class VoucherController {
     @Query('code') code: string,
     @Query('orderValue', ParseFloatPipe) orderValue: number,
     @Req() req: Request & { user: AuthenticatedUser }, // Corrected type for req
-  ): Promise<object> {
+  ): Promise<VoucherCheckResponseDto> {
     this.logger.log(
       `Checking voucher code "${code}" for order value: ${orderValue} by user ${req.user.userProfileId}`,
     );

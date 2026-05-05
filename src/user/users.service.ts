@@ -60,6 +60,9 @@ type UpdateUnverifiedAccountPayload = Partial<Account> & {
   };
 };
 
+import { AccountResponseDto, AccountPaginatedResponseDto } from './dto/account-response.dto';
+import { UserProfileResponseDto } from './dto/user-profile-response.dto';
+
 /**
  * UsersService chịu trách nhiệm xử lý logic nghiệp vụ liên quan đến người dùng,
  * bao gồm tạo, tìm kiếm, và quản lý tài khoản, hồ sơ người dùng.
@@ -81,6 +84,48 @@ export class UsersService {
     private branchRepository: Repository<Branch>,
     private readonly configService: ConfigService,
   ) { }
+
+  /**
+   * @method mapAccountToDto
+   * @description Ánh xạ từ thực thể Account sang AccountResponseDto.
+   */
+  private mapAccountToDto(account: Account): AccountResponseDto {
+    const dto = new AccountResponseDto();
+    dto.id = account.id;
+    dto.email = account.email;
+    dto.provider = account.provider;
+    dto.status = account.status;
+    dto.is_verified = account.is_verified;
+    dto.last_login = account.last_login;
+    dto.created_at = account.created_at;
+    dto.updated_at = account.updated_at;
+    dto.role = account.role;
+
+    if (account.userProfile) {
+      dto.userProfile = this.mapProfileToDto(account.userProfile);
+    }
+
+    return dto;
+  }
+
+  /**
+   * @method mapProfileToDto
+   * @description Ánh xạ từ thực thể UserProfile sang UserProfileResponseDto.
+   */
+  private mapProfileToDto(profile: UserProfile): UserProfileResponseDto {
+    const dto = new UserProfileResponseDto();
+    dto.id = profile.id;
+    dto.full_name = profile.full_name;
+    dto.date_of_birth = profile.date_of_birth;
+    dto.gender = profile.gender;
+    dto.phone_number = profile.phone_number;
+    dto.avatar_url = profile.avatar_url;
+    dto.bio = profile.bio;
+    dto.is_profile_complete = profile.is_profile_complete;
+    dto.created_at = profile.created_at;
+    dto.updated_at = profile.updated_at;
+    return dto;
+  }
 
   /**
    * Tìm kiếm một tài khoản dựa trên địa chỉ email.
@@ -267,17 +312,18 @@ export class UsersService {
   /**
    * Tìm một tài khoản bằng ID của nó.
    * @param id ID của tài khoản cần tìm.
-   * @returns Promise giải quyết thành đối tượng `Account` nếu tìm thấy, ngược lại là `null`.
+   * @returns Promise giải quyết thành đối tượng `AccountResponseDto` nếu tìm thấy, ngược lại là `null`.
    */
   async findAccountById(
     id: string,
     relations: string[] = [],
-  ): Promise<Account | null> {
+  ): Promise<AccountResponseDto | null> {
     this.logger.log(`Finding account by id: ${id}`);
     if (!id) {
       throw new NotFoundException('ID người dùng không hợp lệ.');
     }
-    return this.accountRepository.findOne({ where: { id }, relations });
+    const account = await this.accountRepository.findOne({ where: { id }, relations });
+    return account ? this.mapAccountToDto(account) : null;
   }
 
   /**
@@ -406,9 +452,9 @@ export class UsersService {
    * Lấy danh sách tất cả người dùng với phân trang.
    * @param page Số trang hiện tại.
    * @param limit Số lượng kết quả trên mỗi trang.
-   * @returns Promise giải quyết thành một đối tượng chứa dữ liệu người dùng và tổng số lượng.
+   * @returns Promise giải quyết thành một AccountPaginatedResponseDto.
    */
-  async findAllUser(page: number, limit: number) {
+  async findAllUser(page: number, limit: number): Promise<AccountPaginatedResponseDto> {
     this.logger.log(`Finding all users for page: ${page}, limit: ${limit}`);
     const [user, total] = await this.accountRepository.findAndCount({
       relations: ['userProfile', 'role', 'userProfile.branch'],
@@ -416,10 +462,11 @@ export class UsersService {
       take: limit,
       order: { created_at: 'DESC' },
     });
-    return {
-      data: user,
-      total,
-    };
+    
+    const response = new AccountPaginatedResponseDto();
+    response.data = user.map(u => this.mapAccountToDto(u));
+    response.total = total;
+    return response;
   }
 
   /**
@@ -427,7 +474,7 @@ export class UsersService {
    * @param id ID của tài khoản cần khóa.
    * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
    */
-  async banUser(id: string) {
+  async banUser(id: string): Promise<{ message: string }> {
     this.logger.log(`Banning user with id: ${id}`);
     await this.accountRepository.update(id, {
       status: AccountStatus.SUSPENDED,
@@ -441,7 +488,7 @@ export class UsersService {
    * @param id ID của tài khoản cần mở khóa.
    * @returns Promise giải quyết thành một đối tượng chứa thông báo thành công.
    */
-  async unbanUser(id: string) {
+  async unbanUser(id: string): Promise<{ message: string }> {
     this.logger.log(`Unbanning user with id: ${id}`);
     const account = await this.accountRepository.findOneBy({ id });
     if (!account) {
@@ -469,12 +516,12 @@ export class UsersService {
    * Cập nhật đường dẫn ảnh đại diện cho người dùng.
    * @param accountId ID của tài khoản người dùng.
    * @param avatarFilename Tên file ảnh đã được lưu trên server.
-   * @returns Hồ sơ người dùng sau khi cập nhật.
+   * @returns Hồ sơ người dùng sau khi cập nhật (UserProfileResponseDto).
    */
   async updateAvatar(
     accountId: string,
     avatarFilename: string,
-  ): Promise<UserProfile> {
+  ): Promise<UserProfileResponseDto> {
     this.logger.log(`Updating avatar for account id: ${accountId}`);
     if (!avatarFilename) {
       throw new Error('Thiếu tên file');
@@ -490,7 +537,8 @@ export class UsersService {
     const baseUrl = this.configService.get<string>('BASE_URL');
     account.userProfile.avatar_url = `${baseUrl}/uploads/${avatarFilename}`;
 
-    return this.userProfileRepository.save(account.userProfile);
+    const savedProfile = await this.userProfileRepository.save(account.userProfile);
+    return this.mapProfileToDto(savedProfile);
   }
 
   /**
@@ -510,7 +558,7 @@ export class UsersService {
     newPassword: string,
   ): Promise<{ message: string }> {
     this.logger.log(`Changing password for account id: ${accountId}`);
-    const account = await this.findAccountById(accountId);
+    const account = await this.accountRepository.findOneBy({ id: accountId });
     if (!account) {
       throw new NotFoundException('Không tìm thấy tài khoản.');
     }
@@ -559,7 +607,7 @@ export class UsersService {
   async createEmployee(
     requesterId: string,
     data: CreateEmployeeDto,
-  ): Promise<Account> {
+  ): Promise<AccountResponseDto> {
     this.logger.log(
       `Creating employee with requester id: ${requesterId} and data: ${JSON.stringify(
         data,
@@ -626,7 +674,7 @@ export class UsersService {
     const hashedPassword = await this.hashPassword(data.password);
 
     // 6. Thực hiện Transaction lưu DB
-    return this.accountRepository.manager.transaction(async (manager) => {
+    const savedAccount = await this.accountRepository.manager.transaction(async (manager) => {
       // 6.1 Lấy Role từ DB (để đảm bảo vai trò tồn tại)
       const targetRoleEntity = await manager.findOne(RoleEntity, {
         where: { name: targetRoleName },
@@ -675,7 +723,7 @@ export class UsersService {
         role: targetRoleEntity, // Gán thực thể Role
       });
 
-      const savedAccount = await manager.save(newAccount);
+      const savedAccountEntity = await manager.save(newAccount);
 
       // (Tùy chọn) Nếu tạo Manager, cập nhật lại bảng Branch để set người này làm manager_id
       if (targetRoleName === Role.Manager) {
@@ -685,7 +733,15 @@ export class UsersService {
         });
       }
 
-      return savedAccount;
+      return savedAccountEntity;
     });
+    
+    // Reload to get relations for mapping
+    const reloadedAccount = await this.accountRepository.findOne({
+      where: { id: savedAccount.id },
+      relations: ['userProfile', 'role', 'userProfile.branch']
+    });
+    
+    return this.mapAccountToDto(reloadedAccount!);
   }
 }

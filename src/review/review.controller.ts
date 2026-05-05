@@ -31,6 +31,9 @@ import { Throttle } from '@nestjs/throttler';
 import { User } from '@/auth/decorator/users.decorator'; // Import decorator User
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Import interface
 
+import { ReviewDto, ReviewPaginatedResponseDto } from './dto/review.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
+
 /**
  * @controller ReviewController
  * @description Xử lý các yêu cầu HTTP liên quan đến đánh giá (reviews).
@@ -54,7 +57,7 @@ export class ReviewController {
   @ApiBearerAuth()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({ summary: '(User) Tạo một bài đánh giá mới' })
-  @ApiResponse({ status: 201, description: 'Tạo đánh giá thành công.' })
+  @ApiResponse({ status: 201, type: ReviewDto, description: 'Tạo đánh giá thành công.' })
   @ApiResponse({
     status: 400,
     description: 'Dữ liệu không hợp lệ hoặc đã đánh giá trước đó.',
@@ -67,7 +70,7 @@ export class ReviewController {
   async create(
     @Body() createReviewDto: CreateReviewDto,
     @User() user: AuthenticatedUser,
-  ) {
+  ): Promise<ReviewDto> {
     const accountId = user.id;
     this.logger.log(`User ${accountId} creating new review.`);
     const userProfile =
@@ -90,13 +93,13 @@ export class ReviewController {
   @ApiOperation({ summary: 'Lấy danh sách đánh giá của một sân bóng' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Trả về danh sách đánh giá.' })
+  @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   async findByField(
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
-  ) {
+  ): Promise<ReviewPaginatedResponseDto> {
     this.logger.log(`Fetching reviews for field ${fieldId}, page ${page}, limit ${limit}.`);
     return this.reviewService.findByField(fieldId, Number(page), Number(limit));
   }
@@ -117,14 +120,14 @@ export class ReviewController {
   @ApiOperation({ summary: '(Admin/Manager) Quản lý danh sách đánh giá' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Trả về danh sách đánh giá.' })
+  @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async getAllReviews(
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 10,
     @User() user: AuthenticatedUser, // Lấy thông tin user để lọc theo branch
-  ) {
+  ): Promise<ReviewPaginatedResponseDto> {
     this.logger.log(`User ${user.id} fetching all reviews, page ${page}, limit ${limit}.`);
     return this.reviewService.findAllReviews(Number(page), Number(limit), user);
   }
@@ -142,14 +145,14 @@ export class ReviewController {
   @Roles(Role.Admin, Role.Manager, Role.User) // Mở rộng quyền xóa
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Xóa một bài đánh giá' })
-  @ApiResponse({ status: 200, description: 'Xóa đánh giá thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Xóa đánh giá thành công.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đánh giá.' })
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
     @User() user: AuthenticatedUser, // Truyền user xuống service để check quyền
-  ) {
+  ): Promise<MessageResponseDto> {
     this.logger.log(`User ${user.id} attempting to delete review ${id}.`);
     return this.reviewService.delete(id, user);
   }

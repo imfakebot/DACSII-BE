@@ -36,6 +36,8 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { VnpayReturnDto } from './dto/vnpay-return.dto';
 import { ConfigService } from '@nestjs/config';
 
+import { StatsResponseDto, RevenueChartItemDto, PaymentUrlResponseDto } from './dto/stats-response.dto';
+
 /**
  * @controller PaymentController
  * @description Xử lý các yêu cầu HTTP liên quan đến thanh toán.
@@ -61,11 +63,11 @@ export class PaymentController {
 
   /**
    * @route POST /payment/create_payment_url
-   * @description (Public) Tạo URL thanh toán VNPAY cho một đơn đặt sân đã tồn tại.
+   * @description (Public) Tạo URL thanh toán VNPAY for một đơn đặt sân đã tồn tại.
    * Thường được dùng khi người dùng muốn thử thanh toán lại cho một đơn hàng đang ở trạng thái `PENDING`.
    * @param {string} bookingId - ID của đơn đặt sân cần tạo link thanh toán.
    * @param {Request} req - Đối tượng request để lấy địa chỉ IP của người dùng.
-   * @returns {Promise<{ url: string }>} - Một đối tượng chứa URL thanh toán VNPAY.
+   * @returns {Promise<PaymentUrlResponseDto>} - Một đối tượng chứa URL thanh toán VNPAY.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân hoặc thông tin thanh toán tương ứng.
    * @throws {BadRequestException} Nếu đơn đặt sân đã được xử lý (đã thanh toán hoặc hủy).
    */
@@ -81,7 +83,7 @@ export class PaymentController {
   @ApiResponse({
     status: 200,
     description: 'Trả về URL thanh toán VNPAY.',
-    schema: { properties: { url: { type: 'string' } } },
+    type: PaymentUrlResponseDto,
   })
   @ApiResponse({
     status: 404,
@@ -94,7 +96,7 @@ export class PaymentController {
   async createPaymentUrl(
     @Body('bookingId') bookingId: string,
     @Req() req: Request,
-  ) {
+  ): Promise<PaymentUrlResponseDto> {
     this.logger.log(`Received request to create VNPAY URL for booking ID: ${bookingId}`);
     // 1. Tìm đơn hàng để lấy số tiền CHÍNH XÁC trong DB
     const booking = await this.bookingService.findOne(bookingId);
@@ -218,7 +220,7 @@ export class PaymentController {
    * @param {string} [startDate] - Ngày bắt đầu để lọc (YYYY-MM-DD).
    * @param {string} [endDate] - Ngày kết thúc để lọc (YYYY-MM-DD).
    * @param {string} [branchId] - (Chỉ Admin) ID của chi nhánh muốn lọc.
-   * @returns {Promise<object>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
+   * @returns {Promise<StatsResponseDto>} - Một đối tượng chứa tổng doanh thu và số lượng giao dịch theo từng trạng thái.
    */
   @Get('stats/overview')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -246,6 +248,7 @@ export class PaymentController {
   })
   @ApiResponse({
     status: 200,
+    type: StatsResponseDto,
     description: 'Trả về dữ liệu thống kê thành công.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
@@ -255,7 +258,7 @@ export class PaymentController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('branchId') branchId?: string,
-  ) {
+  ): Promise<StatsResponseDto> {
     this.logger.log(`Fetching admin stats for user ${user.id} with role ${user.role}. StartDate: ${startDate}, EndDate: ${endDate}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
     // Nếu là Manager, chỉ được xem chi nhánh của mình và không được dùng filter branchId
@@ -276,7 +279,7 @@ export class PaymentController {
    * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu.
    * @param {number} [year] - Năm cần lấy dữ liệu (mặc định là năm hiện tại).
    * @param {string} [branchId] - (Chỉ Admin) ID của chi nhánh muốn lọc.
-   * @returns {Promise<Array<object>>} - Mảng dữ liệu doanh thu theo từng tháng.
+   * @returns {Promise<RevenueChartItemDto[]>} - Mảng dữ liệu doanh thu theo từng tháng.
    */
   @Get('chart')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -296,11 +299,16 @@ export class PaymentController {
     required: false,
     description: '(Chỉ Admin) Lọc theo ID chi nhánh cụ thể',
   })
+  @ApiResponse({
+    status: 200,
+    type: [RevenueChartItemDto],
+    description: 'Trả về dữ liệu biểu đồ thành công.',
+  })
   async getRevenueChart(
     @User() user: AuthenticatedUser,
     @Query('year') year: number = new Date().getFullYear(),
     @Query('branchId') branchId?: string,
-  ) {
+  ): Promise<RevenueChartItemDto[]> {
     this.logger.log(`Fetching revenue chart for user ${user.id} with role ${user.role}. Year: ${year}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
     const targetBranchId = user.role === Role.Manager ? userBranchId : branchId;

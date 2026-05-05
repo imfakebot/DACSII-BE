@@ -40,6 +40,8 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
+import { FieldDto } from './dto/field.dto';
+
 /**
  * @controller FieldsController
  * @description Xử lý các yêu cầu liên quan đến quản lý sân bóng (Fields).
@@ -66,14 +68,14 @@ export class FieldsController {
   @ApiResponse({
     status: 201,
     description: 'Tạo sân bóng thành công.',
-    type: Field,
+    type: FieldDto,
   })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ.' })
   @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async create(
     @Body() createFieldDto: CreateFieldDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<Field> {
+  ): Promise<FieldDto> {
     const userId = req.user.sub;
     this.logger.log(
       `User ${userId} creating field with DTO: ${JSON.stringify(
@@ -102,8 +104,9 @@ export class FieldsController {
   @ApiOperation({
     summary: 'Tìm kiếm sân bóng (Hỗ trợ tìm theo vị trí, tên, chi nhánh)',
   })
+  @ApiResponse({ status: 200, description: 'Thành công.', type: [FieldDto] })
   @UseInterceptors(ClassSerializerInterceptor)
-  findAll(@Query() filterDto: FilterFieldDto) {
+  findAll(@Query() filterDto: FilterFieldDto): Promise<FieldDto[]> {
     this.logger.log(
       `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
     );
@@ -116,9 +119,9 @@ export class FieldsController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một sân bóng (Công khai)' })
-  @ApiResponse({ status: 200, description: 'Thành công.', type: Field })
+  @ApiResponse({ status: 200, description: 'Thành công.', type: FieldDto })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Field> {
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<FieldDto> {
     this.logger.log(`Finding field with id: ${id}`);
     return this.fieldsService.findOne(id);
   }
@@ -135,14 +138,14 @@ export class FieldsController {
   @ApiResponse({
     status: 200,
     description: 'Cập nhật thành công.',
-    type: Field,
+    type: FieldDto,
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateFieldDto: UpdateFieldDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<Field> {
+  ): Promise<FieldDto> {
     this.logger.log(
       `Updating field ${id} with DTO: ${JSON.stringify(updateFieldDto)}`,
     );

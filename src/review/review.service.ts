@@ -14,6 +14,7 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { Role } from '@/auth/enums/role.enum';
+import { ReviewDto, ReviewPaginatedResponseDto } from './dto/review.dto';
 
 /**
  * @class ReviewService
@@ -35,17 +36,46 @@ export class ReviewService {
   ) {}
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Review sang ReviewDto.
+   */
+  private mapToDto(review: Review): ReviewDto {
+    const dto = new ReviewDto();
+    dto.id = review.id;
+    dto.rating = review.rating;
+    dto.comment = review.comment;
+    dto.createdAt = review.createdAt;
+    
+    if (review.userProfile) {
+      dto.userProfile = {
+        id: review.userProfile.id,
+        full_name: review.userProfile.full_name,
+        avatar_url: review.userProfile.avatar_url,
+        phone_number: review.userProfile.phone_number,
+        is_profile_complete: review.userProfile.is_profile_complete,
+        created_at: review.userProfile.created_at,
+        updated_at: review.userProfile.updated_at,
+        date_of_birth: review.userProfile.date_of_birth,
+        gender: review.userProfile.gender,
+        bio: review.userProfile.bio,
+      };
+    }
+    
+    return dto;
+  }
+
+  /**
    * Tạo một bài đánh giá mới cho một lượt đặt sân.
    * @param {CreateReviewDto} createReviewDto - DTO chứa thông tin đánh giá (ID đơn đặt, điểm, bình luận).
    * @param {UserProfile} userProfile - Hồ sơ của người dùng đang thực hiện đánh giá.
-   * @returns {Promise<Review>} - Bài đánh giá vừa được tạo.
+   * @returns {Promise<ReviewDto>} - Bài đánh giá vừa được tạo.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    * @throws {BadRequestException} Nếu người dùng không có quyền, đơn chưa hoàn thành, hoặc đã được đánh giá trước đó.
    */
   async createReview(
     createReviewDto: CreateReviewDto,
     userProfile: UserProfile,
-  ) {
+  ): Promise<ReviewDto> {
     this.logger.log(`User ${userProfile.id} creating review for booking ${createReviewDto.bookingId}`);
     const { bookingId, rating, comment } = createReviewDto;
 
@@ -113,9 +143,9 @@ export class ReviewService {
       userProfile: userProfile, // Lấy userProfile từ người đang review
     });
 
-    const savedReview = this.reviewRepository.save(newReview);
+    const savedReview = await this.reviewRepository.save(newReview);
     this.logger.log(`Review ${newReview.id} created successfully for booking ${bookingId}.`);
-    return savedReview;
+    return this.mapToDto(savedReview);
   }
 
   /**
@@ -123,9 +153,9 @@ export class ReviewService {
    * @param {string} fieldId - ID của sân bóng cần lấy đánh giá.
    * @param {number} [page=1] - Trang hiện tại.
    * @param {number} [limit=10] - Số lượng đánh giá trên mỗi trang.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách đánh giá và thông tin meta (tổng số, trang, điểm trung bình...).
+   * @returns {Promise<ReviewPaginatedResponseDto>} - Một đối tượng chứa danh sách đánh giá và thông tin meta.
    */
-  async findByField(fieldId: string, page: number = 1, limit: number = 10) {
+  async findByField(fieldId: string, page: number = 1, limit: number = 10): Promise<ReviewPaginatedResponseDto> {
     this.logger.log(`Fetching reviews for field ${fieldId}, page ${page}, limit ${limit}.`);
     const skip = (page - 1) * limit;
 
@@ -145,25 +175,19 @@ export class ReviewService {
     const averageRating =
       total > 0 ? review.reduce((sum, r) => sum + r.rating, 0) / total : 0;
     this.logger.log(`Found ${total} reviews for field ${fieldId}, average rating: ${averageRating}.`);
-    return {
-      data: review.map((review) => ({
-        id: review.id,
-        rating: review.rating,
-        comment: review.comment,
-        createdAt: review.createdAt,
-        user: {
-          full_name: review.userProfile.full_name,
-          avatar_url: review.userProfile.avatar_url,
-        },
-      })),
-      meta: {
-        total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-        averageRating: parseFloat(averageRating.toFixed(1)),
-      },
+    
+    const response = new ReviewPaginatedResponseDto();
+    response.data = review.map(r => this.mapToDto(r));
+    response.meta = {
+      total,
+      page,
+      limit,
+      lastPage: Math.ceil(total / limit),
     };
+    // Include averageRating in meta
+    (response.meta as any).averageRating = parseFloat(averageRating.toFixed(1));
+
+    return response;
   }
 
   /**
@@ -172,7 +196,7 @@ export class ReviewService {
    * - Admin: Lấy hết.
    * - Manager: Chỉ lấy review thuộc chi nhánh mình quản lý.
    */
-  async findAllReviews(page: number, limit: number, user: AuthenticatedUser) {
+  async findAllReviews(page: number, limit: number, user: AuthenticatedUser): Promise<ReviewPaginatedResponseDto> {
     this.logger.log(`User ${user.id} fetching all reviews (management), page ${page}, limit ${limit}. Role: ${user.role}.`);
     const skip = (page - 1) * limit;
 
@@ -194,15 +218,17 @@ export class ReviewService {
 
     const [data, total] = await query.getManyAndCount();
     this.logger.log(`Found ${total} reviews for management view.`);
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-      },
+    
+    const response = new ReviewPaginatedResponseDto();
+    response.data = data.map(r => this.mapToDto(r));
+    response.meta = {
+      total,
+      page,
+      limit,
+      lastPage: Math.ceil(total / limit),
     };
+
+    return response;
   }
 
   /**

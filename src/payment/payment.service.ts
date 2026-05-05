@@ -25,6 +25,8 @@ import * as QRCode from 'qrcode';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
+import { StatsResponseDto, RevenueChartItemDto } from './dto/stats-response.dto';
+
 /**
  * @class PaymentService
  * @description Chịu trách nhiệm xử lý logic nghiệp vụ liên quan đến thanh toán và thống kê doanh thu.
@@ -474,9 +476,9 @@ export class PaymentService {
    * @param {string} [startDate] - Ngày bắt đầu lọc (YYYY-MM-DD).
    * @param {string} [endDate] - Ngày kết thúc lọc (YYYY-MM-DD).
    * @param {string} [branchId] - ID của chi nhánh cần lọc.
-   * @returns {Promise<object>} - Đối tượng chứa `revenue` (tổng doanh thu) và `transactions` (số lượng theo trạng thái).
+   * @returns {Promise<StatsResponseDto>} - Đối tượng chứa `revenue` (tổng doanh thu) và `transactions` (số lượng theo trạng thái).
    */
-  async getStats(startDate?: string, endDate?: string, branchId?: string) {
+  async getStats(startDate?: string, endDate?: string, branchId?: string): Promise<StatsResponseDto> {
     const query = this.paymentRepository
       .createQueryBuilder('payment')
       .leftJoin('payment.booking', 'booking')
@@ -517,10 +519,10 @@ export class PaymentService {
       {} as Record<string, number>,
     );
 
-    return {
-      revenue: Number(revenue?.total || 0),
-      transactions: transaction,
-    };
+    const dto = new StatsResponseDto();
+    dto.revenue = Number(revenue?.total || 0);
+    dto.transactions = transaction;
+    return dto;
   }
 
   /**
@@ -528,9 +530,9 @@ export class PaymentService {
    * @description Lấy dữ liệu doanh thu đặt sân theo từng tháng trong một năm để vẽ biểu đồ.
    * @param {number} year - Năm cần lấy dữ liệu.
    * @param {string} [branchId] - ID của chi nhánh cần lọc.
-   * @returns {Promise<Array<{ month: number; revenue: number }>>} - Mảng dữ liệu doanh thu.
+   * @returns {Promise<RevenueChartItemDto[]>} - Mảng dữ liệu doanh thu.
    */
-  async getRevenueChart(year: number, branchId?: string) {
+  async getRevenueChart(year: number, branchId?: string): Promise<RevenueChartItemDto[]> {
     const query = this.paymentRepository
       .createQueryBuilder('payment')
       .select('MONTH(payment.createdAt)', 'month')

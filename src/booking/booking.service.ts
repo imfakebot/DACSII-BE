@@ -13,6 +13,7 @@ import { Booking } from './entities/booking.entity';
 import { Field } from '../field/entities/field.entity';
 import { PricingService } from '@/pricing/pricing.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { BookingResponse } from './dto/booking-response.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from './enums/booking-status.enum';
 import { Voucher } from '@/voucher/entities/voucher.entity';
@@ -32,6 +33,10 @@ import * as handlebars from 'handlebars';
 import * as qrcode from 'qrcode';
 import { generatePdf } from 'html-pdf-node';
 import { VoucherService } from '@/voucher/voucher.service';
+
+import { BookingDto, BookingFieldDto, BookingPaginatedResponseDto } from './dto/booking.dto';
+import { PaginationMetaDto } from '@/common/dto/pagination-meta.dto';
+import { FieldScheduleResponseDto, SlotScheduleDto } from './dto/field-schedule-response.dto';
 
 /**
  * @class BookingService
@@ -57,6 +62,89 @@ export class BookingService {
     private readonly userService: UsersService,
     private readonly voucherService: VoucherService,
   ) { }
+
+  /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Booking sang BookingDto.
+   */
+  mapToDto(booking: Booking): BookingDto {
+    const dto = new BookingDto();
+    dto.id = booking.id;
+    dto.code = booking.code;
+    dto.check_in_at = booking.check_in_at;
+    dto.bookingDate = booking.bookingDate;
+    dto.start_time = booking.start_time;
+    dto.end_time = booking.end_time;
+    dto.total_price = Number(booking.total_price);
+    dto.status = booking.status;
+    dto.customerName = booking.customerName;
+    dto.customerPhone = booking.customerPhone;
+    dto.createdAt = booking.createdAt;
+    dto.updatedAt = booking.updatedAt;
+
+    if (booking.userProfile) {
+      dto.userProfile = {
+        id: booking.userProfile.id,
+        full_name: booking.userProfile.full_name,
+        date_of_birth: booking.userProfile.date_of_birth,
+        gender: booking.userProfile.gender,
+        phone_number: booking.userProfile.phone_number,
+        avatar_url: booking.userProfile.avatar_url,
+        bio: booking.userProfile.bio,
+        is_profile_complete: booking.userProfile.is_profile_complete,
+        created_at: booking.userProfile.created_at,
+        updated_at: booking.userProfile.updated_at,
+      };
+    }
+
+    if (booking.field) {
+      const fieldDto = new BookingFieldDto();
+      fieldDto.id = booking.field.id;
+      fieldDto.name = booking.field.name;
+
+      if (booking.field.branch) {
+        const branch = booking.field.branch;
+        fieldDto.branch = {
+          id: branch.id,
+          name: branch.name,
+          phone_number: branch.phone_number,
+          description: branch.description,
+          status: branch.status,
+          open_time: branch.open_time,
+          close_time: branch.close_time,
+          created_at: branch.created_at,
+          updated_at: branch.updated_at,
+          address: branch.address ? {
+            id: branch.address.id,
+            street: branch.address.street,
+            latitude: branch.address.latitude ? Number(branch.address.latitude) : null,
+            longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
+            ward_name: branch.address.ward?.name || '',
+            city_name: branch.address.city?.name || '',
+          } : (null as any),
+        };
+      }
+      dto.field = fieldDto;
+    }
+
+    return dto;
+  }
+
+  /**
+   * @method mapPaginatedToDto
+   * @description Ánh xạ kết quả phân trang sang BookingPaginatedResponseDto.
+   */
+  mapPaginatedToDto(data: Booking[], total: number, page: number, limit: number): BookingPaginatedResponseDto {
+    const response = new BookingPaginatedResponseDto();
+    response.data = data.map(b => this.mapToDto(b));
+    response.meta = {
+      total,
+      page,
+      limit,
+      lastPage: Math.ceil(total / limit),
+    };
+    return response;
+  }
 
   /**
    * @method downloadTicket
@@ -136,7 +224,7 @@ export class BookingService {
     createBookingDto: CreateBookingDto,
     userProfile: UserProfile,
     ip: string,
-  ) {
+  ): Promise<BookingResponse> {
     this.logger.log(
       `Creating booking for user ${userProfile.id} with DTO: ${JSON.stringify(
         createBookingDto,
@@ -278,8 +366,11 @@ export class BookingService {
         ip,
       );
 
+      // Reload to get relations for DTO mapping
+      const bookingWithRelations = await this.findOne(savedBooking.id);
+
       return {
-        booking: savedBooking,
+        booking: this.mapToDto(bookingWithRelations!),
         paymentUrl: paymentUrl,
         finalAmount: finalPrice,
         message: 'Đặt sân thành công, vui lòng thanh toán.',
@@ -301,7 +392,7 @@ export class BookingService {
     accountId: string,
     userRole: Role,
     ipAddr: string,
-  ) {
+  ): Promise<{ message: string }> {
     this.logger.log(
       `Attempting to cancel booking ${bookingId} by user ${accountId} with role ${userRole}`,
     );
@@ -442,7 +533,7 @@ export class BookingService {
    * @param {string} id - ID của đơn đặt sân.
    * @returns {Promise<Booking | null>} - Thực thể Booking hoặc null nếu không tìm thấy.
    */
-  async findOne(id: string) {
+  async findOne(id: string): Promise<Booking | null> {
     this.logger.log(`Finding booking with id ${id}`);
     const booking = await this.bookingRepository.findOne({
       where: { id },
@@ -465,6 +556,15 @@ export class BookingService {
   }
 
   /**
+   * @method findOneDto
+   * @description Tìm một đơn đặt sân bằng ID và trả về DTO.
+   */
+  async findOneDto(id: string): Promise<BookingDto | null> {
+    const booking = await this.findOne(id);
+    return booking ? this.mapToDto(booking) : null;
+  }
+
+  /**
    * @method updateStatus
    * @description Cập nhật trạng thái của một đơn đặt sân.
    * Thường được gọi bởi các service khác (ví dụ: `PaymentService` sau khi xử lý IPN).
@@ -472,7 +572,7 @@ export class BookingService {
    * @param {BookingStatus} status - Trạng thái mới.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    */
-  async updateStatus(bookingId: string, status: BookingStatus) {
+  async updateStatus(bookingId: string, status: BookingStatus): Promise<void> {
     this.logger.log(`Updating booking ${bookingId} to status ${status}`);
 
     // Use query builder to ensure status is updated
@@ -496,9 +596,9 @@ export class BookingService {
    * @description Lấy danh sách các đơn đặt sân của một người dùng cụ thể, có phân trang và lọc.
    * @param {string} accountId - ID tài khoản của người dùng.
    * @param {FilterBookingDto} filter - DTO chứa các tiêu chí lọc và phân trang.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
+   * @returns {Promise<BookingPaginatedResponseDto>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
-  async getUserBooking(accountId: string, filter: FilterBookingDto) {
+  async getUserBooking(accountId: string, filter: FilterBookingDto): Promise<BookingPaginatedResponseDto> {
     this.logger.log(
       `Getting user bookings for account ${accountId} with filter: ${JSON.stringify(
         filter,
@@ -528,15 +628,7 @@ export class BookingService {
 
     const [data, total] = await query.getManyAndCount();
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-      },
-    };
+    return this.mapPaginatedToDto(data, total, page, limit);
   }
 
   /**
@@ -546,9 +638,9 @@ export class BookingService {
    * - Manager/Staff: Chỉ xem các booking thuộc chi nhánh của mình.
    * @param {FilterBookingDto} filter - DTO chứa các tiêu chí lọc và phân trang.
    * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
+   * @returns {Promise<BookingPaginatedResponseDto>} - Một đối tượng chứa danh sách đơn đặt sân và thông tin phân trang.
    */
-  async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser) {
+  async getAllBookings(filter: FilterBookingDto, user: AuthenticatedUser): Promise<BookingPaginatedResponseDto> {
     this.logger.log(
       `Getting all bookings for user ${user.id
       } with filter: ${JSON.stringify(filter)}`,
@@ -580,15 +672,7 @@ export class BookingService {
 
     const [data, total] = await query.getManyAndCount();
 
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-      },
-    };
+    return this.mapPaginatedToDto(data, total, page, limit);
   }
 
   /**
@@ -597,10 +681,10 @@ export class BookingService {
    * @param {number} page - Số trang hiện tại.
    * @param {number} limit - Số lượng kết quả trên mỗi trang.
    * @param {BookingStatus} [status] - (Tùy chọn) Lọc các đơn đặt sân theo một trạng thái cụ thể.
-   * @returns {Promise<{ data: Booking[]; total: number; page: number; lastPage: number; }>} - Một đối tượng chứa danh sách các đơn đặt sân, tổng số lượng, trang hiện tại và trang cuối cùng.
+   * @returns {Promise<BookingPaginatedResponseDto>}
    * @deprecated Should use `getAllBookings` instead for better role-based filtering.
    */
-  async findAll(page: number, limit: number, status?: BookingStatus) {
+  async findAll(page: number, limit: number, status?: BookingStatus): Promise<BookingPaginatedResponseDto> {
     this.logger.log(
       `Finding all bookings with page: ${page}, limit: ${limit}, status: ${status}`,
     );
@@ -622,12 +706,7 @@ export class BookingService {
 
     const [data, total] = await query.getManyAndCount();
 
-    return {
-      data,
-      total,
-      page,
-      lastPage: Math.ceil(total / limit),
-    };
+    return this.mapPaginatedToDto(data, total, page, limit);
   }
 
   /**
@@ -636,13 +715,13 @@ export class BookingService {
    * Đơn được tạo với phương thức thanh toán là `CASH` và trạng thái `COMPLETED`.
    * @param {AdminCreateBookingDto} dto - DTO chứa thông tin đơn đặt sân.
    * @param {AuthenticatedUser} user - Người dùng (nhân viên) đang tạo đơn.
-   * @returns {Promise<Booking>} - Đơn đặt sân vừa được tạo.
+   * @returns {Promise<BookingDto>} - Đơn đặt sân vừa được tạo.
    * @throws {ForbiddenException} Nếu nhân viên cố gắng tạo đơn cho chi nhánh khác.
    */
   async createBookingByAdmin(
     dto: AdminCreateBookingDto,
     user: AuthenticatedUser,
-  ) {
+  ): Promise<BookingDto> {
     this.logger.log(
       `User ${user.id} creating booking by admin with DTO: ${JSON.stringify(
         dto,
@@ -716,8 +795,9 @@ export class BookingService {
         `Booking ${savedBooking.id} created successfully by admin ${user.id}`,
       );
       
-      // Reload to get all relations for the response
-      return await this.findOne(savedBooking.id);
+      // Reload to get all relations for the response mapping
+      const finalBooking = await this.findOne(savedBooking.id);
+      return this.mapToDto(finalBooking!);
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -731,17 +811,18 @@ export class BookingService {
    * @description (Manager/Admin) Check-in cho khách hàng tại sân.
    * Cập nhật trạng thái đơn đặt sân từ `COMPLETED` thành `CHECKED_IN`.
    * @param {string} bookingId - ID của đơn đặt sân cần check-in.
-   * @returns {Promise<Booking>} - Thông tin đơn đặt sân đã được cập nhật.
+   * @returns {Promise<BookingDto>} - Thông tin đơn đặt sân đã được cập nhật.
    * @throws {NotFoundException} Nếu không tìm thấy đơn đặt sân.
    * @throws {BadRequestException} Nếu đơn không ở trạng thái `COMPLETED` hoặc đã được check-in.
    */
-  async checkInCustomer(identifier: string): Promise<Booking> {
+  async checkInCustomer(identifier: string): Promise<BookingDto> {
     this.logger.log(`Checking in customer for booking with identifier ${identifier}`);
     const booking = await this.bookingRepository.findOne({
       where: [
         { id: identifier }, // Searches by UUID
         { code: identifier }, // Searches by code
       ],
+      relations: ['userProfile', 'field', 'field.branch', 'field.branch.address', 'field.branch.address.ward', 'field.branch.address.city']
     });
 
     if (!booking) {
@@ -767,10 +848,6 @@ export class BookingService {
       );
     }
 
-    booking.status = BookingStatus.CHECKED_IN;
-    booking.check_in_at = new Date();
-    this.logger.log(`[DEBUG] About to save booking ${booking.id} with status: ${booking.status}`);
-
     // Update using query builder to ensure status is saved
     await this.bookingRepository
       .createQueryBuilder()
@@ -786,16 +863,13 @@ export class BookingService {
 
     // Reload booking to get fresh data
     const savedBooking = await this.bookingRepository.findOne({
-      where: { id: booking.id }
+      where: { id: booking.id },
+      relations: ['userProfile', 'field', 'field.branch', 'field.branch.address', 'field.branch.address.ward', 'field.branch.address.city']
     });
-
-    if (savedBooking) {
-      this.logger.log(`[DEBUG] Booking ${savedBooking.id} reloaded. Status after save: "${savedBooking.status}"`);
-    }
 
     this.logger.log(`Booking ${booking.id} checked in successfully`);
 
-    return savedBooking || booking;
+    return this.mapToDto(savedBooking || booking);
   }
 
   /**
@@ -803,9 +877,9 @@ export class BookingService {
    * @description Lấy lịch các khung giờ đã được đặt của một sân trong một ngày cụ thể.
    * @param {string} fieldId - ID của sân.
    * @param {string} date - Ngày cần xem lịch (format: YYYY-MM-DD).
-   * @returns {Promise<object>} - Danh sách các khung giờ đã đặt trong ngày.
+   * @returns {Promise<FieldScheduleResponseDto>} - Danh sách các khung giờ đã đặt trong ngày.
    */
-  async getFieldSchedule(fieldId: string, date: string) {
+  async getFieldSchedule(fieldId: string, date: string): Promise<FieldScheduleResponseDto> {
     this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
 
     const startOfDay = new Date(`${date}T00:00:00`);

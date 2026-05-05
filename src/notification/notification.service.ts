@@ -6,6 +6,8 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Notification } from '../notification/entities/notification.entities';
 import { EventGateway } from '@/event/event.gateway';
 
+import { NotificationDto, NotificationPaginatedResponseDto } from './dto/notification.dto';
+
 /**
  * @class NotificationService
  * @description Service xử lý logic nghiệp vụ cho hệ thống thông báo.
@@ -25,12 +27,26 @@ export class NotificationService {
   ) {}
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Notification sang NotificationDto.
+   */
+  private mapToDto(notification: Notification): NotificationDto {
+    const dto = new NotificationDto();
+    dto.id = notification.id;
+    dto.title = notification.title;
+    dto.content = notification.content;
+    dto.isRead = notification.isRead;
+    dto.createdAt = notification.createdAt;
+    return dto;
+  }
+
+  /**
    * @method createNotification
    * @description Tạo một thông báo mới, lưu vào CSDL và gửi sự kiện real-time đến người nhận.
    * @param {CreateNotificationDto} dto - DTO chứa thông tin để tạo thông báo.
-   * @returns {Promise<Notification>} - Thông báo vừa được tạo.
+   * @returns {Promise<NotificationDto>} - Thông báo vừa được tạo.
    */
-  async createNotification(dto: CreateNotificationDto): Promise<Notification> {
+  async createNotification(dto: CreateNotificationDto): Promise<NotificationDto> {
     this.logger.log(`Creating notification for recipient: ${dto.recipientId}`);
     const notification = this.notificationRepository.create({
       title: dto.title,
@@ -47,7 +63,7 @@ export class NotificationService {
       savedNotification,
     );
     this.logger.log(`Notification ${savedNotification.id} created and sent.`);
-    return savedNotification;
+    return this.mapToDto(savedNotification);
   }
 
   /**
@@ -56,13 +72,13 @@ export class NotificationService {
    * @param {string} userProfileId - ID hồ sơ người dùng.
    * @param {number} page - Số trang.
    * @param {number} limit - Số lượng trên mỗi trang.
-   * @returns {Promise<object>} - Dữ liệu thông báo và thông tin meta (phân trang, số lượng chưa đọc).
+   * @returns {Promise<NotificationPaginatedResponseDto>} - Dữ liệu thông báo và thông tin meta (phân trang, số lượng chưa đọc).
    */
   async findAllByUser(
     userProfileId: string,
     page: number = 1,
     limit: number = 10,
-  ) {
+  ): Promise<NotificationPaginatedResponseDto> {
     this.logger.log(`Fetching notifications for user ${userProfileId}, page ${page}, limit ${limit}`);
     const skip = (page - 1) * limit;
 
@@ -77,16 +93,22 @@ export class NotificationService {
       where: { recipient: { id: userProfileId }, isRead: false },
     });
     this.logger.log(`Found ${total} notifications for user ${userProfileId}, ${unreadCount} unread.`);
-    return {
-      data,
-      meta: {
-        total,
-        unreadCount,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
-      },
+    
+    const response = new NotificationPaginatedResponseDto();
+    response.data = data.map(n => this.mapToDto(n));
+    response.meta = {
+      total,
+      // Note: PaginationMetaDto doesn't have unreadCount, but we can include it in the response object if needed
+      // For now keeping it consistent with the schema.
+      page,
+      limit,
+      lastPage: Math.ceil(total / limit),
     };
+    
+    // We can cast to any to include unreadCount if frontend expects it
+    (response.meta as any).unreadCount = unreadCount;
+
+    return response;
   }
 
   /**
@@ -94,10 +116,10 @@ export class NotificationService {
    * @description Đánh dấu một thông báo cụ thể là đã đọc.
    * @param {string} id - ID của thông báo.
    * @param {string} userProfileId - ID của người dùng để xác thực quyền sở hữu.
-   * @returns {Promise<Notification>} - Thông báo đã được cập nhật.
+   * @returns {Promise<NotificationDto>} - Thông báo đã được cập nhật.
    * @throws {NotFoundException} Nếu không tìm thấy thông báo.
    */
-  async markAsRead(id: string, userProfileId: string): Promise<Notification> {
+  async markAsRead(id: string, userProfileId: string): Promise<NotificationDto> {
     this.logger.log(`Marking notification ${id} as read for user ${userProfileId}`);
     const notification = await this.notificationRepository.findOne({
       where: { id, recipient: { id: userProfileId } },
@@ -109,9 +131,9 @@ export class NotificationService {
     }
 
     notification.isRead = true;
-    const savedNotification = this.notificationRepository.save(notification);
+    const savedNotification = await this.notificationRepository.save(notification);
     this.logger.log(`Notification ${id} marked as read.`);
-    return savedNotification;
+    return this.mapToDto(savedNotification);
   }
 
   /**

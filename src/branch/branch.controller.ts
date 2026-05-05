@@ -25,10 +25,11 @@ import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Role } from '@/auth/enums/role.enum';
-import { Branch } from './entities/branch.entity';
 import { User } from '@/auth/decorator/users.decorator';
-import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Account } from '@/user/entities/account.entity';
+import { BranchResponseDto } from './dto/branch-response.dto';
+import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
 
 @ApiTags('Branches (Chi nhánh)')
 @Controller('branches')
@@ -44,9 +45,9 @@ export class BranchController {
   @ApiResponse({
     status: 201,
     description: 'Tạo chi nhánh thành công.',
-    type: Branch,
+    type: BranchResponseDto,
   })
-  create(@Body() createBranchDto: CreateBranchDto, @User() creator: Account) {
+  create(@Body() createBranchDto: CreateBranchDto, @User() creator: Account): Promise<BranchResponseDto> {
     this.logger.log(
       `Admin ${creator.id} creating branch with DTO: ${JSON.stringify(
         createBranchDto,
@@ -60,9 +61,9 @@ export class BranchController {
   @ApiResponse({
     status: 200,
     description: 'Danh sách chi nhánh.',
-    type: [Branch],
+    type: [BranchResponseDto],
   })
-  findAll() {
+  findAll(): Promise<BranchResponseDto[]> {
     this.logger.log('Fetching all branches');
     return this.branchService.findAll();
   }
@@ -77,9 +78,9 @@ export class BranchController {
   @ApiResponse({
     status: 200,
     description: 'Danh sách các quản lý khả dụng.',
-    type: [UserProfile],
+    type: [UserProfileResponseDto],
   })
-  findAvailableManagers() {
+  findAvailableManagers(): Promise<UserProfileResponseDto[]> {
     this.logger.log('Fetching available managers');
     return this.branchService.findAvailableManagers();
   }
@@ -89,9 +90,9 @@ export class BranchController {
   @ApiResponse({
     status: 200,
     description: 'Chi tiết chi nhánh.',
-    type: Branch,
+    type: BranchResponseDto,
   })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<BranchResponseDto> {
     this.logger.log(`Fetching branch with id ${id}`);
     return this.branchService.findOne(id);
   }
@@ -104,12 +105,12 @@ export class BranchController {
   @ApiResponse({
     status: 200,
     description: 'Cập nhật thành công.',
-    type: Branch,
+    type: BranchResponseDto,
   })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateBranchDto: UpdateBranchDto,
-  ) {
+  ): Promise<BranchResponseDto> {
     this.logger.log(
       `Updating branch ${id} with DTO: ${JSON.stringify(updateBranchDto)}`,
     );
@@ -122,8 +123,8 @@ export class BranchController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '(Admin) Xóa một chi nhánh' })
-  @ApiResponse({ status: 200, description: 'Xóa thành công.' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Xóa thành công.' })
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<MessageResponseDto> {
     this.logger.log(`Deleting branch ${id}`);
     return this.branchService.remove(id);
   }

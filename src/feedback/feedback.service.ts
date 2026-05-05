@@ -11,6 +11,8 @@ import { Role } from '@/auth/enums/role.enum';
 import { FeedbackStatus } from './enums/feedback-status.enum';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 
+import { FeedbackDto, FeedbackResponseDto } from './dto/feedback.dto';
+
 /**
  * @class FeedbackService
  * @description Service xử lý logic nghiệp vụ cho hệ thống feedback và hỗ trợ.
@@ -35,16 +37,72 @@ export class FeedbackService {
   ) { }
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Feedback sang FeedbackDto.
+   */
+  private mapToDto(feedback: Feedback): FeedbackDto {
+    const dto = new FeedbackDto();
+    dto.id = feedback.id;
+    dto.title = feedback.title;
+    dto.category = feedback.category;
+    dto.status = feedback.status;
+    dto.created_at = feedback.created_at;
+
+    if (feedback.submitter) {
+      dto.submitter = this.mapProfileToDto(feedback.submitter);
+    }
+
+    if (feedback.assignee) {
+      dto.assignee = this.mapProfileToDto(feedback.assignee);
+    }
+
+    if (feedback.responses) {
+      dto.responses = feedback.responses.map(res => this.mapResponseToDto(res));
+    } else {
+      dto.responses = [];
+    }
+
+    return dto;
+  }
+
+  /**
+   * @method mapResponseToDto
+   * @description Ánh xạ từ thực thể FeedbackResponse sang FeedbackResponseDto.
+   */
+  private mapResponseToDto(res: FeedbackResponse): FeedbackResponseDto {
+    const dto = new FeedbackResponseDto();
+    dto.id = res.id;
+    dto.content = res.content;
+    dto.created_at = res.created_at;
+    if (res.responder) {
+      dto.responder = this.mapProfileToDto(res.responder);
+    }
+    return dto;
+  }
+
+  private mapProfileToDto(profile: UserProfile): any {
+    return {
+      id: profile.id,
+      full_name: profile.full_name,
+      avatar_url: profile.avatar_url,
+      phone_number: profile.phone_number,
+      is_profile_complete: profile.is_profile_complete,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at,
+    };
+  }
+
+  /**
    * @method create
    * @description Tạo một ticket feedback mới cùng với tin nhắn đầu tiên.
    * @param {CreateFeedbackDto} createDto - DTO chứa thông tin để tạo feedback.
    * @param {Account} account - Tài khoản của người dùng tạo feedback.
-   * @returns {Promise<Feedback>} - Ticket feedback vừa được tạo.
+   * @returns {Promise<FeedbackDto>} - Ticket feedback vừa được tạo.
    */
   async create(
     createDto: CreateFeedbackDto,
     account: Account,
-  ): Promise<Feedback> {
+  ): Promise<FeedbackDto> {
     this.logger.log(
       `User ${account.id} creating feedback with DTO: ${JSON.stringify(
         createDto,
@@ -85,9 +143,13 @@ export class FeedbackService {
 
       await queryRunner.commitTransaction();
       this.logger.log(`Feedback ${savedFeedback.id} created successfully`);
+
+      // Reload to get relations for mapping
+      const result = await this.findOne(savedFeedback.id);
+
       // Thông báo cho admin về ticket mới
-      this.eventGateway.notifyAdminsNewFeedback(savedFeedback);
-      return savedFeedback;
+      this.eventGateway.notifyAdminsNewFeedback(result);
+      return result;
     } catch (err) {
       this.logger.error(`Error creating feedback: `, err);
       await queryRunner.rollbackTransaction();
@@ -101,50 +163,46 @@ export class FeedbackService {
    * @method findMyFeedbacks
    * @description Tìm tất cả các ticket feedback do một người dùng cụ thể tạo.
    * @param {Account} account - Tài khoản của người dùng.
-   * @returns {Promise<Feedback[]>} - Danh sách các ticket.
+   * @returns {Promise<FeedbackDto[]>} - Danh sách các ticket của người dùng.
    */
-  async findMyFeedbacks(account: Account): Promise<Feedback[]> {
+  async findMyFeedbacks(account: Account): Promise<FeedbackDto[]> {
     this.logger.log(`Finding feedbacks for user ${account.id}`);
     const feedbacks = await this.feedbackRepo.find({
       where: { submitter: { account: { id: account.id } } },
       order: { created_at: 'DESC' },
-      relations: ['responses', 'submitter', 'submitter.account'],
+      relations: ['responses', 'responses.responder', 'submitter', 'submitter.account', 'assignee'],
     });
 
-    feedbacks.forEach((f) => this.mapFeedbackEmail(f));
-
-    return feedbacks;
+    return feedbacks.map(f => this.mapToDto(f));
   }
 
   /**
    * @method findAll
    * @description (Admin/Manager) Lấy tất cả các ticket feedback trong hệ thống.
-   * @returns {Promise<Feedback[]>} - Danh sách tất cả các ticket.
+   * @returns {Promise<FeedbackDto[]>} - Danh sách tất cả các ticket.
    */
-  async findAll(): Promise<Feedback[]> {
+  async findAll(): Promise<FeedbackDto[]> {
     this.logger.log('Finding all feedbacks');
     const feedbacks = await this.feedbackRepo.find({
       order: { created_at: 'DESC' },
-      relations: ['submitter', 'submitter.account'], // Load thông tin người gửi + account
+      relations: ['submitter', 'submitter.account', 'assignee', 'responses', 'responses.responder'], // Load thông tin người gửi + account
     });
 
-    feedbacks.forEach((f) => this.mapFeedbackEmail(f));
-
-    return feedbacks;
+    return feedbacks.map(f => this.mapToDto(f));
   }
 
   /**
    * @method findOne
    * @description Tìm chi tiết một ticket feedback, bao gồm tất cả các tin nhắn trả lời.
    * @param {string} id - ID của ticket.
-   * @returns {Promise<Feedback>} - Chi tiết của ticket.
+   * @returns {Promise<FeedbackDto>} - Chi tiết của ticket.
    * @throws {NotFoundException} Nếu không tìm thấy ticket.
    */
-  async findOne(id: string): Promise<Feedback> {
+  async findOne(id: string): Promise<FeedbackDto> {
     this.logger.log(`Finding feedback with id ${id}`);
     const feedback = await this.feedbackRepo.findOne({
       where: { id },
-      relations: ['responses', 'responses.responder', 'submitter', 'submitter.account'],
+      relations: ['responses', 'responses.responder', 'submitter', 'submitter.account', 'assignee'],
       order: {
         responses: { created_at: 'ASC' },
       },
@@ -153,9 +211,8 @@ export class FeedbackService {
       this.logger.error(`Feedback with id ${id} not found`);
       throw new NotFoundException('Không tìm thấy ticket feedback.');
     }
-    this.mapFeedbackEmail(feedback);
 
-    return feedback;
+    return this.mapToDto(feedback);
   }
 
   /**
@@ -165,18 +222,24 @@ export class FeedbackService {
    * @param {string} feedbackId - ID của ticket để trả lời.
    * @param {ReplyFeedbackDto} dto - DTO chứa nội dung trả lời.
    * @param {Account} account - Tài khoản của người gửi trả lời.
-   * @returns {Promise<FeedbackResponse>} - Tin nhắn trả lời vừa được lưu.
+   * @returns {Promise<FeedbackResponseDto>} - Tin nhắn trả lời vừa được lưu.
    */
   async reply(
     feedbackId: string,
     dto: ReplyFeedbackDto,
     account: Account,
-  ): Promise<FeedbackResponse> {
+  ): Promise<FeedbackResponseDto> {
     this.logger.log(
       `User ${account.id
       } replying to feedback ${feedbackId} with DTO: ${JSON.stringify(dto)}`,
     );
-    const feedback = await this.findOne(feedbackId);
+    const feedback = await this.feedbackRepo.findOne({
+      where: { id: feedbackId },
+    });
+
+    if (!feedback) {
+      throw new NotFoundException('Không tìm thấy ticket feedback.');
+    }
 
     // SỬA LỖI: Truy vấn lại UserProfile một cách tường minh để đảm bảo nó tồn tại
     // và tránh lỗi khóa ngoại khi `account.userProfile` là undefined.
@@ -220,13 +283,6 @@ export class FeedbackService {
       },
     });
 
-    return savedResponse;
-  }
-
-  private mapFeedbackEmail(feedback: Feedback) {
-    const submitter = feedback.submitter as UserProfile & { email?: string };
-    if (submitter?.account?.email) {
-      submitter.email = submitter.email ?? submitter.account.email;
-    }
+    return this.mapResponseToDto(savedResponse);
   }
 }

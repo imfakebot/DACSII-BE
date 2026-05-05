@@ -40,6 +40,10 @@ import { Booking } from './entities/booking.entity';
 import { Response } from 'express';
 
 
+import { BookingDto, BookingPaginatedResponseDto } from './dto/booking.dto';
+import { FieldScheduleResponseDto } from './dto/field-schedule-response.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
+
 /**
  * @controller BookingController
  * @description Xử lý các yêu cầu HTTP liên quan đến việc đặt sân.
@@ -125,7 +129,7 @@ export class BookingController {
   async create(
     @Body() createBookingDto: CreateBookingDto,
     @Req() req: AuthenticatedRequest,
-  ) {
+  ): Promise<BookingResponse> {
     const accountId = req.user.sub;
     this.logger.log(
       `User ${accountId} creating booking for field ${createBookingDto.fieldId}`,
@@ -173,7 +177,7 @@ export class BookingController {
   @ApiOperation({
     summary: '(User/Admin/Manager) Hủy yêu cầu đặt sân & Hoàn Voucher (nếu có)',
   })
-  @ApiResponse({ status: 200, description: 'Hủy thành công.' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Hủy thành công.' })
   @ApiResponse({
     status: 403,
     description: 'Không có quyền hủy đơn của người khác.',
@@ -183,7 +187,7 @@ export class BookingController {
   async cancel(
     @Param('id', ParseUUIDPipe) bookingId: string,
     @Req() req: AuthenticatedRequest,
-  ) {
+  ): Promise<MessageResponseDto> {
     const accountId = req.user.sub;
     const userRole = req.user.role as unknown as Role;
     this.logger.log(
@@ -207,18 +211,18 @@ export class BookingController {
    * Hỗ trợ lọc và phân trang.
    * @param {AuthenticatedRequest} req - Đối tượng request đã được xác thực.
    * @param {FilterBookingDto} filterDto - DTO chứa các tham số để lọc và phân trang.
-   * @returns {Promise<object>} - Một đối tượng chứa danh sách các đơn đặt sân và thông tin phân trang (meta).
+   * @returns {Promise<BookingPaginatedResponseDto>} - Một đối tượng chứa danh sách các đơn đặt sân và thông tin phân trang (meta).
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(User) Xem lịch sử đặt sân của tôi' })
-  @ApiResponse({ status: 200, description: 'Trả về danh sách đơn đặt sân.' })
+  @ApiResponse({ status: 200, type: BookingPaginatedResponseDto, description: 'Trả về danh sách đơn đặt sân.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   async getMyBookings(
     @Req() req: AuthenticatedRequest,
     @Query() filterDto: FilterBookingDto,
-  ) {
+  ): Promise<BookingPaginatedResponseDto> {
     this.logger.log(`Fetching bookings for user ${req.user.sub}`);
     return await this.bookingService.getUserBooking(req.user.sub, filterDto);
   }
@@ -230,17 +234,18 @@ export class BookingController {
    * - Manager/Staff: Chỉ xem các booking thuộc chi nhánh của mình.
    * @param {FilterBookingDto} filter - DTO chứa các tham số lọc và phân trang.
    * @param {AuthenticatedUser} user - Người dùng đang thực hiện yêu cầu (để lấy branch_id).
-   * @returns {Promise<object>} - Danh sách đơn đặt sân và thông tin phân trang.
+   * @returns {Promise<BookingPaginatedResponseDto>} - Danh sách đơn đặt sân và thông tin phân trang.
    */
   @Get('management/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager, Role.Staff)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Manager/Staff) Lấy danh sách booking' })
+  @ApiResponse({ status: 200, type: BookingPaginatedResponseDto })
   async getAllBooking(
     @Query() filter: FilterBookingDto,
     @User() user: AuthenticatedUser,
-  ) {
+  ): Promise<BookingPaginatedResponseDto> {
     this.logger.log(
       `User ${user.id} fetching all bookings with filter: ${JSON.stringify(
         filter,
@@ -255,17 +260,18 @@ export class BookingController {
    * Đơn được tạo với phương thức thanh toán là `CASH` và trạng thái `COMPLETED`.
    * @param {AdminCreateBookingDto} dto - DTO chứa thông tin đơn đặt sân.
    * @param {AuthenticatedUser} user - Người dùng (nhân viên) đang tạo đơn.
-   * @returns {Promise<Booking>} - Đơn đặt sân vừa được tạo.
+   * @returns {Promise<BookingDto>} - Đơn đặt sân vừa được tạo.
    */
   @Post('management/create')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.Manager, Role.Staff)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Staff/Manager) Tạo đơn đặt sân tại quầy' })
+  @ApiResponse({ status: 201, type: BookingDto })
   async createBookingByAdmin(
     @Body() dto: AdminCreateBookingDto,
     @User() user: AuthenticatedUser,
-  ) {
+  ): Promise<BookingDto> {
     this.logger.log(
       `User ${user.id} creating booking at counter: ${JSON.stringify(dto)}`,
     );
@@ -277,7 +283,7 @@ export class BookingController {
    * @description (Manager/Admin) Check-in cho khách hàng khi đến sân.
    * Cập nhật trạng thái của đơn đặt sân từ `COMPLETED` thành `CHECKED_IN`.
    * @param {CheckInDto} checkInDto - DTO chứa ID của đơn đặt sân cần check-in.
-   * @returns {Promise<Booking>} - Đơn đặt sân sau khi đã cập nhật.
+   * @returns {Promise<BookingDto>} - Đơn đặt sân sau khi đã cập nhật.
    */
   @Post('check-in')
   @HttpCode(HttpStatus.OK)
@@ -289,7 +295,7 @@ export class BookingController {
     status: 200,
     description:
       'Check-in thành công. Trả về thông tin đơn đặt sân đã cập nhật.',
-    type: Booking,
+    type: BookingDto,
   })
   @ApiResponse({
     status: 400,
@@ -298,7 +304,7 @@ export class BookingController {
   })
   @ApiResponse({ status: 403, description: 'Không có quyền thực hiện.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
-  checkIn(@Body() checkInDto: CheckInDto) {
+  checkIn(@Body() checkInDto: CheckInDto): Promise<BookingDto> {
     this.logger.log(`Checking in booking with identifier ${checkInDto.identifier}`);
     return this.bookingService.checkInCustomer(checkInDto.identifier);
   }
@@ -309,19 +315,20 @@ export class BookingController {
    * Hữu ích cho việc hiển thị lịch trực quan cho người dùng.
    * @param {string} fieldId - ID của sân bóng.
    * @param {string} date - Ngày cần xem lịch (định dạng YYYY-MM-DD).
-   * @returns {Promise<object>} - Danh sách các khung giờ đã đặt.
+   * @returns {Promise<FieldScheduleResponseDto>} - Danh sách các khung giờ đã đặt.
    */
   @Get('field/:fieldId/schedule')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '(Public) Lấy lịch đặt sân theo ngày' })
   @ApiResponse({
     status: 200,
+    type: FieldScheduleResponseDto,
     description: 'Trả về danh sách các booking trong ngày',
   })
   async getFieldSchedule(
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
     @Query('date') date: string,
-  ) {
+  ): Promise<FieldScheduleResponseDto> {
     this.logger.log(`Getting schedule for field ${fieldId} on date ${date}`);
     return this.bookingService.getFieldSchedule(fieldId, date);
   }
@@ -330,18 +337,19 @@ export class BookingController {
    * @route GET /bookings/:id
    * @description Lấy chi tiết một đơn đặt sân cụ thể.
    * @param {string} id - ID của đơn đặt sân.
-   * @returns {Promise<Booking>} - Thông tin chi tiết đơn đặt sân.
+   * @returns {Promise<BookingDto>} - Thông tin chi tiết đơn đặt sân.
    */
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết đơn đặt sân' })
-  @ApiResponse({ status: 200, description: 'Tìm thấy đơn đặt sân.', type: BookingResponse })
+  @ApiResponse({ status: 200, description: 'Tìm thấy đơn đặt sân.', type: BookingDto })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn đặt sân.' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<BookingDto> {
     this.logger.log(`Finding booking with id ${id}`);
-    const booking = await this.bookingService.findOne(id);
+    const booking = await this.bookingService.findOneDto(id);
     if (!booking) throw new NotFoundException('Không tìm thấy đơn đặt sân');
     return booking;
   }
 }
+

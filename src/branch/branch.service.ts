@@ -17,6 +17,9 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Role as RoleEnum } from '@/auth/enums/role.enum';
 import { Account } from '@/user/entities/account.entity';
 import { IsNull } from 'typeorm';
+import { BranchResponseDto, AddressResponseDto } from './dto/branch-response.dto';
+import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
+import { MessageResponseDto } from '@/common/dto/message-response.dto';
 
 /**
  * @class BranchService
@@ -51,17 +54,62 @@ export class BranchService {
     private readonly dataSource: DataSource,
   ) { }
 
+  private mapBranchToResponseDto(branch: Branch): BranchResponseDto {
+    const addressDto: AddressResponseDto = {
+      id: branch.address.id,
+      street: branch.address.street,
+      latitude: branch.address.latitude ? Number(branch.address.latitude) : null,
+      longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
+      ward_name: branch.address.ward.name,
+      city_name: branch.address.city.name,
+    };
+
+    let managerDto: UserProfileResponseDto | undefined;
+    if (branch.manager) {
+      managerDto = this.mapUserProfileToResponseDto(branch.manager);
+    }
+
+    return {
+      id: branch.id,
+      name: branch.name,
+      phone_number: branch.phone_number,
+      description: branch.description,
+      status: branch.status,
+      open_time: branch.open_time,
+      close_time: branch.close_time,
+      created_at: branch.created_at,
+      updated_at: branch.updated_at,
+      address: addressDto,
+      manager: managerDto,
+    };
+  }
+
+  private mapUserProfileToResponseDto(profile: UserProfile): UserProfileResponseDto {
+    return {
+      id: profile.id,
+      full_name: profile.full_name,
+      date_of_birth: profile.date_of_birth,
+      gender: profile.gender,
+      phone_number: profile.phone_number,
+      avatar_url: profile.avatar_url,
+      bio: profile.bio,
+      is_profile_complete: profile.is_profile_complete,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at,
+    };
+  }
+
   /**
    * @method create
    * @description Creates a new branch with its address and optionally assigns a manager.
    * @param {CreateBranchDto} createBranchDto - The data to create the branch.
    * @param {Account} creator - The account of the user creating the branch.
-   * @returns {Promise<Branch>} The newly created branch.
+   * @returns {Promise<BranchResponseDto>} The newly created branch.
    */
   async create(
     createBranchDto: CreateBranchDto,
     creator: Account,
-  ): Promise<Branch> {
+  ): Promise<BranchResponseDto> {
     this.logger.log(
       `Admin ${creator.id} creating new branch: ${createBranchDto.name}`,
     );
@@ -177,22 +225,23 @@ export class BranchService {
   /**
    * @method findAll
    * @description Retrieves all branches with their address and manager information.
-   * @returns {Promise<Branch[]>} A list of all branches.
+   * @returns {Promise<BranchResponseDto[]>} A list of all branches.
    */
-  async findAll(): Promise<Branch[]> {
-    return this.branchRepository.find({
-      relations: ['address', 'address.ward', 'address.city', 'manager', 'manager.account'],
+  async findAll(): Promise<BranchResponseDto[]> {
+    const branches = await this.branchRepository.find({
+      relations: ['address', 'address.ward', 'address.city', 'manager'],
     });
+    return branches.map(branch => this.mapBranchToResponseDto(branch));
   }
 
   /**
    * @method findAvailableManagers
    * @description Finds user profiles with the 'Manager' role who are not yet assigned to any branch.
-   * @returns {Promise<UserProfile[]>} A list of available managers.
+   * @returns {Promise<UserProfileResponseDto[]>} A list of available managers.
    */
-  async findAvailableManagers(): Promise<UserProfile[]> {
+  async findAvailableManagers(): Promise<UserProfileResponseDto[]> {
     this.logger.log('Fetching available managers');
-    return this.userProfileRepository.find({
+    const managers = await this.userProfileRepository.find({
       where: {
         account: {
           role: {
@@ -202,16 +251,17 @@ export class BranchService {
         branch: IsNull(), // Only find managers not yet assigned to a branch
       },
     });
+    return managers.map(manager => this.mapUserProfileToResponseDto(manager));
   }
 
   /**
    * @method findOne
    * @description Finds a single branch by its ID, including related entities.
    * @param {string} id - The ID of the branch to find.
-   * @returns {Promise<Branch>} The found branch.
+   * @returns {Promise<BranchResponseDto>} The found branch.
    * @throws {NotFoundException} If the branch with the given ID is not found.
    */
-  async findOne(id: string): Promise<Branch> {
+  async findOne(id: string): Promise<BranchResponseDto> {
     const branch = await this.branchRepository.findOne({
       where: { id },
       relations: [
@@ -219,14 +269,12 @@ export class BranchService {
         'address.ward',
         'address.city',
         'manager',
-        'fields',
-        'staffMembers',
       ],
     });
     if (!branch) {
       throw new NotFoundException(`Branch with ID ${id} not found.`);
     }
-    return branch;
+    return this.mapBranchToResponseDto(branch);
   }
 
   /**
@@ -234,16 +282,24 @@ export class BranchService {
    * @description Updates a branch's information.
    * @param {string} id - The ID of the branch to update.
    * @param {UpdateBranchDto} updateBranchDto - The data to update the branch with.
-   * @returns {Promise<Branch>} The updated branch.
+   * @returns {Promise<BranchResponseDto>} The updated branch.
    */
-  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<Branch> {
-    const branch = await this.findOne(id);
+  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<BranchResponseDto> {
+    const branchEntity = await this.branchRepository.findOne({
+      where: { id },
+      relations: ['address'],
+    });
+
+    if (!branchEntity) {
+      throw new NotFoundException(`Branch with ID ${id} not found.`);
+    }
+
     const { street, wardId, cityId, manager_id, latitude, longitude, ...branchData } =
       updateBranchDto;
 
     // Update address if any address field is provided
     if (street !== undefined || wardId !== undefined || cityId !== undefined || latitude !== undefined || longitude !== undefined) {
-      const address = branch.address;
+      const address = branchEntity.address;
       if (address) {
         // Update street if provided
         if (street !== undefined) {
@@ -283,23 +339,22 @@ export class BranchService {
     if (manager_id !== undefined) {
       if (manager_id === null) {
         // Remove manager assignment
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        branch.manager = null as any;
-        branch.manager_id = null;
+        branchEntity.manager = null as any;
+        branchEntity.manager_id = null;
       } else {
         const managerProfile = await this.userProfileRepository.findOne({
           where: { id: manager_id },
           relations: ['account', 'account.role'],
         });
         if (managerProfile) {
-          branch.manager = managerProfile;
-          branch.manager_id = manager_id;
+          branchEntity.manager = managerProfile;
+          branchEntity.manager_id = manager_id;
         }
       }
     }
 
-    this.branchRepository.merge(branch, branchData);
-    await this.branchRepository.save(branch);
+    this.branchRepository.merge(branchEntity, branchData);
+    await this.branchRepository.save(branchEntity);
 
     return this.findOne(id);
   }
@@ -308,10 +363,10 @@ export class BranchService {
    * @method remove
    * @description Deletes a branch by its ID.
    * @param {string} id - The ID of the branch to delete.
-   * @returns {Promise<{ message: string }>} A confirmation message.
+   * @returns {Promise<MessageResponseDto>} A confirmation message.
    * @throws {NotFoundException} If the branch with the given ID is not found.
    */
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(id: string): Promise<MessageResponseDto> {
     const result = await this.branchRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException(`Branch with ID ${id} not found.`);

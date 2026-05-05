@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Booking } from '../entities/booking.entity';
+import { BookingDto } from './booking.dto';
 
 /**
  * @class CreateBookingResponse
@@ -37,9 +37,9 @@ export class BookingResponse {
   finalAmount!: number;
 
   /**
-   * Đối tượng `Booking` vừa được tạo và lưu trong cơ sở dữ liệu.
+   * Đối tượng `BookingDto` vừa được tạo và lưu trong cơ sở dữ liệu.
    * Chứa tất cả chi tiết về lượt đặt sân.
    */
-  @ApiProperty({ type: Booking })
-  booking!: Booking;
+  @ApiProperty({ type: BookingDto })
+  booking!: BookingDto;
 }

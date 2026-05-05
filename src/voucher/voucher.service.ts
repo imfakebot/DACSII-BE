@@ -11,6 +11,8 @@ import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Booking } from '@/booking/entities/booking.entity';
 
+import { VoucherDto, VoucherCheckResponseDto } from './dto/voucher.dto';
+
 /**
  * @class VoucherService
  * @description Service quản lý các logic liên quan đến mã giảm giá (voucher).
@@ -28,13 +30,34 @@ export class VoucherService {
   ) {}
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Voucher sang VoucherDto.
+   */
+  private mapToDto(voucher: Voucher): VoucherDto {
+    const dto = new VoucherDto();
+    dto.id = voucher.id;
+    dto.code = voucher.code;
+    dto.discountAmount = voucher.discountAmount ? Number(voucher.discountAmount) : null;
+    dto.discountPercentage = voucher.discountPercentage;
+    dto.maxDiscountAmount = voucher.maxDiscountAmount ? Number(voucher.maxDiscountAmount) : null;
+    dto.minOrderValue = Number(voucher.minOrderValue);
+    dto.validFrom = voucher.validFrom;
+    dto.validTo = voucher.validTo;
+    dto.quantity = voucher.quantity;
+    dto.userProfileId = voucher.userProfileId;
+    dto.createdAt = voucher.createdAt;
+    dto.updatedAt = voucher.updatedAt;
+    return dto;
+  }
+
+  /**
    * (Admin) Tạo một mã giảm giá mới.
    * Kiểm tra xem mã đã tồn tại chưa trước khi tạo.
    * @param {CreateVoucherDto} dto - Dữ liệu để tạo voucher mới.
-   * @returns {Promise<Voucher>} Voucher vừa được tạo.
+   * @returns {Promise<VoucherDto>} Voucher vừa được tạo.
    * @throws {BadRequestException} Nếu mã voucher đã tồn tại.
    */
-  async create(dto: CreateVoucherDto): Promise<Voucher> {
+  async create(dto: CreateVoucherDto): Promise<VoucherDto> {
     this.logger.log(`Creating new voucher with DTO: ${JSON.stringify(dto)}`);
     const exists = await this.voucherRepository.findOne({
       where: { code: dto.code },
@@ -47,7 +70,7 @@ export class VoucherService {
     const voucher = this.voucherRepository.create(dto);
     const savedVoucher = await this.voucherRepository.save(voucher);
     this.logger.log(`Voucher ${savedVoucher.code} created successfully.`);
-    return savedVoucher;
+    return this.mapToDto(savedVoucher);
   }
 
   /**
@@ -127,7 +150,7 @@ export class VoucherService {
    * @param orderValue Giá trị của đơn hàng để kiểm tra điều kiện minOrderValue.
    * @returns Danh sách các voucher có thể áp dụng.
    */
-  async findAvailableVouchers(orderValue: number): Promise<Voucher[]> {
+  async findAvailableVouchers(orderValue: number): Promise<VoucherDto[]> {
     this.logger.log(`Finding available vouchers for order value: ${orderValue}`);
     const now = new Date();
     const availableVouchers = await this.voucherRepository.find({
@@ -145,7 +168,7 @@ export class VoucherService {
       },
     });
     this.logger.log(`Found ${availableVouchers.length} available vouchers.`);
-    return availableVouchers;
+    return availableVouchers.map(v => this.mapToDto(v));
   }
 
   /**
@@ -159,11 +182,11 @@ export class VoucherService {
    * @param {string} code - Mã voucher cần kiểm tra.
    * @param {number} orderValue - Giá trị của đơn hàng để kiểm tra điều kiện.
    * @param {string} userId - ID của người dùng đang áp dụng.
-   * @returns {Promise<object>} Một object chứa kết quả kiểm tra và số tiền được giảm.
+   * @returns {Promise<VoucherCheckResponseDto>} Một object chứa kết quả kiểm tra và số tiền được giảm.
    * @throws {NotFoundException} Nếu voucher không tồn tại.
    * @throws {BadRequestException} Nếu voucher không hợp lệ (hết hạn, hết lượt, không đủ điều kiện,...).
    */
-  async checkVoucher(code: string, orderValue: number, userProfileId: string) {
+  async checkVoucher(code: string, orderValue: number, userProfileId: string): Promise<VoucherCheckResponseDto> {
     this.logger.log(
       `Checking voucher code "${code}" for order value: ${orderValue} by user ${userProfileId}`,
     );
@@ -234,13 +257,15 @@ export class VoucherService {
     this.logger.log(
       `Voucher "${code}" applied, discount amount: ${discountAmount}.`,
     );
-    return {
-      isValid: true,
-      code: voucher.code,
-      discountAmount: Math.floor(discountAmount),
-      finalAmount: orderValue - Math.floor(discountAmount),
-      message: 'Áp dụng mã giảm giá thành công',
-    };
+    
+    const response = new VoucherCheckResponseDto();
+    response.isValid = true;
+    response.code = voucher.code;
+    response.discountAmount = Math.floor(discountAmount);
+    response.finalAmount = orderValue - Math.floor(discountAmount);
+    response.message = 'Áp dụng mã giảm giá thành công';
+
+    return response;
   }
 
   async remove(id: string) {

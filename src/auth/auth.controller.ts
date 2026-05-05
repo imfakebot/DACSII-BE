@@ -35,6 +35,9 @@ import { LoginCompleteDto } from './dto/login-complete.dto';
 import { AuthenticatedRequest } from './interface/authenticated-request.interface';
 import { Throttle } from '@nestjs/throttler';
 import { AuthenticatedUser } from './interface/authenicated-user.interface';
+import { AuthMessageResponseDto } from './dto/auth-message-response.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
+import { TokenResponseDto } from './dto/token-response.dto';
 
 /**
  * @controller AuthController
@@ -49,7 +52,7 @@ export class AuthController {
     private readonly authService: AuthService,
     /**
      * @param {AuthService} authService - Service xử lý logic nghiệp vụ xác thực.
-     * @param {ConfigService} configService - Service để truy cập các biến môi trường.
+     * @param {ConfigService} configService - Service để truy cập các biến môi trường cấu hình.
      */
     private readonly configService: ConfigService,
   ) { }
@@ -58,11 +61,11 @@ export class AuthController {
    * @route POST /auth/register/initiate
    * @description Bắt đầu quá trình đăng ký. Nhận thông tin người dùng và gửi email xác thực.
    * @param {RegisterUserDto} registerDto - DTO chứa thông tin đăng ký của người dùng.
-   * @returns {Promise<{ message: string }>} - Thông báo về việc đã gửi email xác thực.
+   * @returns {Promise<AuthMessageResponseDto>} - Thông báo về việc đã gửi email xác thực.
    */
   @Post('register/initiate')
   @ApiOperation({ summary: 'Bắt đầu quá trình đăng ký' })
-  @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
+  @ApiResponse({ status: 200, type: AuthMessageResponseDto, description: 'Gửi mã xác thực thành công.' })
   @ApiResponse({
     status: 400,
     description: 'Dữ liệu không hợp lệ (Validation Error).',
@@ -73,7 +76,7 @@ export class AuthController {
   })
   @ApiBody({ type: RegisterUserDto })
   @HttpCode(HttpStatus.OK)
-  initiateRegistration(@Body() registerDto: RegisterUserDto) {
+  initiateRegistration(@Body() registerDto: RegisterUserDto): Promise<AuthMessageResponseDto> {
     this.logger.log(`Registration initiated for ${registerDto.email}`);
     return this.authService.initiateRegistration(registerDto);
   }
@@ -82,18 +85,18 @@ export class AuthController {
    * @route POST /auth/register/complete
    * @description Hoàn tất quá trình đăng ký bằng cách xác thực mã được gửi qua email.
    * @param {VerifyEmailDto} verifyEmailDto - DTO chứa email và mã xác thực.
-   * @returns {Promise<User>} - Thông tin người dùng sau khi đăng ký thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Thông báo xác thực thành công.
    */
   @Post('register/complete')
   @ApiOperation({ summary: 'Hoàn thành đăng ký bằng mã xác thực' })
-  @ApiResponse({ status: 200, description: 'Xác thực thành công.' })
+  @ApiResponse({ status: 200, type: AuthMessageResponseDto, description: 'Xác thực thành công.' })
   @ApiResponse({
     status: 400,
     description: 'Dữ liệu không hợp lệ (Validation Error).',
   })
   @ApiResponse({ status: 409, description: 'Mã không hợp lệ hoặc đã hết hạn.' })
   @HttpCode(HttpStatus.OK)
-  completeRegistration(@Body() verifyEmailDto: VerifyEmailDto) {
+  completeRegistration(@Body() verifyEmailDto: VerifyEmailDto): Promise<AuthMessageResponseDto> {
     this.logger.log(`Completing registration for ${verifyEmailDto.email}`);
     return this.authService.completeRegistration(
       verifyEmailDto.email,
@@ -214,24 +217,18 @@ export class AuthController {
   /**
    * @route POST /auth/refresh
    * @description Làm mới access token bằng cách sử dụng refresh token được lưu trong cookie.
-   * Luồng hoạt động:
-   * 1. Frontend gọi POST /auth/refresh (không cần body).
-   * 2. Trình duyệt tự động đính kèm cookie 'refresh_token'.
-   * 3. JwtRefreshGuard chặn request, đọc cookie, và xác thực token.
-   * 4. Nếu hợp lệ, Guard gắn payload (chứa userId) vào req.user.
-   * 5. Controller được thực thi, gọi service để tạo access token mới.
    */
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Làm mới access token bằng refresh token' })
-  @ApiCookieAuth('refresh_token') // Mô tả rằng endpoint này yêu cầu cookie 'refresh_token'
-  @ApiResponse({ status: 200, description: 'Trả về access token mới.' })
+  @ApiCookieAuth('refresh_token')
+  @ApiResponse({ status: 200, type: TokenResponseDto, description: 'Trả về access token mới.' })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - Refresh token không hợp lệ hoặc đã hết hạn.',
   })
-  refreshTokens(@Req() req: AuthenticatedRequest) {
+  refreshTokens(@Req() req: AuthenticatedRequest): Promise<TokenResponseDto> {
     const userId = req.user.sub;
     this.logger.log(`Refreshing tokens for user ${userId}`);
     return this.authService.refreshTokens(userId);
@@ -242,14 +239,14 @@ export class AuthController {
    * @description Đăng xuất người dùng. Vô hiệu hóa refresh token trong CSDL và xóa cookie phía client.
    * @param {AuthenticatedRequest} req - Request đã được xác thực bởi `JwtAuthGuard`.
    * @param {Response} res - Đối tượng response của Express để xóa cookie.
-   * @returns {Promise<{ message: string }>} - Thông báo đăng xuất thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Thông báo đăng xuất thành công.
    */
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất người dùng' })
-  @ApiCookieAuth() // Cho Swagger biết endpoint này cần xác thực (JWT)
-  @ApiResponse({ status: 200, description: 'Đăng xuất thành công.' })
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, type: AuthMessageResponseDto, description: 'Đăng xuất thành công.' })
   @ApiResponse({
     status: 401,
     description: 'Unauthorized - Access token không hợp lệ.',
@@ -257,7 +254,7 @@ export class AuthController {
   async logout(
     @Req() req: AuthenticatedRequest,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<AuthMessageResponseDto> {
     const userId = req.user.sub;
     this.logger.log(`User ${userId} logging out`);
     await this.authService.logout(userId);
@@ -268,21 +265,23 @@ export class AuthController {
 
     return { message: 'Đăng xuất thành công' };
   }
+
   /**
    * @route POST /auth/forgot-password
    * @description Bắt đầu quá trình quên mật khẩu. Gửi email chứa link đặt lại mật khẩu cho người dùng.
    * @param {ForgotPasswordDto} forgotPasswordDto - DTO chứa email của người dùng.
-   * @returns {Promise<{ message: string }>} - Một thông báo chung để bảo mật.
+   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo chung để bảo mật.
    */
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Gửi yêu cầu đặt lại mật khẩu' })
   @ApiResponse({
     status: 200,
+    type: AuthMessageResponseDto,
     description: 'Luôn trả về thông báo thành công để tránh dò email.',
   })
   @ApiBody({ type: ForgotPasswordDto })
-  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<AuthMessageResponseDto> {
     this.logger.log(
       `Forgot password requested for email ${forgotPasswordDto.email}`,
     );
@@ -296,20 +295,21 @@ export class AuthController {
    * @route POST /auth/reset-password
    * @description Đặt lại mật khẩu bằng token đã nhận được qua email.
    * @param {ResetPasswordDto} resetPasswordDto - DTO chứa token và mật khẩu mới.
-   * @returns {Promise<{ message: string }>} - Thông báo cập nhật mật khẩu thành công.
+   * @returns {Promise<AuthMessageResponseDto>} - Thông báo cập nhật mật khẩu thành công.
    */
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đặt lại mật khẩu với token' })
   @ApiResponse({
     status: 200,
+    type: AuthMessageResponseDto,
     description: 'Mật khẩu đã được cập nhật thành công.',
   })
   @ApiResponse({
     status: 400,
     description: 'Token không hợp lệ hoặc đã hết hạn.',
   })
-  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<AuthMessageResponseDto> {
     this.logger.log('Resetting password');
     return this.authService.resetPassword(
       resetPasswordDto.token,
@@ -322,20 +322,20 @@ export class AuthController {
    * @description Bước 1 của quá trình đăng nhập bằng email/mật khẩu.
    * Xác thực thông tin đăng nhập và gửi mã xác thực (OTP) qua email nếu thành công.
    * @param {LoginUserDto} loginUserDto - DTO chứa email và mật khẩu.
-   * @returns {Promise<{ message: string }>} - Thông báo về việc đã gửi mã xác thực.
+   * @returns {Promise<AuthMessageResponseDto>} - Thông báo về việc đã gửi mã xác thực.
    */
   @Post('login/initiate')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'B1 Đăng nhập: Xác thực mật khẩu, gửi mã về email' })
-  @ApiResponse({ status: 200, description: 'Gửi mã xác thực thành công.' })
+  @ApiResponse({ status: 200, type: AuthMessageResponseDto, description: 'Gửi mã xác thực thành công.' })
   @ApiResponse({
     status: 401,
     description: 'Email hoặc mật khẩu không chính xác.',
   })
   @ApiResponse({ status: 404, description: 'Tài khoản không tồn tại.' })
   @ApiBody({ type: LoginUserDto })
-  loginInitiate(@Body() loginUserDto: LoginUserDto) {
+  loginInitiate(@Body() loginUserDto: LoginUserDto): Promise<AuthMessageResponseDto> {
     this.logger.log(`Login initiated for ${loginUserDto.email}`);
     return this.authService.loginInitiate(
       loginUserDto.email,
@@ -349,7 +349,7 @@ export class AuthController {
    * Xác thực mã OTP được gửi qua email để hoàn tất đăng nhập, sau đó cấp access token và refresh token.
    * @param {LoginCompleteDto} loginCompleteDto - DTO chứa email và mã xác thực.
    * @param {Response} res - Đối tượng response để set cookie.
-   * @returns {Promise<{ accessToken: string; user: any }>} - Access token và thông tin người dùng.
+   * @returns {Promise<LoginResponseDto>} - Access token và thông tin người dùng.
    */
   @Post('login/complete')
   @HttpCode(HttpStatus.OK)
@@ -357,6 +357,7 @@ export class AuthController {
   @ApiOperation({ summary: 'B2 Đăng nhập: Xác thực mã OTP, nhận tokens' })
   @ApiResponse({
     status: 200,
+    type: LoginResponseDto,
     description:
       'Đăng nhập thành công, trả về access token và thông tin người dùng.',
   })
@@ -369,7 +370,7 @@ export class AuthController {
   async loginComplete(
     @Body() loginCompleteDto: LoginCompleteDto,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<LoginResponseDto> {
     this.logger.log(`Completing login for ${loginCompleteDto.email}`);
     const loginData = await this.authService.loginComplete(
       loginCompleteDto.email,
@@ -402,7 +403,7 @@ export class AuthController {
   @Post('google/mobile')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập Google Native cho Mobile (Nhận idToken)' })
-  @ApiResponse({ status: 200, description: 'Trả về accessToken và thông tin user' })
+  @ApiResponse({ status: 200, type: LoginResponseDto, description: 'Trả về accessToken và thông tin user' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -412,11 +413,10 @@ export class AuthController {
   async googleAuthNative(
     @Body('idToken') idToken: string,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<LoginResponseDto> {
     this.logger.log(`Received Native Google idToken from Mobile`);
 
     // 1. Gọi AuthService để verify cái idToken này với Google 
-    // (Hàm này Sếp xem lại tin nhắn trước tui gửi nhé, xài thư viện google-auth-library)
     const loginData = await this.authService.verifyGoogleAndroidToken(idToken);
 
     // 2. Trả refresh_token qua Cookie (hoặc ném luôn vào body nếu Android không xài cookie)

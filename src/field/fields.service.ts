@@ -21,6 +21,8 @@ import { Utility } from '../utility/entities/utility.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
 
+import { FieldDto, FieldTypeDto, FieldImageDto } from './dto/field.dto';
+
 /**
  * @class FieldsService
  * @description Service xử lý logic nghiệp vụ liên quan đến sân bóng.
@@ -41,10 +43,79 @@ export class FieldsService {
     private readonly configService: ConfigService,
   ) { }
 
+  /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Field sang FieldDto.
+   */
+  private mapToDto(field: Field): FieldDto {
+    const dto = new FieldDto();
+    dto.id = field.id;
+    dto.name = field.name;
+    dto.description = field.description;
+    dto.status = field.status;
+    dto.createdAt = field.createdAt;
+    dto.updatedAt = field.updatedAt;
+    dto.averageRating = field.averageRating;
+    dto.reviewCount = field.reviewCount;
+
+    if (field.fieldType) {
+      dto.fieldType = this.mapTypeToDto(field.fieldType);
+    }
+
+    if (field.branch) {
+      const branch = field.branch;
+      dto.branch = {
+        id: branch.id,
+        name: branch.name,
+        phone_number: branch.phone_number,
+        description: branch.description,
+        status: branch.status,
+        open_time: branch.open_time,
+        close_time: branch.close_time,
+        created_at: branch.created_at,
+        updated_at: branch.updated_at,
+        address: branch.address ? {
+          id: branch.address.id,
+          street: branch.address.street,
+          latitude: branch.address.latitude ? Number(branch.address.latitude) : null,
+          longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
+          ward_name: branch.address.ward?.name || '',
+          city_name: branch.address.city?.name || '',
+        } : (null as any),
+      };
+    }
+
+    if (field.images) {
+      dto.images = field.images.map(img => this.mapImageToDto(img));
+    } else {
+      dto.images = [];
+    }
+
+    dto.utilities = field.utilities || [];
+
+    return dto;
+  }
+
+  private mapTypeToDto(type: FieldType): FieldTypeDto {
+    const dto = new FieldTypeDto();
+    dto.id = type.id;
+    dto.name = type.name;
+    dto.description = type.description;
+    return dto;
+  }
+
+  private mapImageToDto(img: FieldImage): FieldImageDto {
+    const dto = new FieldImageDto();
+    dto.id = img.id;
+    dto.image_url = img.image_url;
+    dto.isCover = img.isCover;
+    return dto;
+  }
+
   async create(
     createFieldDto: CreateFieldDto,
     userProfile: UserProfile,
-  ): Promise<Field> {
+  ): Promise<FieldDto> {
     this.logger.log(
       `User ${userProfile.id} is creating a new field with DTO: ${JSON.stringify(
         createFieldDto,
@@ -115,7 +186,7 @@ export class FieldsService {
     return this.findOne(savedField.id);
   }
 
-  async findAll(filterDto: FilterFieldDto): Promise<Field[]> {
+  async findAll(filterDto: FilterFieldDto): Promise<FieldDto[]> {
     this.logger.log(
       `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
     );
@@ -203,14 +274,14 @@ export class FieldsService {
       entity.reviewCount = rawItem?.field_reviewCount
         ? parseInt(rawItem.field_reviewCount)
         : 0;
-      return entity;
+      return this.mapToDto(entity);
     });
 
     this.logger.log(`Found ${fields.length} fields`);
     return fields;
   }
 
-  async findOne(id: string): Promise<Field> {
+  async findOne(id: string): Promise<FieldDto> {
     this.logger.log(`Finding field with ID: ${id}`);
     const query = this.fieldRepository.createQueryBuilder('field');
 
@@ -259,14 +330,14 @@ export class FieldsService {
       ? parseInt(rawItem.field_reviewCount)
       : 0;
 
-    return field;
+    return this.mapToDto(field);
   }
 
   async update(
     id: string,
     updateFieldDto: UpdateFieldDto,
     userProfile: UserProfile,
-  ): Promise<Field> {
+  ): Promise<FieldDto> {
     this.logger.log(
       `User ${userProfile.id} updating field ${id} with DTO: ${JSON.stringify(
         updateFieldDto,

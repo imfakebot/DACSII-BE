@@ -16,6 +16,9 @@ import moment from 'moment-timezone';
 import { Branch } from '@/branch/entities/branch.entity';
 import { UpdateTimeSlotDto } from './dto/update-time-slot.dto';
 
+import { TimeSlotDto } from './dto/pricing.dto';
+import { CheckPriceResponseDto } from './dto/check-price-response.dto';
+
 /**
  * @class PricingService
  * @description Dịch vụ này chịu trách nhiệm xử lý tất cả logic liên quan đến việc tính giá và kiểm tra tính khả dụng của sân bóng.
@@ -50,12 +53,12 @@ export class PricingService {
    * 5. Tính toán tổng chi phí dựa trên giá mỗi giờ và thời lượng đặt.
    *
    * @param {CheckPriceDto} dto - DTO chứa ID sân, thời gian bắt đầu và thời lượng.
-   * @returns {Promise<object>} Một đối tượng chứa thông tin về tính khả dụng, chi tiết đặt sân và giá tiền.
+   * @returns {Promise<CheckPriceResponseDto>} Một đối tượng chứa thông tin về tính khả dụng, chi tiết đặt sân và giá tiền.
    * @throws {BadRequestException} Nếu thời gian đặt nằm ngoài giờ hoạt động hoặc sân không hoạt động.
    * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
    * @throws {ConflictException} Nếu khung giờ đã được người khác đặt.
    */
-  async checkPriceAndAvailability(dto: CheckPriceDto) {
+  async checkPriceAndAvailability(dto: CheckPriceDto): Promise<CheckPriceResponseDto> {
     this.logger.log(`Checking price and availability for field ${dto.fieldId} at ${dto.startTime} for ${dto.durationMinutes} minutes.`);
     const { fieldId, startTime, durationMinutes } = dto;
 
@@ -133,28 +136,30 @@ export class PricingService {
     // Làm tròn tiền (ví dụ làm tròn đến hàng nghìn)
     const roundedPrice = Math.ceil(finalPrice / 1000) * 1000;
     this.logger.log(`Price calculated for field ${fieldId}: ${roundedPrice} VND.`);
-    return {
-      available: true,
-      field_name: field.name,
-      booking_details: {
-        date: start.toLocaleDateString('vi-VN'),
-        start_time: start.toLocaleTimeString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        end_time: end.toLocaleTimeString('vi-VN', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        duration: `${durationMinutes} phút`,
-      },
-      pricing: {
-        price_per_hour: pricePerHour,
-        total_price: roundedPrice,
-        currency: 'VND',
-      },
-      message: 'Sân còn trống, có thể đặt ngay.',
+    
+    const response = new CheckPriceResponseDto();
+    response.available = true;
+    response.field_name = field.name;
+    response.booking_details = {
+      date: start.toLocaleDateString('vi-VN'),
+      start_time: start.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      end_time: end.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      duration: `${durationMinutes} phút`,
     };
+    response.pricing = {
+      price_per_hour: pricePerHour,
+      total_price: roundedPrice,
+      currency: 'VND',
+    };
+    response.message = 'Sân còn trống, có thể đặt ngay.';
+    
+    return response;
   }
 
   private validateOperatingHour(start: Date, end: Date, branch: Branch) {
@@ -190,13 +195,37 @@ export class PricingService {
   }
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể TimeSlot sang TimeSlotDto.
+   */
+  private mapToDto(slot: TimeSlot): TimeSlotDto {
+    const dto = new TimeSlotDto();
+    dto.id = slot.id;
+    dto.start_time = slot.start_time;
+    dto.end_time = slot.end_time;
+    dto.price = Number(slot.price);
+    dto.is_peak_hour = slot.is_peak_hour;
+    
+    if (slot.fieldType) {
+      dto.fieldType = {
+        id: slot.fieldType.id,
+        name: slot.fieldType.name,
+        description: slot.fieldType.description,
+      };
+    }
+    
+    return dto;
+  }
+
+  /**
    * Lấy tất cả các khung giờ.
    *
-   * @returns {Promise<TimeSlot[]>} Danh sách tất cả các khung giờ.
+   * @returns {Promise<TimeSlotDto[]>} Danh sách tất cả các khung giờ.
    */
-  async getAllTimeSlots(): Promise<TimeSlot[]> {
+  async getAllTimeSlots(): Promise<TimeSlotDto[]> {
     this.logger.log('Fetching all time slots.');
-    return this.timeSlotRepository.find({ relations: ['fieldType'] });
+    const slots = await this.timeSlotRepository.find({ relations: ['fieldType'] });
+    return slots.map(s => this.mapToDto(s));
   }
 
   /**
@@ -204,12 +233,12 @@ export class PricingService {
    *
    * @param {number} id - ID của khung giờ cần cập nhật.
    * @param {UpdateTimeSlotDto} dto - DTO chứa thông tin cập nhật.
-   * @returns {Promise<TimeSlot>} Khung giờ đã được cập nhật.
+   * @returns {Promise<TimeSlotDto>} Khung giờ đã được cập nhật.
    * @throws {NotFoundException} Nếu không tìm thấy khung giờ.
    */
-  async updateTimeSlot(id: number, dto: UpdateTimeSlotDto): Promise<TimeSlot> {
+  async updateTimeSlot(id: number, dto: UpdateTimeSlotDto): Promise<TimeSlotDto> {
     this.logger.log(`Updating time slot with ID ${id} with data: ${JSON.stringify(dto)}`);
-    const timeSlot = await this.timeSlotRepository.findOne({ where: { id } });
+    const timeSlot = await this.timeSlotRepository.findOne({ where: { id }, relations: ['fieldType'] });
 
     if (!timeSlot) {
       this.logger.warn(`Time slot with ID ${id} not found.`);
@@ -230,6 +259,7 @@ export class PricingService {
       timeSlot.is_peak_hour = dto.is_peak_hour;
     }
 
-    return this.timeSlotRepository.save(timeSlot);
+    const savedSlot = await this.timeSlotRepository.save(timeSlot);
+    return this.mapToDto(savedSlot);
   }
 }

@@ -5,6 +5,8 @@ import { Utility } from '@/utility/entities/utility.entity';
 import { CreateUtilityDto } from './dto/create-utility.dto';
 import { UpdateUtilityDto } from './dto/update-utility.dto';
 
+import { UtilityDto } from './dto/utility.dto';
+
 /**
  * @class UtilityService
  * @description Service để quản lý các tiện ích (utilities) và sản phẩm bán tại sân.
@@ -23,44 +25,59 @@ export class UtilityService {
   ) {}
 
   /**
+   * @method mapToDto
+   * @description Ánh xạ từ thực thể Utility sang UtilityDto.
+   */
+  private mapToDto(utility: Utility): UtilityDto {
+    const dto = new UtilityDto();
+    dto.id = utility.id;
+    dto.name = utility.name;
+    dto.iconUrl = utility.iconUrl;
+    dto.price = Number(utility.price);
+    dto.type = utility.type;
+    return dto;
+  }
+
+  /**
    * @method create
    * @description (Admin) Tạo một tiện ích hoặc sản phẩm mới.
    * @param {CreateUtilityDto} createUtilityDto - DTO chứa thông tin để tạo tiện ích.
-   * @returns {Promise<Utility>} - Tiện ích vừa được tạo.
+   * @returns {Promise<UtilityDto>} - Tiện ích vừa được tạo.
    */
-  async create(createUtilityDto: CreateUtilityDto): Promise<Utility> {
+  async create(createUtilityDto: CreateUtilityDto): Promise<UtilityDto> {
     this.logger.log(`Creating utility with DTO: ${JSON.stringify(createUtilityDto)}`);
     const utility = this.utilityRepository.create(createUtilityDto);
-    const savedUtility = this.utilityRepository.save(utility);
-    this.logger.log(`Utility ${utility.id} created successfully.`);
-    return savedUtility;
+    const savedUtility = await this.utilityRepository.save(utility);
+    this.logger.log(`Utility ${savedUtility.id} created successfully.`);
+    return this.mapToDto(savedUtility);
   }
 
   /**
    * @method findAll
    * @description (Public) Lấy danh sách tất cả các tiện ích và sản phẩm.
-   * @returns {Promise<Utility[]>} - Danh sách các tiện ích.
+   * @returns {Promise<UtilityDto[]>} - Danh sách các tiện ích.
    */
-  async findAll(): Promise<Utility[]> {
+  async findAll(): Promise<UtilityDto[]> {
     this.logger.log('Fetching all utilities.');
-    return this.utilityRepository.find();
+    const utilities = await this.utilityRepository.find();
+    return utilities.map(u => this.mapToDto(u));
   }
 
   /**
    * @method findOne
    * @description (Public) Tìm một tiện ích/sản phẩm bằng ID.
    * @param {number} id - ID của tiện ích.
-   * @returns {Promise<Utility>} - Thông tin chi tiết của tiện ích.
+   * @returns {Promise<UtilityDto>} - Thông tin chi tiết của tiện ích.
    * @throws {NotFoundException} Nếu không tìm thấy tiện ích.
    */
-  async findOne(id: number): Promise<Utility> {
+  async findOne(id: number): Promise<UtilityDto> {
     this.logger.log(`Fetching utility with ID: ${id}`);
     const utility = await this.utilityRepository.findOne({ where: { id } });
     if (!utility) {
       this.logger.warn(`Utility with ID ${id} not found.`);
       throw new NotFoundException(`Utility with ID ${id} not found`);
     }
-    return utility;
+    return this.mapToDto(utility);
   }
 
   /**
@@ -68,18 +85,22 @@ export class UtilityService {
    * @description (Admin) Cập nhật thông tin một tiện ích/sản phẩm.
    * @param {number} id - ID của tiện ích cần cập nhật.
    * @param {UpdateUtilityDto} updateUtilityDto - DTO chứa thông tin cập nhật.
-   * @returns {Promise<Utility>} - Tiện ích sau khi đã được cập nhật.
+   * @returns {Promise<UtilityDto>} - Tiện ích sau khi đã được cập nhật.
    */
   async update(
     id: number,
     updateUtilityDto: UpdateUtilityDto,
-  ): Promise<Utility> {
+  ): Promise<UtilityDto> {
     this.logger.log(`Updating utility ${id} with DTO: ${JSON.stringify(updateUtilityDto)}`);
-    const utility = await this.findOne(id);
+    const utility = await this.utilityRepository.findOne({ where: { id } });
+    if (!utility) {
+      this.logger.warn(`Utility with ID ${id} not found.`);
+      throw new NotFoundException(`Utility with ID ${id} not found`);
+    }
     this.utilityRepository.merge(utility, updateUtilityDto);
-    const updatedUtility = this.utilityRepository.save(utility);
+    const updatedUtility = await this.utilityRepository.save(utility);
     this.logger.log(`Utility ${id} updated successfully.`);
-    return updatedUtility;
+    return this.mapToDto(updatedUtility);
   }
 
   /**

@@ -27,6 +27,8 @@ import { Role } from '@/auth/enums/role.enum';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { Utility } from '@/utility/entities/utility.entity';
 
+import { UtilityDto } from '@/utility/dto/utility.dto';
+
 /**
  * @controller UtilityController
  * @description Xử lý các yêu cầu HTTP liên quan đến quản lý tiện ích và các sản phẩm bán tại sân.
@@ -42,7 +44,7 @@ export class UtilityController {
    * @route POST /utilities
    * @description (Admin) Tạo một tiện ích hoặc sản phẩm mới.
    * @param {CreateUtilityDto} createUtilityDto - DTO chứa thông tin để tạo mới.
-   * @returns {Promise<Utility>} - Tiện ích vừa được tạo.
+   * @returns {Promise<UtilityDto>} - Tiện ích vừa được tạo.
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,9 +54,9 @@ export class UtilityController {
   @ApiResponse({
     status: 201,
     description: 'Tạo tiện ích thành công.',
-    type: Utility,
+    type: UtilityDto,
   })
-  create(@Body() createUtilityDto: CreateUtilityDto) {
+  create(@Body() createUtilityDto: CreateUtilityDto): Promise<UtilityDto> {
     this.logger.log(`Creating utility with DTO: ${JSON.stringify(createUtilityDto)}`);
     return this.utilityService.create(createUtilityDto);
   }
@@ -62,16 +64,16 @@ export class UtilityController {
   /**
    * @route GET /utilities
    * @description (Public) Lấy danh sách tất cả các tiện ích và sản phẩm có trong hệ thống.
-   * @returns {Promise<Utility[]>} - Mảng các tiện ích.
+   * @returns {Promise<UtilityDto[]>} - Mảng các tiện ích.
    */
   @Get()
   @ApiOperation({ summary: '(Public) Lấy danh sách tất cả tiện ích' })
   @ApiResponse({
     status: 200,
     description: 'Danh sách các tiện ích.',
-    type: [Utility],
+    type: [UtilityDto],
   })
-  findAll() {
+  findAll(): Promise<UtilityDto[]> {
     this.logger.log('Fetching all utilities.');
     return this.utilityService.findAll();
   }
@@ -80,17 +82,17 @@ export class UtilityController {
    * @route GET /utilities/:id
    * @description (Public) Lấy thông tin chi tiết của một tiện ích/sản phẩm bằng ID.
    * @param {number} id - ID của tiện ích.
-   * @returns {Promise<Utility>} - Chi tiết tiện ích.
+   * @returns {Promise<UtilityDto>} - Chi tiết tiện ích.
    */
   @Get(':id')
   @ApiOperation({ summary: '(Public) Lấy thông tin chi tiết một tiện ích' })
   @ApiResponse({
     status: 200,
     description: 'Chi tiết tiện ích.',
-    type: Utility,
+    type: UtilityDto,
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy tiện ích.' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<UtilityDto> {
     this.logger.log(`Fetching utility with ID: ${id}`);
     return this.utilityService.findOne(id);
   }
@@ -100,7 +102,7 @@ export class UtilityController {
    * @description (Admin) Cập nhật thông tin của một tiện ích/sản phẩm.
    * @param {number} id - ID của tiện ích cần cập nhật.
    * @param {UpdateUtilityDto} updateUtilityDto - DTO chứa thông tin cập nhật.
-   * @returns {Promise<Utility>} - Tiện ích sau khi đã cập nhật.
+   * @returns {Promise<UtilityDto>} - Tiện ích sau khi đã cập nhật.
    */
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -110,12 +112,12 @@ export class UtilityController {
   @ApiResponse({
     status: 200,
     description: 'Cập nhật thành công.',
-    type: Utility,
+    type: UtilityDto,
   })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUtilityDto: UpdateUtilityDto,
-  ) {
+  ): Promise<UtilityDto> {
     this.logger.log(`Updating utility ${id} with DTO: ${JSON.stringify(updateUtilityDto)}`);
     return this.utilityService.update(id, updateUtilityDto);
   }
