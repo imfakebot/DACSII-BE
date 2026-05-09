@@ -24,6 +24,7 @@ import { EventGateway } from '@/event/event.gateway';
 import * as QRCode from 'qrcode';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { VoucherService } from '@/voucher/voucher.service';
 
 import { StatsResponseDto, RevenueChartItemDto } from './dto/stats-response.dto';
 
@@ -56,6 +57,7 @@ export class PaymentService {
     private readonly paymentRepository: Repository<Payment>,
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
+    private readonly voucherService: VoucherService,
     private readonly notificationService: NotificationService,
     private readonly mailerService: MailerService,
     private readonly eventGateWay: EventGateway,
@@ -423,6 +425,13 @@ export class PaymentService {
             'quantity',
             1,
           );
+
+          // Hoàn lại lượt sử dụng voucher cho người dùng
+          await this.voucherService.cancelUsage(
+            payment.booking.userProfile.id,
+            payment.voucher.id,
+          );
+
           this.logger.log(
             `[IPN_INFO] Voucher ${payment.voucher.code} for booking ${bookingId} has been refunded.`,
           );

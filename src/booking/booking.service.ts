@@ -324,6 +324,9 @@ export class BookingService {
           'quantity',
           1,
         );
+
+        // Ghi nhận lượt sử dụng voucher cho người dùng
+        await this.voucherService.recordUsage(userProfile.id, voucher.id);
       }
 
       const newBooking = queryRunner.manager.create(Booking, {
@@ -500,6 +503,12 @@ export class BookingService {
           'quantity',
           1,
         );
+        
+        // Hoàn lại lượt sử dụng voucher cho người dùng
+        if (booking.userProfile) {
+          await this.voucherService.cancelUsage(booking.userProfile.id, booking.payment.voucher.id);
+        }
+        
         this.logger.log(`Voucher for booking ${bookingId} has been refunded`);
       }
 

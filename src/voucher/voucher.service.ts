@@ -10,6 +10,7 @@ import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Booking } from '@/booking/entities/booking.entity';
+import { VoucherUsage } from './entities/voucher-usage.entity';
 
 import { VoucherDto, VoucherCheckResponseDto } from './dto/voucher.dto';
 
@@ -27,6 +28,8 @@ export class VoucherService {
     // Inject BookingRepository to check user's booking history
     @InjectRepository(Booking)
     private readonly bookingRepository: Repository<Booking>,
+    @InjectRepository(VoucherUsage)
+    private readonly voucherUsageRepository: Repository<VoucherUsage>,
   ) {}
 
   /**
@@ -172,6 +175,72 @@ export class VoucherService {
   }
 
   /**
+   * (User) Lấy danh sách voucher của cá nhân người dùng và các voucher công khai chưa sử dụng.
+   * @param userProfileId ID của người dùng.
+   * @returns Danh sách các voucher khả dụng.
+   */
+  async findMyVouchers(userProfileId: string): Promise<VoucherDto[]> {
+    this.logger.log(`Finding vouchers for user: ${userProfileId}`);
+    const now = new Date();
+
+    // Lấy danh sách ID các voucher người dùng đã sử dụng
+    const usedVoucherUsages = await this.voucherUsageRepository.find({
+      where: { userProfileId },
+      select: ['voucherId'],
+    });
+    const usedVoucherIds = usedVoucherUsages.map(usage => usage.voucherId);
+
+    // Tìm các voucher:
+    // - Còn số lượng
+    // - Trong thời gian hiệu lực
+    // - Là voucher công khai (userProfileId is null) HOẶC là của riêng người dùng này
+    // - Chưa nằm trong danh sách đã sử dụng
+    const queryBuilder = this.voucherRepository.createQueryBuilder('voucher');
+    
+    queryBuilder.where('voucher.quantity > 0')
+      .andWhere('voucher.validFrom <= :now', { now })
+      .andWhere('voucher.validTo > :now', { now })
+      .andWhere('(voucher.userProfileId IS NULL OR voucher.userProfileId = :userProfileId)', { userProfileId });
+
+    if (usedVoucherIds.length > 0) {
+      queryBuilder.andWhere('voucher.id NOT IN (:...usedVoucherIds)', { usedVoucherIds });
+    }
+
+    const availableVouchers = await queryBuilder
+      .orderBy('voucher.createdAt', 'DESC')
+      .getMany();
+
+    this.logger.log(`Found ${availableVouchers.length} available vouchers for user ${userProfileId}.`);
+    return availableVouchers.map(v => this.mapToDto(v));
+  }
+
+  /**
+   * (Internal) Ghi nhận việc sử dụng voucher của người dùng.
+   * @param userProfileId ID người dùng.
+   * @param voucherId ID voucher.
+   * @param bookingId ID đơn đặt sân liên quan.
+   */
+  async recordUsage(userProfileId: string, voucherId: string, bookingId?: string): Promise<void> {
+    this.logger.log(`Recording voucher usage: user ${userProfileId}, voucher ${voucherId}`);
+    const usage = this.voucherUsageRepository.create({
+      userProfileId,
+      voucherId,
+      bookingId,
+    });
+    await this.voucherUsageRepository.save(usage);
+  }
+
+  /**
+   * (Internal) Hoàn lại lượt sử dụng voucher (khi đơn bị hủy hoặc thanh toán thất bại).
+   * @param userProfileId ID người dùng.
+   * @param voucherId ID voucher.
+   */
+  async cancelUsage(userProfileId: string, voucherId: string): Promise<void> {
+    this.logger.log(`Cancelling voucher usage: user ${userProfileId}, voucher ${voucherId}`);
+    await this.voucherUsageRepository.delete({ userProfileId, voucherId });
+  }
+
+  /**
    * (User) Kiểm tra tính hợp lệ của một mã giảm giá và tính toán số tiền được giảm.
    * Thực hiện các kiểm tra sau:
    * - Tồn tại
@@ -179,9 +248,10 @@ export class VoucherService {
    * - Còn số lượng
    * - Đạt giá trị đơn hàng tối thiểu
    * - Có đúng là của người dùng không (nếu là voucher cá nhân)
+   * - Người dùng đã sử dụng voucher này chưa
    * @param {string} code - Mã voucher cần kiểm tra.
    * @param {number} orderValue - Giá trị của đơn hàng để kiểm tra điều kiện.
-   * @param {string} userId - ID của người dùng đang áp dụng.
+   * @param {string} userProfileId - ID của người dùng đang áp dụng.
    * @returns {Promise<VoucherCheckResponseDto>} Một object chứa kết quả kiểm tra và số tiền được giảm.
    * @throws {NotFoundException} Nếu voucher không tồn tại.
    * @throws {BadRequestException} Nếu voucher không hợp lệ (hết hạn, hết lượt, không đủ điều kiện,...).
@@ -195,6 +265,15 @@ export class VoucherService {
     if (!voucher) {
       this.logger.warn(`Voucher "${code}" not found.`);
       throw new NotFoundException('Voucher không tồn tại');
+    }
+
+    // Kiểm tra xem người dùng đã sử dụng voucher này chưa
+    const isUsed = await this.voucherUsageRepository.findOne({
+      where: { voucherId: voucher.id, userProfileId },
+    });
+    if (isUsed) {
+      this.logger.warn(`User ${userProfileId} already used voucher "${code}".`);
+      throw new BadRequestException('Bạn đã sử dụng mã giảm giá này rồi.');
     }
 
     // Kiểm tra xem voucher có phải của riêng ai không
@@ -282,4 +361,5 @@ export class VoucherService {
     this.logger.log(`Voucher ${id} soft deleted successfully.`);
     return { message: 'Xóa voucher thành công.' };
   }
+
 }

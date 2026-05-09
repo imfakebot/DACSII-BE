@@ -104,6 +104,26 @@ export class VoucherController {
   }
 
   /**
+   * (User) Lấy danh sách voucher cá nhân và voucher công khai chưa sử dụng.
+   * @returns Danh sách các voucher khả dụng cho người dùng hiện tại.
+   */
+  @Get('my-vouchers')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: '(User) Lấy danh sách voucher của tôi' })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách voucher của người dùng.',
+    type: [VoucherDto],
+  })
+  getMyVouchers(
+    @Req() req: Request & { user: AuthenticatedUser },
+  ): Promise<VoucherDto[]> {
+    this.logger.log(`Fetching vouchers for user ${req.user.userProfileId}`);
+    return this.voucherService.findMyVouchers(req.user.userProfileId);
+  }
+
+  /**
    * (User) Endpoint để kiểm tra tính hợp lệ của voucher.
    * Yêu cầu đăng nhập.
    * @param {string} code - Mã voucher cần kiểm tra.

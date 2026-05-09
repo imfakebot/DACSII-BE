@@ -35,10 +35,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       callbackURL: googleConfiguration.callbackURL || '',
       scope: ['email', 'profile'],
     });
-    this.logger.log(
-      'Initializing GoogleStrategy with configuration:',
-      JSON.stringify(googleConfiguration),
-    );
     if (
       !googleConfiguration.clientID ||
       !googleConfiguration.clientSecret ||
@@ -101,10 +97,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       const validatedUser = await this.authService.validateOAuthLogin(
         userPayload,
         AuthProvider.GOOGLE,
-      );      
+      );
       // Lưu Google access token để revoke sau khi logout
       await this.authService.saveGoogleAccessToken(validatedUser.id, accessToken);
-            // Trả về người dùng đã được xác thực, Passport sẽ gắn đối tượng này vào req.user
+      // Trả về người dùng đã được xác thực, Passport sẽ gắn đối tượng này vào req.user
       done(null, validatedUser);
     } catch (err) {
       done(err, false); // Báo lỗi cho Passport
