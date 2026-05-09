@@ -60,4 +60,7 @@ export class FieldDto {
 
   @ApiProperty({ required: false })
   reviewCount?: number;
+
+  @ApiProperty({required:false,description:'Khoảng cách đến người dùng (km)'})
+  distance?:number
 }

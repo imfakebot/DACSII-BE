@@ -110,4 +110,7 @@ export class Field {
     required: false,
   })
   reviewCount?: number;
+
+  @ApiProperty({ required: false })
+  distance?: number
 }

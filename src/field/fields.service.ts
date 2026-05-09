@@ -57,6 +57,7 @@ export class FieldsService {
     dto.updatedAt = field.updatedAt;
     dto.averageRating = field.averageRating;
     dto.reviewCount = field.reviewCount;
+    dto.distance = field.distance 
 
     if (field.fieldType) {
       dto.fieldType = this.mapTypeToDto(field.fieldType);
@@ -81,9 +82,9 @@ export class FieldsService {
           longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
           ward_name: branch.address.ward?.name || '',
           city_name: branch.address.city?.name || '',
-          } : null,
-          };
-          }
+        } : null,
+      };
+    }
     if (field.images) {
       dto.images = field.images.map(img => this.mapImageToDto(img));
     } else {
@@ -273,6 +274,10 @@ export class FieldsService {
       entity.reviewCount = rawItem?.field_reviewCount
         ? parseInt(rawItem.field_reviewCount)
         : 0;
+
+      if (rawItem?.distance) {
+        entity.distance = parseFloat(parseFloat(rawItem.distance).toFixed(2));
+      }
       return this.mapToDto(entity);
     });
 
