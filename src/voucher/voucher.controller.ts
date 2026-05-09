@@ -119,8 +119,13 @@ export class VoucherController {
   getMyVouchers(
     @Req() req: Request & { user: AuthenticatedUser },
   ): Promise<VoucherDto[]> {
-    this.logger.log(`Fetching vouchers for user ${req.user.userProfileId}`);
-    return this.voucherService.findMyVouchers(req.user.userProfileId);
+    const userProfileId = req.user.userProfileId;
+    if (!userProfileId) {
+      this.logger.warn(`User ${req.user.sub} has no userProfileId in JWT.`);
+      throw new BadRequestException('Thông tin người dùng không đầy đủ.');
+    }
+    this.logger.log(`Fetching vouchers for user ${userProfileId}`);
+    return this.voucherService.findMyVouchers(userProfileId);
   }
 
   /**
