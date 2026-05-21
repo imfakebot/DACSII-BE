@@ -17,6 +17,7 @@ import { BookingResponse } from './dto/booking-response.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from './enums/booking-status.enum';
 import { Voucher } from '@/voucher/entities/voucher.entity';
+import { VoucherUsage } from '@/voucher/entities/voucher-usage.entity';
 import { Payment } from '@/payment/entities/payment.entity';
 import { PaymentService } from '@/payment/payment.service';
 import { PaymentMethod } from '@/payment/enums/payment-method.enum';
@@ -281,6 +282,14 @@ export class BookingService {
 
         if (!voucher) throw new NotFoundException('Mã giảm giá không tồn tại');
 
+        // Kiểm tra xem người dùng đã sử dụng voucher này chưa
+        const isUsed = await queryRunner.manager.findOne(VoucherUsage, {
+          where: { voucherId: voucher.id, userProfileId: userProfile.id },
+        });
+        if (isUsed) {
+          throw new BadRequestException('Bạn đã sử dụng mã giảm giá này rồi.');
+        }
+
         // Check ownership for private vouchers
         if (voucher.userProfileId && voucher.userProfileId !== userProfile.id) {
           throw new BadRequestException('Bạn không thể sử dụng mã giảm giá này.');
@@ -324,9 +333,6 @@ export class BookingService {
           'quantity',
           1,
         );
-
-        // Ghi nhận lượt sử dụng voucher cho người dùng
-        await this.voucherService.recordUsage(userProfile.id, voucher.id);
       }
 
       const newBooking = queryRunner.manager.create(Booking, {
@@ -343,6 +349,16 @@ export class BookingService {
       });
 
       const savedBooking = await queryRunner.manager.save(Booking, newBooking);
+
+      // Ghi nhận lượt sử dụng voucher cho người dùng (trong transaction và gắn với bookingId)
+      if (appliedVoucher) {
+        await this.voucherService.recordUsage(
+          userProfile.id,
+          appliedVoucher.id,
+          savedBooking.id,
+          queryRunner.manager,
+        );
+      }
 
       const newPayment = queryRunner.manager.create(Payment, {
         amount: originalPrice,
@@ -506,7 +522,11 @@ export class BookingService {
         
         // Hoàn lại lượt sử dụng voucher cho người dùng
         if (booking.userProfile) {
-          await this.voucherService.cancelUsage(booking.userProfile.id, booking.payment.voucher.id);
+          await this.voucherService.cancelUsage(
+            booking.userProfile.id, 
+            booking.payment.voucher.id,
+            queryRunner.manager
+          );
         }
         
         this.logger.log(`Voucher for booking ${bookingId} has been refunded`);

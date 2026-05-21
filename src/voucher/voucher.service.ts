@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Voucher } from './entities/voucher.entity';
-import { IsNull, LessThanOrEqual, MoreThan, Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, MoreThan, Repository, EntityManager } from 'typeorm';
 import { CreateVoucherDto } from './dto/create-voucher.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Booking } from '@/booking/entities/booking.entity';
@@ -219,25 +219,38 @@ export class VoucherService {
    * @param userProfileId ID người dùng.
    * @param voucherId ID voucher.
    * @param bookingId ID đơn đặt sân liên quan.
+   * @param manager Optional EntityManager for transaction.
    */
-  async recordUsage(userProfileId: string, voucherId: string, bookingId?: string): Promise<void> {
+  async recordUsage(
+    userProfileId: string, 
+    voucherId: string, 
+    bookingId?: string,
+    manager?: EntityManager
+  ): Promise<void> {
     this.logger.log(`Recording voucher usage: user ${userProfileId}, voucher ${voucherId}`);
-    const usage = this.voucherUsageRepository.create({
+    const repo = manager ? manager.getRepository(VoucherUsage) : this.voucherUsageRepository;
+    const usage = repo.create({
       userProfileId,
       voucherId,
       bookingId,
     });
-    await this.voucherUsageRepository.save(usage);
+    await repo.save(usage);
   }
 
   /**
    * (Internal) Hoàn lại lượt sử dụng voucher (khi đơn bị hủy hoặc thanh toán thất bại).
    * @param userProfileId ID người dùng.
    * @param voucherId ID voucher.
+   * @param manager Optional EntityManager for transaction.
    */
-  async cancelUsage(userProfileId: string, voucherId: string): Promise<void> {
+  async cancelUsage(
+    userProfileId: string, 
+    voucherId: string,
+    manager?: EntityManager
+  ): Promise<void> {
     this.logger.log(`Cancelling voucher usage: user ${userProfileId}, voucher ${voucherId}`);
-    await this.voucherUsageRepository.delete({ userProfileId, voucherId });
+    const repo = manager ? manager.getRepository(VoucherUsage) : this.voucherUsageRepository;
+    await repo.delete({ userProfileId, voucherId });
   }
 
   /**

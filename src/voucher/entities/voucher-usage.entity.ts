@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -10,6 +11,7 @@ import {
 import { Voucher } from './voucher.entity';
 
 @Entity({ name: 'voucher_usages' })
+@Index(['userProfileId', 'voucherId'], { unique: true })
 export class VoucherUsage {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

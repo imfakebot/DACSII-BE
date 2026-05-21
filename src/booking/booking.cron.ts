@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Booking } from './entities/booking.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Raw, Repository } from 'typeorm';
+import { DataSource, LessThan, Raw, Repository } from 'typeorm';
 import { Payment } from '@/payment/entities/payment.entity';
 import { Voucher } from '@/voucher/entities/voucher.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BookingStatus } from './enums/booking-status.enum';
+import { VoucherService } from '@/voucher/voucher.service';
 
 @Injectable()
 export class BookingCronService {
@@ -18,6 +19,8 @@ export class BookingCronService {
     private readonly PaymentRepository: Repository<Payment>,
     @InjectRepository(Voucher)
     private readonly voucherRepository: Repository<Voucher>,
+    private readonly voucherService: VoucherService,
+    private readonly dataSource: DataSource,
   ) { }
 
   /**
@@ -32,7 +35,7 @@ export class BookingCronService {
         status: BookingStatus.PENDING,
         createdAt: Raw((alias) => `${alias} < NOW() - INTERVAL 30 MINUTE`),
       },
-      relations: ['payment', 'payment.voucher'],
+      relations: ['userProfile', 'payment', 'payment.voucher'],
     });
 
     if (expiredBookings.length === 0) {
@@ -44,25 +47,43 @@ export class BookingCronService {
     );
 
     for (const booking of expiredBookings) {
+      const queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
       try {
         booking.status = BookingStatus.CANCELLED;
-        await this.bookingRepository.save(booking);
+        await queryRunner.manager.save(Booking, booking);
 
         if (booking.payment?.voucher) {
-          await this.voucherRepository.increment(
+          await queryRunner.manager.increment(
+            Voucher,
             {
               id: booking.payment.voucher.id,
             },
             'quantity',
             1,
           );
+
+          // Hoàn lại lượt sử dụng voucher cho người dùng
+          if (booking.userProfile) {
+            await this.voucherService.cancelUsage(
+              booking.userProfile.id,
+              booking.payment.voucher.id,
+              queryRunner.manager
+            );
+          }
+
           this.logger.log(`Refunded voucher for expired booking ${booking.id}`);
-        } else {
-          this.logger.log(`No voucher found for expired booking ${booking.id}`);
         }
+        
+        await queryRunner.commitTransaction();
         this.logger.log(`Auto-cancelled booking ${booking.id}`);
       } catch (error) {
+        await queryRunner.rollbackTransaction();
         this.logger.error(`Error cancelling booking ${booking.id}: `, error);
+      } finally {
+        await queryRunner.release();
       }
     }
   }
