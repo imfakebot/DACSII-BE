@@ -205,7 +205,7 @@ export class UsersService {
 
         const newProfile = transactionalEntityManager.create(UserProfile, {
           full_name: data.fullName,
-          avatar_url: data.avatarUrl,
+          avatar_url: data.avatarUrl ?? undefined
         });
         await transactionalEntityManager.save(newProfile);
 
@@ -462,7 +462,7 @@ export class UsersService {
       take: limit,
       order: { created_at: 'DESC' },
     });
-    
+
     const response = new AccountPaginatedResponseDto();
     response.data = user.map(u => this.mapAccountToDto(u));
     response.total = total;
@@ -735,13 +735,13 @@ export class UsersService {
 
       return savedAccountEntity;
     });
-    
+
     // Reload to get relations for mapping
     const reloadedAccount = await this.accountRepository.findOne({
       where: { id: savedAccount.id },
       relations: ['userProfile', 'role', 'userProfile.branch']
     });
-    
+
     return this.mapAccountToDto(reloadedAccount!);
   }
 }
