@@ -11,6 +11,12 @@ export class UserResponseDto {
   @ApiProperty({ example: 'user@example.com' })
   email!: string;
 
+  @ApiProperty({ example: 'Nguyễn Văn A' })
+  full_name!: string;
+
+  @ApiProperty({ example: '/uploads/avatar.jpg', required: false })
+  avatar_url?: string;
+
   @ApiProperty({ example: 'CUSTOMER' })
   role!: string;
 

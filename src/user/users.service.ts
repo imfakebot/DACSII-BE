@@ -205,6 +205,7 @@ export class UsersService {
 
         const newProfile = transactionalEntityManager.create(UserProfile, {
           full_name: data.fullName,
+          avatar_url: data.avatarUrl,
         });
         await transactionalEntityManager.save(newProfile);
 

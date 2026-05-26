@@ -15,6 +15,8 @@ interface JwtPayload {
   email: string;
   sub: string;
   role: Role;
+  branch_id?: string;
+  userProfileId?: string;
 }
 
 /**
@@ -63,6 +65,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sub: payload.sub, // Thêm lại thuộc tính 'sub'
       email: payload.email,
       role: payload.role,
+      branch_id: payload.branch_id,
+      userProfileId: payload.userProfileId,
     };
   }
 }

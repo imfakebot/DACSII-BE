@@ -249,18 +249,21 @@ export class AuthService {
    */
   async login(user: AuthenticatedUser | Account): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Logging in user ${user.email}`);
-    const userProfile = (user as Account).userProfile;
-    const bracnhId = userProfile?.branch?.id ?? undefined;
-    const userProfileId = userProfile?.id;
+    const account = user as Account;
+    const authenticatedUser = user as AuthenticatedUser;
+
+    const userProfile = account.userProfile;
+    const branchId = userProfile?.branch?.id ?? authenticatedUser.branch_id ?? undefined;
+    const userProfileId = userProfile?.id ?? authenticatedUser.userProfileId;
 
     const roleName = (user.role as unknown as { name: string }).name;
 
-    const payload: JwtPayload & { branch_id?: string; userProfileId?: string } = {
+    const payload: JwtPayload = {
       email: user.email,
       sub: user.id,
       role: roleName,
-      branch_id: bracnhId,
-      userProfileId: userProfileId, // Add this line
+      branch_id: branchId as string,
+      userProfileId: userProfileId,
     };
 
     const accessTokenSecret =
@@ -310,6 +313,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
+        full_name: user.userProfile?.full_name || '',
+        avatar_url: user.userProfile?.avatar_url,
         role: roleName,
         is_profile_complete:
           user.userProfile &&
@@ -318,7 +323,7 @@ export class AuthService {
             ? ((user.userProfile as { is_profile_complete?: boolean })
               .is_profile_complete ?? false)
             : false,
-        branch: { branchId: bracnhId },
+        branch: { branchId: branchId },
       },
     };
   }
@@ -488,17 +493,21 @@ export class AuthService {
    */
   async createAccessToken(user: AuthenticatedUser | Account): Promise<string> {
     this.logger.debug(`Creating new access token for user ${user.id}`);
-    const userProfile = (user as Account).userProfile;
-    const branchId = userProfile?.branch?.id ?? undefined; // Fix: change null to undefined
-    const userProfileId = userProfile?.id; // Add this line
+    const account = user as Account;
+    const authenticatedUser = user as AuthenticatedUser;
+
+    const userProfile = account.userProfile;
+    const branchId = userProfile?.branch?.id ?? authenticatedUser.branch_id ?? undefined;
+    const userProfileId = userProfile?.id ?? authenticatedUser.userProfileId;
+
     const roleName = (user.role as unknown as { name: string }).name;
 
-    const payload: JwtPayload & { branch_id?: string; userProfileId?: string } = {
+    const payload: JwtPayload = {
       email: user.email,
       sub: user.id,
       role: roleName,
-      branch_id: branchId,
-      userProfileId: userProfileId, // Add this line
+      branch_id: branchId as string,
+      userProfileId: userProfileId,
     };
 
     const accessTokenSecret =

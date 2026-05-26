@@ -13,7 +13,7 @@ entity "roles" as roles {
 }
 
 entity "accounts" as accounts {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   email : varchar(255) <<UK>>
   password_hash : varchar(255) <<Exclude>>
@@ -33,12 +33,12 @@ entity "accounts" as accounts {
   created_at : timestamp
   updated_at : timestamp
   --
-  * //user_profile_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : uuid <<FK>>//
   * //role_id** : int <<FK>>//
 }
 
 entity "user_profiles" as user_profiles {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   full_name : varchar(255)
   date_of_birth : date
@@ -50,7 +50,7 @@ entity "user_profiles" as user_profiles {
   created_at : timestamp
   updated_at : timestamp
   --
-  * //branch_id** : varchar(36) <<FK>>//
+  * //branch_id** : uuid <<FK>>//
 }
 
 ' Location Management
@@ -100,7 +100,7 @@ entity "branches" as branches {
 }
 
 entity "field_types" as field_types {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   name : varchar(100)
   description : text
@@ -117,11 +117,11 @@ entity "fields" as fields {
   deleted_at : timestamp
   --
   * //branch_id** : uuid <<FK>>//
-  * //field_type_id** : varchar(36) <<FK>>//
+  * //field_type_id** : uuid <<FK>>//
 }
 
 entity "field_images" as field_images {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   image_url : text
   is_cover : boolean
@@ -147,12 +147,12 @@ entity "time_slots" as time_slots {
   price : decimal(10,2)
   is_peak_hour : boolean
   --
-  * //field_type_id** : varchar(36) <<FK>>//
+  * //field_type_id** : uuid <<FK>>//
 }
 
 ' Booking & Payment
 entity "bookings" as bookings {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   code : varchar(255) <<UK>>
   booking_date : date
@@ -166,7 +166,7 @@ entity "bookings" as bookings {
   created_at : timestamp
   updated_at : timestamp
   --
-  * //user_profile_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : uuid <<FK>>//
   * //field_id** : uuid <<FK>>//
 }
 
@@ -185,21 +185,21 @@ entity "vouchers" as vouchers {
   updated_at : timestamp
   deleted_at : timestamp
   --
-  * //user_profile_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : uuid <<FK>>//
 }
 
 entity "voucher_usages" as voucher_usages {
   * **id** : uuid <<PK>>
   --
   used_at : timestamp
-  booking_id : varchar(36)
+  booking_id : uuid
   --
-  * //user_profile_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : uuid <<FK>>//
   * //voucher_id** : uuid <<FK>>//
 }
 
 entity "payments" as payments {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   amount : decimal(10,2)
   final_amount : decimal(10,2)
@@ -210,7 +210,7 @@ entity "payments" as payments {
   created_at : timestamp
   bank_code : varchar(255)
   --
-  * //booking_id** : varchar(36) <<FK>>//
+  * //booking_id** : uuid <<FK>>//
   * //voucher_id** : uuid <<FK>>//
 }
 
@@ -223,8 +223,8 @@ entity "feedbacks" as feedbacks {
   status : enum
   created_at : timestamp
   --
-  * //submitter_id** : varchar(36) <<FK>>//
-  * //assignee_id** : varchar(36) <<FK>>//
+  * //submitter_id** : uuid <<FK>>//
+  * //assignee_id** : uuid <<FK>>//
 }
 
 entity "feedback_responses" as feedback_responses {
@@ -234,19 +234,31 @@ entity "feedback_responses" as feedback_responses {
   created_at : timestamp
   --
   * //feedback_id** : uuid <<FK>>//
-  * //responder_id** : varchar(36) <<FK>>//
+  * //responder_id** : uuid <<FK>>//
 }
 
 entity "reviews" as reviews {
-  * **id** : varchar(36) <<PK>>
+  * **id** : uuid <<PK>>
   --
   rating : int
   comment : text
   created_at : timestamp
   --
-  * //booking_id** : varchar(36) <<FK, UK>>//
+  * //booking_id** : uuid <<FK, UK>>//
   * //field_id** : uuid <<FK>>//
-  * //user_profile_id** : varchar(36) <<FK>>//
+  * //user_profile_id** : uuid <<FK>>//
+}
+
+' Notifications
+entity "notifications" as notifications {
+  * **id** : uuid <<PK>>
+  --
+  title : varchar(255)
+  content : text
+  is_read : boolean
+  created_at : timestamp
+  --
+  * //recipient_id** : uuid <<FK>>//
 }
 
 ' Join Tables
@@ -301,5 +313,7 @@ bookings ||--|| reviews : "booking_id"
 fields ||--o{ reviews : "field_id"
 user_profiles ||--o{ reviews : "user_profile_id"
 
+' Notifications
+user_profiles ||--o{ notifications : "recipient_id"
 
 @enduml

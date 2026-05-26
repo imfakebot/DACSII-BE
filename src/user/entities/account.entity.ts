@@ -1,15 +1,13 @@
 import {
   Entity,
-  PrimaryColumn,
   Column,
   JoinColumn,
   OneToOne,
-  BeforeInsert,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { UserProfile } from './users-profile.entity';
 import { Exclude } from 'class-transformer';
 import { AccountStatus } from '../enum/account-status.enum';
@@ -29,7 +27,7 @@ export class Account {
    * ID duy nhất của tài khoản, được tạo tự động dưới dạng UUID.
    */
   @ApiProperty({ format: 'uuid' })
-  @PrimaryColumn('varchar')
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   /**
@@ -185,18 +183,4 @@ export class Account {
   })
   @JoinColumn({ name: 'user_profile_id' })
   userProfile!: UserProfile;
-
-  /**
-   * Hook này của TypeORM sẽ tự động được gọi trước khi một thực thể mới được chèn vào cơ sở dữ liệu.
-   * Nó đảm bảo rằng mọi tài khoản mới đều có một ID duy nhất.
-   */
-  @BeforeInsert()
-  generateId() {
-    // Chỉ tạo ID nếu nó chưa tồn tại
-    if (!this.id) {
-      // Phương pháp ưu tiên là sử dụng thư viện `uuid` đã được cài đặt.
-      // Nó đáng tin cậy và hoạt động trên mọi môi trường.
-      this.id = uuidv4();
-    }
-  }
 }
