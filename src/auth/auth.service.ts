@@ -569,7 +569,7 @@ export class AuthService {
     });
 
     // 4. Tạo URL và gửi email
-    const frontendURL = this.configService.get<string>('FRONTEND_URL');
+    const frontendURL = this.configService.get<string>('FRONTEND_URL_WEB');
     const baseUrl = returnUrl || `${frontendURL}/reset-password`;
 
     const resetUrl = baseUrl.includes('?')

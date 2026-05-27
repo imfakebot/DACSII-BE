@@ -70,4 +70,17 @@ export class CreateBookingDto {
   @IsOptional()
   @IsString({ message: 'Mã voucher phải là chuỗi ký tự' })
   voucherCode?: string;
+
+  /**
+   * Platform thực hiện đặt sân (web, mobile).
+   * Dùng để điều hướng link thanh toán.
+   * @example 'mobile'
+   */
+  @ApiPropertyOptional({
+    description: 'Nền tảng thực hiện đặt sân (web/mobile)',
+    example: 'mobile',
+  })
+  @IsOptional()
+  @IsString({ message: 'Platform phải là chuỗi ký tự' })
+  platform?: string;
 }

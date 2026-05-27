@@ -73,9 +73,16 @@ export class PaymentService {
    * @returns {string} - URL thanh toán VNPAY hoàn chỉnh.
    * @throws {Error} Nếu thiếu cấu hình VNPAY.
    */
-  createVnPayUrl(amount: number, orderId: string, ipAddr: string): string {
-    const { tmnCode, secretKey, url, returnUrl } = this.vnpayConfiguration;
+  createVnPayUrl(amount: number, orderId: string, ipAddr: string, platform: string = 'web'): string {
+    const { tmnCode, secretKey, url,returnUrl } = this.vnpayConfiguration;
     if (!secretKey) throw new Error('VNPAY Secret Key is missing');
+
+    const baseUrl = returnUrl
+
+    const seperator = baseUrl?.includes('?') ? '&' : '?';
+    const finalReturnUrl = `${baseUrl}${seperator}platform=${platform}`;
+
+
 
     // 1. Config Params
     const vnp_Params: Record<string, number | string | undefined> = {
@@ -88,7 +95,7 @@ export class PaymentService {
       vnp_OrderInfo: 'ThanhToanDonHangTest2',
       vnp_OrderType: 'other',
       vnp_Amount: Math.floor(amount * 100),
-      vnp_ReturnUrl: returnUrl,
+      vnp_ReturnUrl: finalReturnUrl,
       // vnp_BankCode: 'NCB', // Trong môi trường thật nên để null để user chọn bank
       vnp_IpAddr: ipAddr || '127.0.0.1', // Nên dùng IP thực của client
       vnp_CreateDate: moment(new Date()).format('YYYYMMDDHHmmss'),

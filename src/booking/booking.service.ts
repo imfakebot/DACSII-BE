@@ -382,6 +382,7 @@ export class BookingService {
         finalPrice,
         savedBooking.id,
         ip,
+        createBookingDto.platform || 'web',
       );
 
       // Reload to get relations for DTO mapping
@@ -519,16 +520,16 @@ export class BookingService {
           'quantity',
           1,
         );
-        
+
         // Hoàn lại lượt sử dụng voucher cho người dùng
         if (booking.userProfile) {
           await this.voucherService.cancelUsage(
-            booking.userProfile.id, 
+            booking.userProfile.id,
             booking.payment.voucher.id,
             queryRunner.manager
           );
         }
-        
+
         this.logger.log(`Voucher for booking ${bookingId} has been refunded`);
       }
 
@@ -822,7 +823,7 @@ export class BookingService {
       this.logger.log(
         `Booking ${savedBooking.id} created successfully by admin ${user.id}`,
       );
-      
+
       // Reload to get all relations for the response mapping
       const finalBooking = await this.findOne(savedBooking.id);
       return this.mapToDto(finalBooking!);

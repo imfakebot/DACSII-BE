@@ -28,7 +28,7 @@
 Hệ thống được xây dựng với nhiều lớp bảo vệ để đảm bảo an toàn dữ liệu và chống lại các hình thức tấn công phổ biến:
 
 - **HTTP Headers với `helmet`**: Tự động thiết lập các HTTP header bảo mật (như `X-Content-Type-Options`, `Strict-Transport-Security`, `X-Frame-Options`) để bảo vệ ứng dụng khỏi các lỗ hổng như Clickjacking và XSS.
-- **CORS (Cross-Origin Resource Sharing)**: Cấu hình chặt chẽ để chỉ cho phép các yêu cầu từ địa chỉ frontend (`FRONTEND_URL`), ngăn chặn các trang web không mong muốn truy cập tài nguyên.
+- **CORS (Cross-Origin Resource Sharing)**: Cấu hình chặt chẽ để chỉ cho phép các yêu cầu từ địa chỉ frontend (`FRONTEND_URL_WEB`), ngăn chặn các trang web không mong muốn truy cập tài nguyên.
 - **Rate Limiting (Giới hạn yêu cầu)**: Sử dụng `@nestjs/throttler` để chống lại các cuộc tấn công brute-force vào các endpoint nhạy cảm như đăng nhập và đặt sân.
 - **Validation Pipes**: Mọi dữ liệu đầu vào từ client đều được xác thực (`whitelist: true`, `forbidNonWhitelisted: true`), đảm bảo chỉ các dữ liệu hợp lệ mới được xử lý và ngăn chặn các payload độc hại.
 - **Global Exception Filter**: Một bộ lọc lỗi toàn cục được áp dụng để bắt tất cả các lỗi, ngăn chặn việc rò rỉ thông tin nhạy cảm (như stack trace, đường dẫn file) ra phía client.

@@ -95,9 +95,11 @@ export class PaymentController {
   })
   async createPaymentUrl(
     @Body('bookingId') bookingId: string,
+    @Body('platform') platform: 'web' | 'mobile' = 'web',
     @Req() req: Request,
   ): Promise<PaymentUrlResponseDto> {
     this.logger.log(`Received request to create VNPAY URL for booking ID: ${bookingId}`);
+    this.logger.debug(` platform: ${platform} in createPaymentUrl`);
     // 1. Tìm đơn hàng để lấy số tiền CHÍNH XÁC trong DB
     const booking = await this.bookingService.findOne(bookingId);
     if (!booking) {
@@ -130,11 +132,13 @@ export class PaymentController {
     const ip = ipAddr ? ipAddr.toString() : '127.0.0.1';
     this.logger.debug(`Client IP for booking ${bookingId}: ${ip}`);
 
+    this.logger.debug(`Creating VNPAY URL with amount: ${payment.finalAmount}, orderId: ${bookingId}, platform: ${platform}`);
     // 4. Tạo URL
     const url = this.paymentService.createVnPayUrl(
       Number(payment.finalAmount),
       booking.id,
       ip,
+      platform,
     );
     this.logger.log(`VNPAY URL created for booking ${bookingId}`);
     return { url };
@@ -153,7 +157,7 @@ export class PaymentController {
     description: 'Điều hướng về frontend với kết quả thanh toán.',
   })
   async vnpayReturn(
-    @Query() query: VnpayReturnDto,
+    @Query() query: VnpayReturnDto & { platform?: string },
     @Res() res: Response,
   ) {
     this.logger.log(`Received VNPAY return callback with query: ${JSON.stringify(query)}`);
@@ -163,7 +167,13 @@ export class PaymentController {
       query as unknown as Record<string, any>,
     );
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    const platform = query.platform || 'web';
+    this.logger.log(`VNPAY return platform: ${query.platform ? query.platform : 'not specified, default to web'}`);
+
+    const WEB_URL = this.configService.get<string>('FRONTEND_URL_WEB');
+    const MOBILE_DEEP_LINK = this.configService.get<string>('FRONTEND_URL_MOBILE');
+    const redirectBase = platform === 'mobile' ? MOBILE_DEEP_LINK : WEB_URL;
+
     const bookingId = query.vnp_TxnRef;
 
     // Tìm thông tin booking để lấy mã ngắn (code)
@@ -180,12 +190,12 @@ export class PaymentController {
         this.logger.warn(`Failed to trigger background update for ${bookingId}: ${updateError}`);
       }
 
-      this.logger.log(`VNPAY return successful for booking ${bookingId}, redirecting to frontend...`);
+      this.logger.log(`VNPAY return successful for booking ${bookingId}, redirecting to ${platform}...`);
       // Truyền cả UUID và Mã ngắn sang FE
-      return res.redirect(`${frontendUrl}/payment-success?bookingId=${bookingId}&code=${bookingCode}`);
+      return res.redirect(`${redirectBase}/payment-success?bookingId=${bookingId}&code=${bookingCode}`);
     } else {
       this.logger.warn(`VNPAY return failed for booking ${bookingId}. Error: ${result.message}`);
-      return res.redirect(`${frontendUrl}/payment-failed?bookingId=${bookingId}&code=${bookingCode}&message=${encodeURIComponent(result.message)}`);
+      return res.redirect(`${redirectBase}/payment-failed?bookingId=${bookingId}&code=${bookingCode}&message=${encodeURIComponent(result.message)}`);
     }
   }
 

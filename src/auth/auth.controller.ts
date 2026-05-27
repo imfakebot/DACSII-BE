@@ -145,7 +145,7 @@ export class AuthController {
   })
   @ApiResponse({
     status: 500,
-    description: 'Lỗi cấu hình phía server (ví dụ: thiếu FRONTEND_URL).',
+    description: 'Lỗi cấu hình phía server (ví dụ: thiếu FRONTEND_URL_WEB hoặc FRONTEND_URL_MOBILE).',
   })
   async googleAuthRedirect(
     @User() user: AuthenticatedUser,
@@ -168,9 +168,9 @@ export class AuthController {
       return res.redirect(deepLink);
     }
 
-    const frontendURL = this.configService.get<string>('FRONTEND_URL');
+    const frontendURL = this.configService.get<string>('FRONTEND_URL_WEB');
     if (!frontendURL) {
-      throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL');
+      throw new InternalServerErrorException('Lỗi cấu hình FRONTEND_URL_WEB');
     }
 
     // 1. Gửi refresh token về client qua httpOnly cookie để bảo mật
@@ -205,7 +205,7 @@ export class AuthController {
         }
       } catch (e) {
         console.error('Auth Callback Script Error:', e);
-        document.body.innerHTML = '<h1>An unexpected error occurred</h1><p>Please check the console for details and verify your FRONTEND_URL configuration.</p><pre>' + e.toString() + '</pre>';
+        document.body.innerHTML = '<h1>An unexpected error occurred</h1><p>Please check the console for details and verify your FRONTEND_URL_WEB configuration.</p><pre>' + e.toString() + '</pre>';
       }
     </script>
     `;
