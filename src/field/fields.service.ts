@@ -225,7 +225,7 @@ export class FieldsService {
       query.andWhere('branch.id = :branchId', { branchId });
     }
     if (name) {
-      query.andWhere('field.name ILIKE :name', { name: `%${name}%` });
+      query.andWhere('field.name LIKE :name', { name: `%${name}%` });
     }
     if (fieldTypeId) {
       query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Gender } from '../enum/gender.enum';
+import { AddressResponseDto } from '@/location/dto/address-response.dto';
 
 export class UserProfileResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -45,4 +46,7 @@ export class UserProfileResponseDto {
 
   @ApiProperty()
   updated_at!: Date;
+
+  @ApiProperty({ type: AddressResponseDto, required: false })
+  address!: AddressResponseDto | null;
 }

@@ -58,6 +58,7 @@ export class ReviewService {
         date_of_birth: review.userProfile.date_of_birth,
         gender: review.userProfile.gender,
         bio: review.userProfile.bio,
+        address: null,
       };
     }
     

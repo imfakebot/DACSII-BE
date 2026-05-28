@@ -22,6 +22,10 @@ import { Gender } from './enum/gender.enum';
 import { Branch } from '@/branch/entities/branch.entity';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { ConfigService } from '@nestjs/config';
+import { Address } from '@/location/entities/address.entity';
+import { City } from '@/location/entities/city.entity';
+import { Ward } from '@/location/entities/ward.entity';
+import { AddressResponseDto } from '@/location/dto/address-response.dto';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -82,6 +86,8 @@ export class UsersService {
     private userProfileRepository: Repository<UserProfile>,
     @InjectRepository(Branch)
     private branchRepository: Repository<Branch>,
+    @InjectRepository(Address)
+    private addressRepository: Repository<Address>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -123,6 +129,20 @@ export class UsersService {
     dto.is_profile_complete = profile.is_profile_complete;
     dto.created_at = profile.created_at;
     dto.updated_at = profile.updated_at;
+
+    if (profile.address) {
+      dto.address = {
+        id: profile.address.id,
+        street: profile.address.street,
+        latitude: profile.address.latitude ? Number(profile.address.latitude) : null,
+        longitude: profile.address.longitude ? Number(profile.address.longitude) : null,
+        ward_name: profile.address.ward?.name,
+        city_name: profile.address.city?.name,
+      };
+    } else {
+      dto.address = null;
+    }
+
     return dto;
   }
 
@@ -306,7 +326,7 @@ export class UsersService {
     this.logger.log(`Finding profile by account id: ${accountId}`);
     return this.userProfileRepository.findOne({
       where: { account: { id: accountId } },
-      relations: [...new Set(['account', 'branch', ...relations])],
+      relations: [...new Set(['account', 'branch', 'address', 'address.city', 'address.ward', ...relations])],
     });
   }
   /**
@@ -357,7 +377,7 @@ export class UsersService {
     // 1. Tìm tài khoản và userProfile liên quan
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
-      relations: ['userProfile'], // Chỉ cần join userProfile
+      relations: ['userProfile', 'userProfile.address'], // Join thêm address
     });
 
     if (!account || !account.userProfile) {
@@ -390,6 +410,21 @@ export class UsersService {
     }
     if (data.bio) {
       userProfile.bio = data.bio;
+    }
+
+    // Cập nhật địa chỉ nếu có
+    if (data.address) {
+      if (!userProfile.address) {
+        userProfile.address = this.addressRepository.create({
+          street: data.address.street,
+          city: { id: data.address.cityId } as any,
+          ward: { id: data.address.wardId } as any,
+        });
+      } else {
+        userProfile.address.street = data.address.street;
+        userProfile.address.city = { id: data.address.cityId } as any;
+        userProfile.address.ward = { id: data.address.wardId } as any;
+      }
     }
 
     // 3. Quan trọng: Đánh dấu hồ sơ đã hoàn thành

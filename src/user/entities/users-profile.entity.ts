@@ -17,6 +17,7 @@ import { Exclude } from 'class-transformer';
 import { Gender } from '../enum/gender.enum';
 import { Branch } from '@/branch/entities/branch.entity';
 import { ApiProperty } from '@nestjs/swagger';
+import { Address } from '@/location/entities/address.entity';
 
 @Entity({ name: 'user_profiles' })
 export class UserProfile {
@@ -92,6 +93,11 @@ export class UserProfile {
   @ManyToOne(() => Branch, (branch) => branch.staffMembers, { nullable: true })
   @JoinColumn({ name: 'branch_id' })
   branch!: Branch | null;
+
+  @ApiProperty({ type: () => Address, required: false })
+  @OneToOne(() => Address, { cascade: true, eager: true, nullable: true })
+  @JoinColumn({ name: 'address_id' })
+  address!: Address | null;
 
   @BeforeInsert()
   generateId() {

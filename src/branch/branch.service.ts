@@ -96,6 +96,7 @@ export class BranchService {
       is_profile_complete: profile.is_profile_complete,
       created_at: profile.created_at,
       updated_at: profile.updated_at,
+      address: null,
     };
   }
 

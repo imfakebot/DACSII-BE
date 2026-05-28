@@ -94,6 +94,7 @@ export class BookingService {
         is_profile_complete: booking.userProfile.is_profile_complete,
         created_at: booking.userProfile.created_at,
         updated_at: booking.userProfile.updated_at,
+        address: null,
       };
     }
 
