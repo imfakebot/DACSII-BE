@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
-import { IsOptional, IsString, IsNumber, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsUUID, Min } from 'class-validator';
 import sanitizeHtml from 'sanitize-html';
 
 /**
@@ -51,4 +51,18 @@ export class FilterFieldDto {
   @IsOptional()
   @IsUUID()
   fieldTypeId?: string;
+
+  @ApiPropertyOptional({ description: 'Trang hiện tại', default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Số lượng kết quả mỗi trang', default: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  limit?: number = 10;
 }

@@ -22,6 +22,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
 
 import { FieldDto, FieldTypeDto, FieldImageDto } from './dto/field.dto';
+import { City } from '@/location/entities/city.entity';
 
 /**
  * @class FieldsService
@@ -40,6 +41,8 @@ export class FieldsService {
     private readonly branchRepository: Repository<Branch>,
     @InjectRepository(Utility)
     private readonly utilityRepository: Repository<Utility>,
+    @InjectRepository(City)
+    private readonly cityRepository: Repository<City>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -57,7 +60,7 @@ export class FieldsService {
     dto.updatedAt = field.updatedAt;
     dto.averageRating = field.averageRating;
     dto.reviewCount = field.reviewCount;
-    dto.distance = field.distance 
+    dto.distance = field.distance
 
     if (field.fieldType) {
       dto.fieldType = this.mapTypeToDto(field.fieldType);
@@ -186,13 +189,14 @@ export class FieldsService {
     return this.findOne(savedField.id);
   }
 
-  async findAll(filterDto: FilterFieldDto): Promise<FieldDto[]> {
+  async findAll(filterDto: FilterFieldDto): Promise<any> {
     this.logger.log(
       `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
     );
-    const { name, latitude, longitude, radius, cityId, fieldTypeId, branchId } =
+    const { name, latitude, longitude, cityId, fieldTypeId, branchId, radius = 10, page = 1, limit = 10 } =
       filterDto;
 
+    const skip = (page - 1) * limit;
     const query = this.fieldRepository.createQueryBuilder('field');
 
     query
@@ -264,7 +268,68 @@ export class FieldsService {
     } else {
       query.orderBy('field.createdAt', 'DESC');
     }
-    const { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
+
+    query.take(limit).skip(skip);
+
+    let { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
+    const total = await query.getCount();
+
+    let isSuggestion = false;
+    let suggestMessage: string | null = null;
+    let finalTotal = total;
+
+    // Logic gợi ý (Fallback)
+    if (total === 0 && latitude && longitude) {
+      this.logger.log('Không tìm thấy sân trong bán kính, đang lấy gợi ý...');
+      isSuggestion = true;
+
+      const suggestionQuery = this.fieldRepository.createQueryBuilder('field')
+        .leftJoinAndSelect('field.fieldType', 'fieldType')
+        .leftJoinAndSelect('field.images', 'images')
+        .leftJoinAndSelect('field.branch', 'branch')
+        .leftJoinAndSelect('branch.address', 'address')
+        .leftJoinAndSelect('address.ward', 'ward')
+        .leftJoinAndSelect('address.city', 'city')
+        .addSelect(
+          (subQuery) =>
+            subQuery
+              .select('COALESCE(AVG(r.rating), 0)', 'avg')
+              .from('reviews', 'r')
+              .where('r.field_id = field.id'),
+          'field_averageRating',
+        )
+        .addSelect(
+          (subQuery) =>
+            subQuery
+              .select('COUNT(r.id)', 'count')
+              .from('reviews', 'r')
+              .where('r.field_id = field.id'),
+          'field_reviewCount',
+        );
+
+      if (cityId) {
+        suggestionQuery.andWhere('city.id = :cityId', { cityId });
+      }
+
+      suggestionQuery.orderBy('field.createdAt', 'DESC').take(5);
+
+      const fallback = await suggestionQuery.getRawAndEntities<FieldRawResult>();
+      entities = fallback.entities;
+      raw = fallback.raw;
+      finalTotal = entities.length;
+
+      // Lấy tên thành phố từ entities đầu tiên (nếu có)
+      let cityName = '';
+      if (entities.length > 0 && entities[0].branch?.address?.city?.name) {
+        cityName = entities[0].branch.address.city.name;
+      }
+
+      if (cityName) {
+        suggestMessage = `Quanh bạn hiện chưa có sân nào phù hợp. Dưới đây là các sân HOT tại ${cityName} dành cho bạn!`;
+      } else {
+        suggestMessage = 'Quanh bạn hiện chưa có sân nào phù hợp. Dưới đây là các sân HOT nhất trên hệ thống!';
+      }
+    }
 
     const fields = entities.map((entity) => {
       const rawItem = raw.find((r) => r.field_id === entity.id);
@@ -281,8 +346,19 @@ export class FieldsService {
       return this.mapToDto(entity);
     });
 
-    this.logger.log(`Found ${fields.length} fields`);
-    return fields;
+    this.logger.log(`Found ${fields.length} fields (isSuggestion: ${isSuggestion})`);
+    
+    return {
+      data: fields,
+      metadata: {
+        total: finalTotal,
+        page: Number(page),
+        limit: Number(limit),
+        lastPage: Math.ceil(finalTotal / limit) || 1,
+        isSuggestion,
+        suggestionMessage: suggestMessage,
+      }
+    };
   }
 
   async findOne(id: string): Promise<FieldDto> {

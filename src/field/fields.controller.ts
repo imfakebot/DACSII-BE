@@ -40,6 +40,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 
 import { FieldDto } from './dto/field.dto';
+import { FieldsResponseDto } from './dto/fields-response.dto';
 
 /**
  * @controller FieldsController
@@ -103,9 +104,9 @@ export class FieldsController {
   @ApiOperation({
     summary: 'Tìm kiếm sân bóng (Hỗ trợ tìm theo vị trí, tên, chi nhánh)',
   })
-  @ApiResponse({ status: 200, description: 'Thành công.', type: [FieldDto] })
+  @ApiResponse({ status: 200, description: 'Thành công.', type: FieldsResponseDto })
   @UseInterceptors(ClassSerializerInterceptor)
-  findAll(@Query() filterDto: FilterFieldDto): Promise<FieldDto[]> {
+  findAll(@Query() filterDto: FilterFieldDto): Promise<FieldsResponseDto> {
     this.logger.log(
       `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
     );
