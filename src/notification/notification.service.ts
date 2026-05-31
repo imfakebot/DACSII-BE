@@ -80,6 +80,7 @@ export class NotificationService {
     limit: number = 10,
   ): Promise<NotificationPaginatedResponseDto> {
     this.logger.log(`Fetching notifications for user ${userProfileId}, page ${page}, limit ${limit}`);
+    page=Math.max(1,page);
     const skip = (page - 1) * limit;
 
     const [data, total] = await this.notificationRepository.findAndCount({
@@ -174,5 +175,20 @@ export class NotificationService {
     }
     this.logger.log(`Notification ${id} deleted successfully.`);
     return { message: 'Xóa thông báo thành công.' };
+  }
+
+  /**
+   * @method deleteAll
+   * @description Xóa tất cả thông báo của một người dùng.
+   * @param {string} userProfileId - ID của hồ sơ người dùng.
+   * @returns {Promise<{ message: string }>} - Thông báo xác nhận xóa.
+   */
+  async deleteAll(userProfileId: string): Promise<{ message: string }> {
+    this.logger.log(`Deleting all notifications for user ${userProfileId}`);
+    await this.notificationRepository.delete({
+      recipient: { id: userProfileId },
+    });
+    this.logger.log(`All notifications deleted for user ${userProfileId}`);
+    return { message: 'Đã xóa tất cả thông báo.' };
   }
 }

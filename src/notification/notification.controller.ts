@@ -1,9 +1,11 @@
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import {
   Controller,
+  Delete,
   Get,
   Logger,
   NotFoundException,
+  Param,
   Patch,
   Query,
   Req,
@@ -15,13 +17,15 @@ import { AuthenticatedRequest } from '@/auth/interface/authenticated-request.int
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 
-import { NotificationPaginatedResponseDto } from './dto/notification.dto';
+import { NotificationDto, NotificationPaginatedResponseDto } from './dto/notification.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
+import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';
 
 /**
  * @controller NotificationController
@@ -48,24 +52,11 @@ export class NotificationController {
    * @route GET /notification
    * @description Lấy danh sách thông báo của người dùng đang đăng nhập, có phân trang.
    * @param {AuthenticatedRequest} req - Request đã được xác thực.
-   * @param {number} page - Số trang.
-   * @param {number} limit - Số lượng thông báo trên mỗi trang.
+   * @param {PaginationQueryDto} query - DTO chứa thông tin phân trang (page, limit).
    * @returns {Promise<NotificationPaginatedResponseDto>} - Danh sách thông báo và thông tin meta (phân trang, số thông báo chưa đọc).
    */
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách thông báo của tôi' })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Số trang',
-    type: Number,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Số lượng mỗi trang',
-    type: Number,
-  })
   @ApiResponse({
     status: 200,
     type: NotificationPaginatedResponseDto,
@@ -75,11 +66,11 @@ export class NotificationController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy hồ sơ người dùng.' })
   async findAll(
     @Req() req: AuthenticatedRequest,
-    @Query('page') page = 1,
-    @Query('limit') limit = 10,
+    @Query() query: PaginationQueryDto,
   ): Promise<NotificationPaginatedResponseDto> {
+    const { page, limit } = query;
     const accountId = req.user.sub;
-    this.logger.log(`Finding all notifications for user ${accountId}`);
+    this.logger.log(`Finding all notifications for user ${accountId}, page ${page}, limit ${limit}`);
     const userProfile =
       await this.usersService.findProfileByAccountId(accountId);
     if (!userProfile) {
@@ -89,8 +80,8 @@ export class NotificationController {
 
     return await this.notificationService.findAllByUser(
       userProfile.id,
-      Number(page),
-      Number(limit),
+      page,
+      limit,
     );
   }
 
@@ -117,5 +108,71 @@ export class NotificationController {
     }
 
     return this.notificationService.markAllAsRead(userProfile.id);
+  }
+
+  /**
+   * @route PATCH /notification/:id/read
+   * @description Đánh dấu một thông báo cụ thể là đã đọc.
+   * @param {AuthenticatedRequest} req - Request đã được xác thực.
+   * @param {string} id - ID của thông báo.
+   * @returns {Promise<NotificationDto>} - Thông báo đã được cập nhật.
+   */
+  @Patch(':id/read')
+  @ApiOperation({ summary: 'Đánh dấu một thông báo là đã đọc' })
+  @ApiParam({ name: 'id', description: 'ID của thông báo' })
+  @ApiResponse({ status: 200, type: NotificationDto, description: 'Đánh dấu thành công.' })
+  @ApiResponse({ status: 404, description: 'Thông báo không tồn tại.' })
+  async markAsRead(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<NotificationDto> {
+    const accountId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(accountId);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.notificationService.markAsRead(id, userProfile.id);
+  }
+
+  /**
+   * @route DELETE /notification/clear-all
+   * @description Xóa tất cả thông báo của người dùng.
+   * @param {AuthenticatedRequest} req - Request đã được xác thực.
+   * @returns {Promise<MessageResponseDto>} - Thông báo xác nhận.
+   */
+  @Delete('clear-all')
+  @ApiOperation({ summary: 'Xóa tất cả thông báo' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Xóa thành công.' })
+  async clearAll(@Req() req: AuthenticatedRequest): Promise<MessageResponseDto> {
+    const accountId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(accountId);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.notificationService.deleteAll(userProfile.id);
+  }
+
+  /**
+   * @route DELETE /notification/:id
+   * @description Xóa một thông báo cụ thể.
+   * @param {AuthenticatedRequest} req - Request đã được xác thực.
+   * @param {string} id - ID của thông báo cần xóa.
+   * @returns {Promise<MessageResponseDto>} - Thông báo xác nhận.
+   */
+  @Delete(':id')
+  @ApiOperation({ summary: 'Xóa một thông báo' })
+  @ApiParam({ name: 'id', description: 'ID của thông báo' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Xóa thành công.' })
+  @ApiResponse({ status: 404, description: 'Thông báo không tồn tại.' })
+  async delete(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ): Promise<MessageResponseDto> {
+    const accountId = req.user.sub;
+    const userProfile = await this.usersService.findProfileByAccountId(accountId);
+    if (!userProfile) {
+      throw new NotFoundException('Không tìm thấy hồ sơ người dùng.');
+    }
+    return this.notificationService.delete(id, userProfile.id);
   }
 }

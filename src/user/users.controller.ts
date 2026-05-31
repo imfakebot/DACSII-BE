@@ -37,6 +37,7 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { AccountResponseDto, AccountPaginatedResponseDto } from './dto/account-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
+import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';
 
 /**
  * @controller UsersController
@@ -160,7 +161,7 @@ export class UsersController {
   /**
    * @route GET /users/admin/all
    * @description (Admin) Lấy danh sách tất cả người dùng trong hệ thống với phân trang.
-   * @param {number} [page=1] - Số trang hiện tại.
+   * @param {PaginationQueryDto} query - DTO chứa thông tin phân trang.
    * @returns {Promise<AccountPaginatedResponseDto>} - Một đối tượng chứa danh sách người dùng và tổng số lượng.
    */
   @Get('admin/all')
@@ -169,9 +170,10 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
   @ApiResponse({ status: 200, type: AccountPaginatedResponseDto, description: 'Trả về danh sách người dùng.' })
-  async GetUsers(@Query('page') page = 1): Promise<AccountPaginatedResponseDto> {
-    this.logger.log(`Fetching all users for page ${page}`);
-    return await this.usersService.findAllUser(Number(page), 10);
+  async GetUsers(@Query() query: PaginationQueryDto): Promise<AccountPaginatedResponseDto> {
+    const { page = 1, limit = 10 } = query;
+    this.logger.log(`Fetching all users for page ${page}, limit ${limit}`);
+    return await this.usersService.findAllUser(page, limit);
   }
 
   /**

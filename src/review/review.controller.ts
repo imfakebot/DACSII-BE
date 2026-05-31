@@ -16,7 +16,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -33,6 +32,7 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 
 import { ReviewDto, ReviewPaginatedResponseDto } from './dto/review.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
+import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';
 
 /**
  * @controller ReviewController
@@ -91,17 +91,15 @@ export class ReviewController {
   @Get('field/:fieldId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lấy danh sách đánh giá của một sân bóng' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
   async findByField(
     @Param('fieldId', ParseUUIDPipe) fieldId: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query() query: PaginationQueryDto,
   ): Promise<ReviewPaginatedResponseDto> {
+    const { page, limit } = query;
     this.logger.log(`Fetching reviews for field ${fieldId}, page ${page}, limit ${limit}.`);
-    return this.reviewService.findByField(fieldId, Number(page), Number(limit));
+    return this.reviewService.findByField(fieldId, page, limit);
   }
 
   // ==================== PHẦN BỔ SUNG MỚI ====================
@@ -118,18 +116,16 @@ export class ReviewController {
   @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Manager) Quản lý danh sách đánh giá' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 403, description: 'Forbidden resource.' })
   async getAllReviews(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query() query: PaginationQueryDto,
     @User() user: AuthenticatedUser, // Lấy thông tin user để lọc theo branch
   ): Promise<ReviewPaginatedResponseDto> {
+    const { page = 1, limit = 10 } = query;
     this.logger.log(`User ${user.id} fetching all reviews, page ${page}, limit ${limit}.`);
-    return this.reviewService.findAllReviews(Number(page), Number(limit), user);
+    return this.reviewService.findAllReviews(page, limit, user);
   }
 
   /**
