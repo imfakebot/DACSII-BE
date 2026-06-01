@@ -134,4 +134,15 @@ export class CreateVoucherDto {
   @IsOptional()
   @IsUUID()
   userProfileId?: string;
+
+  /**
+   * Voucher có cần phải được người dùng nhấn "Thu thập" (Lưu) không?
+   * @example false
+   */
+  @ApiPropertyOptional({
+    description: 'Voucher có cần phải được người dùng nhấn "Thu thập" (Lưu) không?',
+    default: false,
+  })
+  @IsOptional()
+  isCollectible?: boolean;
 }

@@ -31,6 +31,9 @@ export class VoucherDto {
   @ApiProperty({ required: false })
   userProfileId!: string | null;
 
+  @ApiProperty({ default: false })
+  isCollectible!: boolean;
+
   @ApiProperty()
   createdAt!: Date;
 

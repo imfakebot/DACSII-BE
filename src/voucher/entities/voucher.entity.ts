@@ -89,6 +89,13 @@ export class Voucher {
   @Column({ name: 'user_profile_id', type: 'varchar', length: 36, nullable: true })
   userProfileId!: string | null;
 
+  @ApiProperty({
+    description: 'Voucher có cần phải được người dùng nhấn "Thu thập" (Lưu) không?',
+    default: false,
+  })
+  @Column({ name: 'is_collectible', type: 'boolean', default: false })
+  isCollectible!: boolean;
+
   @ManyToOne(() => UserProfile, { nullable: true })
   @JoinColumn({ name: 'user_profile_id' })
   userProfile!: UserProfile | null;

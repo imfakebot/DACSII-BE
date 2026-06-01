@@ -129,6 +129,55 @@ export class VoucherController {
   }
 
   /**
+   * (User) Lấy danh sách voucher có thể thu thập (nhận quà).
+   * @returns Danh sách các voucher công khai có thuộc tính isCollectible = true.
+   */
+  @Get('collectible')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: '(User) Lấy danh sách voucher có thể thu thập (nhận quà)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách voucher có thể thu thập.',
+    type: [VoucherDto],
+  })
+  getCollectibleVouchers(
+    @Req() req: Request & { user: AuthenticatedUser },
+  ): Promise<VoucherDto[]> {
+    const userProfileId = req.user.userProfileId;
+    if (!userProfileId) {
+      throw new BadRequestException('Thông tin người dùng không đầy đủ.');
+    }
+    this.logger.log(`Fetching collectible vouchers for user ${userProfileId}`);
+    return this.voucherService.findCollectibleVouchers(userProfileId);
+  }
+
+  /**
+   * (User) Thực hiện thu thập (lưu) một voucher vào ví.
+   * @param id ID của voucher cần thu thập.
+   */
+  @Post(':id/collect')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: '(User) Thu thập (Lưu) mã giảm giá vào ví' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thu thập voucher thành công.',
+  })
+  async collect(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: AuthenticatedUser },
+  ) {
+    const userProfileId = req.user.userProfileId;
+    if (!userProfileId) {
+      throw new BadRequestException('Thông tin người dùng không đầy đủ.');
+    }
+    this.logger.log(`User ${userProfileId} collecting voucher ${id}`);
+    await this.voucherService.collectVoucher(userProfileId, id);
+    return { message: 'Thu thập mã giảm giá thành công.' };
+  }
+
+  /**
    * (User) Endpoint để kiểm tra tính hợp lệ của voucher.
    * Yêu cầu đăng nhập.
    * @param {string} code - Mã voucher cần kiểm tra.
