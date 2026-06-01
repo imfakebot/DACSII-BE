@@ -20,8 +20,10 @@ import { Role } from '@/auth/enums/role.enum';
 import { Utility } from '../utility/entities/utility.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
+import * as geoip from 'geoip-lite';
 
 import { FieldDto, FieldTypeDto, FieldImageDto } from './dto/field.dto';
+import { FieldsResponseDto } from './dto/fields-response.dto';
 import { City } from '@/location/entities/city.entity';
 
 /**
@@ -189,101 +191,53 @@ export class FieldsService {
     return this.findOne(savedField.id);
   }
 
-  async findAll(filterDto: FilterFieldDto): Promise<any> {
+  /**
+   * @method findAll
+   * @description Lấy danh sách sân bóng kèm bộ lọc, phân trang và tính khoảng cách.
+   * Ưu tiên: GPS > IP Geolocation/City > Global Hot.
+   */
+  async findAll(filterDto: FilterFieldDto, ip?: string | null): Promise<FieldsResponseDto> {
+    const {
+      name,
+      cityId,
+      fieldTypeId,
+      branchId,
+      radius = 10,
+      page = 1,
+      limit = 10,
+    } = filterDto;
+    
+    let { latitude, longitude } = filterDto;
+    let locationSource = 'none';
+
+    // 1. Nếu không có GPS, thử đoán vị trí qua IP
+    if (!latitude && !longitude && ip && ip !== '::1' && ip !== '127.0.0.1') {
+      const geo = geoip.lookup(ip);
+      if (geo) {
+        [latitude, longitude] = geo.ll;
+        locationSource = 'ip';
+        this.logger.log(`Guessed location from IP ${ip}: ${latitude}, ${longitude}`);
+      }
+    }
+
     this.logger.log(
-      `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
+      `Finding all fields with filter: ${JSON.stringify(filterDto)} (Location source: ${locationSource})`,
     );
-    const { name, latitude, longitude, cityId, fieldTypeId, branchId, radius = 10, page = 1, limit = 10 } =
-      filterDto;
 
     const skip = (page - 1) * limit;
-    const query = this.fieldRepository.createQueryBuilder('field');
 
-    query
-      .leftJoinAndSelect('field.fieldType', 'fieldType')
-      .leftJoinAndSelect('field.images', 'images')
-      .leftJoinAndSelect('field.branch', 'branch')
-      .leftJoinAndSelect('branch.address', 'address')
-      .leftJoinAndSelect('address.ward', 'ward')
-      .leftJoinAndSelect('address.city', 'city')
-      // Sử dụng Subquery để tính điểm trung bình (tránh lỗi nhân dòng khi join với images)
-      .addSelect(
-        (subQuery) =>
-          subQuery
-            .select('COALESCE(AVG(r.rating), 0)', 'avg')
-            .from('reviews', 'r')
-            .where('r.field_id = field.id'),
-        'field_averageRating',
-      )
-      // Sử dụng Subquery để đếm số lượng đánh giá
-      .addSelect(
-        (subQuery) =>
-          subQuery
-            .select('COUNT(r.id)', 'count')
-            .from('reviews', 'r')
-            .where('r.field_id = field.id'),
-        'field_reviewCount',
-      );
+    // Công thức Haversine để tính khoảng cách
+    const distanceSql = `(6371 * acos(
+      cos(radians(:userLat))
+      * cos(radians(address.latitude))
+      * cos(radians(address.longitude) - radians(:userLong))
+      + sin(radians(:userLat))
+      * sin(radians(address.latitude))
+    ))`;
 
-    if (branchId) {
-      query.andWhere('branch.id = :branchId', { branchId });
-    }
-    if (name) {
-      query.andWhere('field.name LIKE :name', { name: `%${name}%` });
-    }
-    if (fieldTypeId) {
-      query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });
-    }
-    if (cityId) {
-      query.andWhere('city.id = :cityId', { cityId });
-    }
-
-    if (latitude && longitude) {
-      query
-        .addSelect(
-          `(6371 * acos(
-            cos(radians(:userLat))
-            * cos(radians(address.latitude))
-            * cos(radians(address.longitude) - radians(:userLong))
-            + sin(radians(:userLat))
-            * sin(radians(address.latitude))
-          ))`,
-          'distance',
-        )
-        .setParameters({
-          userLat: latitude,
-          userLong: longitude,
-          radius: radius || 10,
-        })
-        .andWhere(
-          `(6371 * acos(
-            cos(radians(:userLat))
-            * cos(radians(address.latitude))
-            * cos(radians(address.longitude) - radians(:userLong))
-            + sin(radians(:userLat))
-            * sin(radians(address.latitude))
-          )) <= :radius`,
-        )
-        .orderBy('distance', 'ASC');
-    } else {
-      query.orderBy('field.createdAt', 'DESC');
-    }
-
-    query.take(limit).skip(skip);
-
-    let { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
-    const total = await query.getCount();
-
-    let isSuggestion = false;
-    let suggestMessage: string | null = null;
-    let finalTotal = total;
-
-    // Logic gợi ý (Fallback)
-    if (total === 0 && latitude && longitude) {
-      this.logger.log('Không tìm thấy sân trong bán kính, đang lấy gợi ý...');
-      isSuggestion = true;
-
-      const suggestionQuery = this.fieldRepository.createQueryBuilder('field')
+    const createBaseQuery = () => {
+      return this.fieldRepository
+        .createQueryBuilder('field')
         .leftJoinAndSelect('field.fieldType', 'fieldType')
         .leftJoinAndSelect('field.images', 'images')
         .leftJoinAndSelect('field.branch', 'branch')
@@ -306,48 +260,89 @@ export class FieldsService {
               .where('r.field_id = field.id'),
           'field_reviewCount',
         );
+    };
 
-      if (cityId) {
-        suggestionQuery.andWhere('city.id = :cityId', { cityId });
-      }
+    const query = createBaseQuery();
 
-      suggestionQuery.orderBy('field.createdAt', 'DESC').take(5);
+    if (branchId) query.andWhere('branch.id = :branchId', { branchId });
+    if (name) query.andWhere('field.name LIKE :name', { name: `%${name}%` });
+    if (fieldTypeId)
+      query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });
+    
+    if (cityId) {
+      query.andWhere('city.id = :cityId', { cityId });
+    }
 
-      const fallback = await suggestionQuery.getRawAndEntities<FieldRawResult>();
-      entities = fallback.entities;
-      raw = fallback.raw;
-      finalTotal = entities.length;
-
-      // Lấy tên thành phố từ entities đầu tiên (nếu có)
-      let cityName = '';
-      if (entities.length > 0 && entities[0].branch?.address?.city?.name) {
-        cityName = entities[0].branch.address.city.name;
-      }
-
-      if (cityName) {
-        suggestMessage = `Quanh bạn hiện chưa có sân nào phù hợp. Dưới đây là các sân HOT tại ${cityName} dành cho bạn!`;
+    if (latitude && longitude) {
+      query
+        .addSelect(distanceSql, 'distance')
+        .setParameters({ userLat: latitude, userLong: longitude, radius });
+      
+      if (locationSource === 'none' || locationSource === 'gps') {
+         query.andWhere(`${distanceSql} <= :radius`).orderBy('distance', 'ASC');
       } else {
-        suggestMessage = 'Quanh bạn hiện chưa có sân nào phù hợp. Dưới đây là các sân HOT nhất trên hệ thống!';
+         query.orderBy('distance', 'ASC').addOrderBy('field_averageRating', 'DESC');
       }
+    } else {
+      query.orderBy('field.createdAt', 'DESC');
+    }
+
+    query.take(limit).skip(skip);
+
+    let { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
+    const total = await query.getCount();
+
+    let isSuggestion = false;
+    let suggestMessage: string | null = null;
+    let finalTotal = total;
+
+    if (total === 0) {
+      isSuggestion = true;
+      const suggestionQuery = createBaseQuery();
+
+      if (latitude && longitude) {
+        this.logger.log('Không tìm thấy sân gần, đang lấy gợi ý sân HOT...');
+        suggestionQuery
+          .addSelect(distanceSql, 'distance')
+          .setParameters({ userLat: latitude, userLong: longitude })
+          .orderBy('field_averageRating', 'DESC')
+          .take(5);
+        
+        const fallback = await suggestionQuery.getRawAndEntities<FieldRawResult>();
+        entities = fallback.entities;
+        raw = fallback.raw;
+        
+        const cityName = entities[0]?.branch?.address?.city?.name;
+        suggestMessage = cityName
+          ? `Khu vực bạn chọn hiện chưa có sân. Dưới đây là các sân HOT tại ${cityName}!`
+          : 'Khu vực bạn chọn hiện chưa có sân. Dưới đây là các sân HOT nhất hệ thống!';
+      } else {
+        suggestionQuery.orderBy('field_averageRating', 'DESC').take(5);
+        const fallback = await suggestionQuery.getRawAndEntities<FieldRawResult>();
+        entities = fallback.entities;
+        raw = fallback.raw;
+        suggestMessage = 'Hiện chưa có sân phù hợp bộ lọc. Gợi ý các sân HOT nhất dành cho bạn!';
+      }
+      finalTotal = entities.length;
     }
 
     const fields = entities.map((entity) => {
       const rawItem = raw.find((r) => r.field_id === entity.id);
-      entity.averageRating = rawItem?.field_averageRating
-        ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
-        : 0;
-      entity.reviewCount = rawItem?.field_reviewCount
-        ? parseInt(rawItem.field_reviewCount)
-        : 0;
+      if (rawItem) {
+        entity.averageRating = rawItem.field_averageRating
+          ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
+          : 0;
+        entity.reviewCount = rawItem.field_reviewCount
+          ? parseInt(rawItem.field_reviewCount)
+          : 0;
 
-      if (rawItem?.distance) {
-        entity.distance = parseFloat(parseFloat(rawItem.distance).toFixed(2));
+        if (rawItem.distance) {
+          entity.distance = parseFloat(parseFloat(rawItem.distance).toFixed(2));
+        }
       }
       return this.mapToDto(entity);
     });
 
-    this.logger.log(`Found ${fields.length} fields (isSuggestion: ${isSuggestion})`);
-    
     return {
       data: fields,
       metadata: {
@@ -357,13 +352,40 @@ export class FieldsService {
         lastPage: Math.ceil(finalTotal / limit) || 1,
         isSuggestion,
         suggestionMessage: suggestMessage,
-      }
+      },
     };
   }
 
-  async findOne(id: string): Promise<FieldDto> {
-    this.logger.log(`Finding field with ID: ${id}`);
+  async findOne(
+    id: string,
+    latitude?: number,
+    longitude?: number,
+    ip?: string | null,
+  ): Promise<FieldDto> {
+    let locationSource = 'none';
+
+    // 1. Nếu không có GPS, thử đoán vị trí qua IP
+    if (!latitude && !longitude && ip && ip !== '::1' && ip !== '127.0.0.1') {
+      const geo = geoip.lookup(ip);
+      if (geo) {
+        [latitude, longitude] = geo.ll;
+        locationSource = 'ip';
+      }
+    }
+
+    this.logger.log(
+      `Finding field with ID: ${id} (lat: ${latitude}, long: ${longitude}, source: ${locationSource})`,
+    );
     const query = this.fieldRepository.createQueryBuilder('field');
+
+    // Công thức Haversine để tính khoảng cách
+    const distanceSql = `(6371 * acos(
+      cos(radians(:userLat))
+      * cos(radians(address.latitude))
+      * cos(radians(address.longitude) - radians(:userLong))
+      + sin(radians(:userLat))
+      * sin(radians(address.latitude))
+    ))`;
 
     query
       .leftJoinAndSelect('field.fieldType', 'fieldType')
@@ -391,8 +413,15 @@ export class FieldsService {
             .from('reviews', 'r')
             .where('r.field_id = field.id'),
         'field_reviewCount',
-      )
-      .where('field.id = :id', { id });
+      );
+
+    if (latitude && longitude) {
+      query
+        .addSelect(distanceSql, 'distance')
+        .setParameters({ userLat: latitude, userLong: longitude });
+    }
+
+    query.where('field.id = :id', { id });
 
     const { entities, raw } = await query.getRawAndEntities<FieldRawResult>();
     const field = entities[0];
@@ -403,12 +432,18 @@ export class FieldsService {
     }
 
     const rawItem = raw.find((r) => r.field_id === field.id);
-    field.averageRating = rawItem?.field_averageRating
-      ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
-      : 0;
-    field.reviewCount = rawItem?.field_reviewCount
-      ? parseInt(rawItem.field_reviewCount)
-      : 0;
+    if (rawItem) {
+      field.averageRating = rawItem.field_averageRating
+        ? parseFloat(parseFloat(rawItem.field_averageRating).toFixed(1))
+        : 0;
+      field.reviewCount = rawItem.field_reviewCount
+        ? parseInt(rawItem.field_reviewCount)
+        : 0;
+
+      if (rawItem.distance) {
+        field.distance = parseFloat(parseFloat(rawItem.distance).toFixed(2));
+      }
+    }
 
     return this.mapToDto(field);
   }

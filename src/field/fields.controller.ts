@@ -38,6 +38,8 @@ import { FilterFieldDto } from './dto/filter-field.dto';
 import { SkipThrottle } from '@nestjs/throttler';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import * as requestIp from 'request-ip';
+import { Request } from 'express';
 
 import { FieldDto } from './dto/field.dto';
 import { FieldsResponseDto } from './dto/fields-response.dto';
@@ -106,11 +108,15 @@ export class FieldsController {
   })
   @ApiResponse({ status: 200, description: 'Thành công.', type: FieldsResponseDto })
   @UseInterceptors(ClassSerializerInterceptor)
-  findAll(@Query() filterDto: FilterFieldDto): Promise<FieldsResponseDto> {
+  findAll(
+    @Query() filterDto: FilterFieldDto,
+    @Req() req: Request,
+  ): Promise<FieldsResponseDto> {
+    const clientIp = requestIp.getClientIp(req);
     this.logger.log(
-      `Finding all fields with filter: ${JSON.stringify(filterDto)}`,
+      `Finding all fields with filter: ${JSON.stringify(filterDto)} from IP: ${clientIp}`,
     );
-    return this.fieldsService.findAll(filterDto);
+    return this.fieldsService.findAll(filterDto, clientIp);
   }
 
   /**
@@ -121,9 +127,17 @@ export class FieldsController {
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một sân bóng (Công khai)' })
   @ApiResponse({ status: 200, description: 'Thành công.', type: FieldDto })
   @ApiResponse({ status: 404, description: 'Không tìm thấy sân bóng.' })
-  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<FieldDto> {
-    this.logger.log(`Finding field with id: ${id}`);
-    return this.fieldsService.findOne(id);
+  findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+    @Query('latitude') latitude?: number,
+    @Query('longitude') longitude?: number,
+  ): Promise<FieldDto> {
+    const clientIp = requestIp.getClientIp(req);
+    this.logger.log(
+      `Finding field with id: ${id} and coords: [${latitude}, ${longitude}] from IP: ${clientIp}`,
+    );
+    return this.fieldsService.findOne(id, latitude, longitude, clientIp);
   }
 
   /**
