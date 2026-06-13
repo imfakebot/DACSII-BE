@@ -176,8 +176,8 @@ export class AuthController {
     // 1. Gửi refresh token về client qua httpOnly cookie để bảo mật
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
-      secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       path: '/',
     });
@@ -380,8 +380,8 @@ export class AuthController {
     // Gửi refresh token về client qua httpOnly cookie để bảo mật
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
-      secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      secure: true,
+      sameSite: 'none',
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       path: '/',
     });
@@ -419,11 +419,11 @@ export class AuthController {
     // 1. Gọi AuthService để verify cái idToken này với Google 
     const loginData = await this.authService.verifyGoogleAndroidToken(idToken);
 
-    // 2. Trả refresh_token qua Cookie (hoặc ném luôn vào body nếu Android không xài cookie)
+    // Gửi refresh token về client qua httpOnly cookie để bảo mật
     res.cookie('refresh_token', loginData.refreshToken, {
       httpOnly: true,
-      secure: this.configService.get('NODE_ENV') === 'production',
-      sameSite: 'strict',
+      secure: true,
+      sameSite: 'none',
       expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       path: '/',
     });
