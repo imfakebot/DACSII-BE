@@ -22,7 +22,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
 import * as geoip from 'geoip-lite';
 
-import { FieldDto, FieldTypeDto, FieldImageDto } from './dto/field.dto';
+import { FieldDto } from './dto/field.dto';
+import { FieldTypeDto } from './dto/field-type.dto';
+import { FieldImageDto } from './dto/field-image.dto';
 import { FieldsResponseDto } from './dto/fields-response.dto';
 import { City } from '@/location/entities/city.entity';
 

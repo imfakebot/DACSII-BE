@@ -34,7 +34,8 @@ import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 
-import { AccountResponseDto, AccountPaginatedResponseDto } from './dto/account-response.dto';
+import { AccountResponseDto } from './dto/account-response.dto';
+import { AccountPaginatedResponseDto } from './dto/account-paginated-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
 import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';

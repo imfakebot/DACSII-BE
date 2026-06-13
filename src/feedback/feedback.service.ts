@@ -12,7 +12,8 @@ import { FeedbackStatus } from './enums/feedback-status.enum';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
 
-import { FeedbackDto, FeedbackResponseDto } from './dto/feedback.dto';
+import { FeedbackDto } from './dto/feedback.dto';
+import { FeedbackResponseDto } from './dto/feedback-response.dto';
 
 /**
  * @class FeedbackService

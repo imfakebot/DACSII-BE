@@ -26,7 +26,8 @@ import { User } from '@/auth/decorator/users.decorator';
 import { Account } from '@/user/entities/account.entity';
 import { Role } from '@/auth/enums/role.enum';
 
-import { FeedbackDto, FeedbackResponseDto } from './dto/feedback.dto';
+import { FeedbackDto } from './dto/feedback.dto';
+import { FeedbackResponseDto } from './dto/feedback-response.dto';
 
 /**
  * @controller FeedbackController

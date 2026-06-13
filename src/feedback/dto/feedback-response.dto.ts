@@ -1,19 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
 
-export class ReviewDto {
+export class FeedbackResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ example: 5 })
-  rating!: number;
-
-  @ApiProperty({ required: false })
-  comment?: string;
+  @ApiProperty({ example: 'Cảm ơn bạn đã góp ý.' })
+  content!: string;
 
   @ApiProperty()
-  createdAt!: Date;
+  created_at!: Date;
 
   @ApiProperty({ type: () => UserProfileResponseDto })
-  userProfile!: UserProfileResponseDto;
+  responder!: UserProfileResponseDto;
 }

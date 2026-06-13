@@ -1,28 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BranchResponseDto } from '@/branch/dto/branch-response.dto';
 import { Utility } from '@/utility/entities/utility.entity';
-
-export class FieldTypeDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty({ example: 'Sân 5' })
-  name!: string;
-
-  @ApiProperty({ required: false })
-  description?: string;
-}
-
-export class FieldImageDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty()
-  image_url!: string;
-
-  @ApiProperty()
-  isCover!: boolean;
-}
+import { FieldTypeDto } from './field-type.dto';
+import { FieldImageDto } from './field-image.dto';
 
 export class FieldDto {
   @ApiProperty({ format: 'uuid' })

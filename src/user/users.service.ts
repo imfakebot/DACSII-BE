@@ -64,7 +64,8 @@ type UpdateUnverifiedAccountPayload = Partial<Account> & {
   };
 };
 
-import { AccountResponseDto, AccountPaginatedResponseDto } from './dto/account-response.dto';
+import { AccountResponseDto } from './dto/account-response.dto';
+import { AccountPaginatedResponseDto } from './dto/account-paginated-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
 
 /**

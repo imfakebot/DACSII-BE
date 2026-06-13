@@ -6,7 +6,8 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { Notification } from '../notification/entities/notification.entities';
 import { EventGateway } from '@/event/event.gateway';
 
-import { NotificationDto, NotificationPaginatedResponseDto } from './dto/notification.dto';
+import { NotificationDto } from './dto/notification.dto';
+import { NotificationPaginatedResponseDto } from './dto/notification-paginated-response.dto';
 
 /**
  * @class NotificationService

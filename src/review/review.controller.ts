@@ -30,7 +30,8 @@ import { Throttle } from '@nestjs/throttler';
 import { User } from '@/auth/decorator/users.decorator'; // Import decorator User
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Import interface
 
-import { ReviewDto, ReviewPaginatedResponseDto } from './dto/review.dto';
+import { ReviewDto } from './dto/review.dto';
+import { ReviewPaginatedResponseDto } from './dto/review-paginated-response.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
 import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';
 

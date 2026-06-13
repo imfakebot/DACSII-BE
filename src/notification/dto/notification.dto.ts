@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { PaginationMetaDto } from '@/common/dto/pagination-meta.dto';
 
 export class NotificationDto {
   @ApiProperty({ format: 'uuid' })
@@ -16,17 +15,4 @@ export class NotificationDto {
 
   @ApiProperty()
   createdAt!: Date;
-}
-
-export class NotificationPaginationMetaDto extends PaginationMetaDto {
-  @ApiProperty({ example: 5 })
-  unreadCount!: number;
-}
-
-export class NotificationPaginatedResponseDto {
-  @ApiProperty({ type: [NotificationDto] })
-  data!: NotificationDto[];
-
-  @ApiProperty({ type: NotificationPaginationMetaDto })
-  meta!: NotificationPaginationMetaDto;
 }

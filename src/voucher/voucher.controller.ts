@@ -30,7 +30,8 @@ import { Role } from '@/auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Keep this import
 import { Request } from 'express'; // Import Request from express
 
-import { VoucherDto, VoucherCheckResponseDto } from './dto/voucher.dto';
+import { VoucherDto } from './dto/voucher.dto';
+import { VoucherCheckResponseDto } from './dto/voucher-check-response.dto';
 
 /**
  * @class VoucherController

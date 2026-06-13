@@ -1,20 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
 import { FeedbackStatus } from '../enums/feedback-status.enum';
-
-export class FeedbackResponseDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty({ example: 'Cảm ơn bạn đã góp ý.' })
-  content!: string;
-
-  @ApiProperty()
-  created_at!: Date;
-
-  @ApiProperty({ type: () => UserProfileResponseDto })
-  responder!: UserProfileResponseDto;
-}
+import { FeedbackResponseDto } from './feedback-response.dto';
 
 export class FeedbackDto {
   @ApiProperty({ format: 'uuid' })

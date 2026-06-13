@@ -39,7 +39,8 @@ import { CheckInDto } from './dto/check-in.dto';
 import { Response } from 'express';
 
 
-import { BookingDto, BookingPaginatedResponseDto } from './dto/booking.dto';
+import { BookingDto } from './dto/booking.dto';
+import { BookingPaginatedResponseDto } from './dto/booking-paginated-response.dto';
 import { FieldScheduleResponseDto } from './dto/field-schedule-response.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
 

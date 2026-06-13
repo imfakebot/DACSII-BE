@@ -31,11 +31,3 @@ export class AccountResponseDto {
   @ApiProperty({ type: () => UserProfileResponseDto })
   userProfile!: UserProfileResponseDto;
 }
-
-export class AccountPaginatedResponseDto {
-  @ApiProperty({ type: [AccountResponseDto] })
-  data!: AccountResponseDto[];
-
-  @ApiProperty()
-  total!: number;
-}

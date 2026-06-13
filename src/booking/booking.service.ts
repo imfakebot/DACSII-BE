@@ -35,7 +35,9 @@ import * as qrcode from 'qrcode';
 import { generatePdf } from 'html-pdf-node';
 import { VoucherService } from '@/voucher/voucher.service';
 
-import { BookingDto, BookingFieldDto, BookingPaginatedResponseDto } from './dto/booking.dto';
+import { BookingDto } from './dto/booking.dto';
+import { BookingFieldDto } from './dto/booking-field.dto';
+import { BookingPaginatedResponseDto } from './dto/booking-paginated-response.dto';
 import { FieldScheduleResponseDto } from './dto/field-schedule-response.dto';
 
 /**

@@ -13,7 +13,8 @@ import { Booking } from '@/booking/entities/booking.entity';
 import { VoucherUsage } from './entities/voucher-usage.entity';
 import { VoucherCollection } from './entities/voucher-collection.entity';
 
-import { VoucherDto, VoucherCheckResponseDto } from './dto/voucher.dto';
+import { VoucherDto } from './dto/voucher.dto';
+import { VoucherCheckResponseDto } from './dto/voucher-check-response.dto';
 
 /**
  * @class VoucherService

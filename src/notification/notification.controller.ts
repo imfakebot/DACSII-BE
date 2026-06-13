@@ -23,7 +23,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { NotificationDto, NotificationPaginatedResponseDto } from './dto/notification.dto';
+import { NotificationDto } from './dto/notification.dto';
+import { NotificationPaginatedResponseDto } from './dto/notification-paginated-response.dto';
 import { MessageResponseDto } from '@/common/dto/message-response.dto';
 import { PaginationQueryDto } from '@/common/dto/pagination-query.dto';
 

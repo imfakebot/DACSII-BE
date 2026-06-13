@@ -1,18 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BookingStatus } from '../enums/booking-status.enum';
 import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
-import { BranchResponseDto } from '@/branch/dto/branch-response.dto';
-
-export class BookingFieldDto {
-  @ApiProperty()
-  id!: string;
-
-  @ApiProperty()
-  name!: string;
-
-  @ApiProperty({ type: () => BranchResponseDto })
-  branch!: BranchResponseDto;
-}
+import { BookingFieldDto } from './booking-field.dto';
 
 export class BookingDto {
   @ApiProperty({ format: 'uuid' })
@@ -56,12 +45,4 @@ export class BookingDto {
 
   @ApiProperty()
   updatedAt!: Date;
-}
-
-export class BookingPaginatedResponseDto {
-  @ApiProperty({ type: [BookingDto] })
-  data!: BookingDto[];
-
-  @ApiProperty()
-  meta!: any; // Will use PaginationMetaDto in manual mapping
 }

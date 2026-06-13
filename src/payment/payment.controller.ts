@@ -36,7 +36,9 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { VnpayReturnDto } from './dto/vnpay-return.dto';
 import { ConfigService } from '@nestjs/config';
 
-import { StatsResponseDto, RevenueChartItemDto, PaymentUrlResponseDto } from './dto/stats-response.dto';
+import { StatsResponseDto } from './dto/stats-response.dto';
+import { RevenueChartItemDto } from './dto/revenue-chart-item.dto';
+import { PaymentUrlResponseDto } from './dto/payment-url-response.dto';
 
 /**
  * @controller PaymentController

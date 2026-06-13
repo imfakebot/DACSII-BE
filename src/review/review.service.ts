@@ -14,7 +14,10 @@ import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { Role } from '@/auth/enums/role.enum';
-import { ReviewDto, ReviewPaginatedResponseDto, ReviewPaginationMetaDto } from './dto/review.dto';
+import { ReviewDto } from './dto/review.dto';
+import { ReviewPaginatedResponseDto } from './dto/review-paginated-response.dto';
+import { ReviewPaginationMetaDto } from './dto/review-pagination-meta.dto';
+
 
 /**
  * @class ReviewService

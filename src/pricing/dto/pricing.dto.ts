@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { FieldTypeDto } from '@/field/dto/field.dto';
+import { FieldTypeDto } from '@/field/dto/field-type.dto';
 
 export class TimeSlotDto {
   @ApiProperty({ example: 1 })

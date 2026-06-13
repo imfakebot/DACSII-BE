@@ -26,7 +26,8 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { VoucherService } from '@/voucher/voucher.service';
 
-import { StatsResponseDto, RevenueChartItemDto } from './dto/stats-response.dto';
+import { StatsResponseDto } from './dto/stats-response.dto';
+import { RevenueChartItemDto } from './dto/revenue-chart-item.dto';
 
 /**
  * @class PaymentService
