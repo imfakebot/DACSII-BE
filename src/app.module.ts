@@ -25,6 +25,7 @@ import { join } from 'path';
 import { Response } from 'express';
 import { BranchModule } from './branch/branch.module';
 import { UtilityModule } from './utility/utility.module';
+import { MulterModule } from '@nestjs/platform-express';
 
 /**
  * @module AppModule
@@ -96,6 +97,18 @@ import { UtilityModule } from './utility/utility.module';
         },
         fallthrough: true,
       },
+    }),
+
+    /**
+     * @description
+     * Cấu hình MulterModule toàn cục để xử lý file upload.
+     * Nới lỏng giới hạn dung lượng file lên 5MB để tránh lỗi 413 Payload Too Large.
+     */
+    MulterModule.register({
+      dest: "./uploads",
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      }
     }),
 
     /**
@@ -179,4 +192,4 @@ import { UtilityModule } from './utility/utility.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }
