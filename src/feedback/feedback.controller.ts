@@ -24,7 +24,7 @@ import { RolesGuard } from '../auth/guards/role.guard';
 import { Roles } from '../auth/decorator/roles.decorator';
 import { User } from '@/auth/decorator/users.decorator';
 import { Account } from '@/user/entities/account.entity';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 
 import { FeedbackDto } from './dto/feedback.dto';
 import { FeedbackResponseDto } from './dto/feedback-response.dto';
@@ -44,7 +44,7 @@ export class FeedbackController {
    * @constructor
    * @param {FeedbackService} feedbacksService - Service xử lý logic nghiệp vụ cho feedback.
    */
-  constructor(private readonly feedbacksService: FeedbackService) {}
+  constructor(private readonly feedbacksService: FeedbackService) { }
 
   /**
    * @route POST /feedbacks
@@ -93,7 +93,7 @@ export class FeedbackController {
    */
   @Get('admin/all')
   @UseGuards(RolesGuard)
-  @Roles(Role.Admin, Role.Manager)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager)
   @ApiOperation({ summary: '(Admin/Manager) Xem tất cả các ticket' })
   @ApiResponse({ status: 200, type: [FeedbackDto], description: 'Trả về tất cả các ticket.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })

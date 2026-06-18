@@ -31,7 +31,7 @@ import { VnpayIpnDto } from './dto/vnpay-ipn.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { SkipThrottle } from '@nestjs/throttler';
 import { VnpayReturnDto } from './dto/vnpay-return.dto';
 import { ConfigService } from '@nestjs/config';
@@ -236,7 +236,7 @@ export class PaymentController {
    */
   @Get('stats/overview')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
   @ApiOperation({
     summary: '(Admin/Manager) Lấy thống kê tổng quan doanh thu đặt sân',
@@ -271,10 +271,10 @@ export class PaymentController {
     @Query('endDate') endDate?: string,
     @Query('branchId') branchId?: string,
   ): Promise<StatsResponseDto> {
-    this.logger.log(`Fetching admin stats for user ${user.id} with role ${user.role}. StartDate: ${startDate}, EndDate: ${endDate}, BranchId: ${branchId}`);
+    this.logger.log(`Fetching admin stats for user ${user.id} with role ${user.role.name}. StartDate: ${startDate}, EndDate: ${endDate}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
     // Nếu là Manager, chỉ được xem chi nhánh của mình và không được dùng filter branchId
-    if (user.role === Role.Manager) {
+    if (user.role.name === (RoleEnum.Manager as string)) {
       this.logger.debug(`User is manager, filtering by own branchId: ${userBranchId}`);
       return this.paymentService.getStats(startDate, endDate, userBranchId);
     }
@@ -295,7 +295,7 @@ export class PaymentController {
    */
   @Get('chart')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
   @ApiOperation({
     summary: '(Admin/Manager) Lấy dữ liệu doanh thu hàng tháng cho biểu đồ',
@@ -321,9 +321,9 @@ export class PaymentController {
     @Query('year') year: number = new Date().getFullYear(),
     @Query('branchId') branchId?: string,
   ): Promise<RevenueChartItemDto[]> {
-    this.logger.log(`Fetching revenue chart for user ${user.id} with role ${user.role}. Year: ${year}, BranchId: ${branchId}`);
+    this.logger.log(`Fetching revenue chart for user ${user.id} with role ${user.role.name}. Year: ${year}, BranchId: ${branchId}`);
     const userBranchId = user.branch_id || undefined;
-    const targetBranchId = user.role === Role.Manager ? userBranchId : branchId;
+    const targetBranchId = user.role.name === (RoleEnum.Manager as string) ? userBranchId : branchId;
     this.logger.debug(`Target branchId for chart: ${targetBranchId}`);
     return this.paymentService.getRevenueChart(year, targetBranchId);
   }

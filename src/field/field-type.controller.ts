@@ -7,7 +7,7 @@ import { UpdateFieldTypeDto } from './dto/update-field-type.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 
 @ApiTags('Field Types (Loại Sân)')
 @Controller('field-types')
@@ -18,7 +18,7 @@ export class FieldTypeController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Tạo loại sân mới' })
   @ApiResponse({ status: 201, description: 'Tạo thành công.', type: FieldType })
@@ -47,7 +47,7 @@ export class FieldTypeController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Cập nhật loại sân' })
   @ApiResponse({ status: 200, description: 'Cập nhật thành công.', type: FieldType })
@@ -57,7 +57,7 @@ export class FieldTypeController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Xóa loại sân' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })

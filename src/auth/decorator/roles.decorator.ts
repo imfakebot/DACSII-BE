@@ -8,7 +8,7 @@
  * request tiếp tục hay không.
  */
 import { SetMetadata } from '@nestjs/common';
-import { Role } from '../enums/role.enum';
+import { RoleEnum } from '../enums/role.enum';
 
 /**
  * Khóa (key) để lưu trữ và truy xuất metadata về vai trò từ Reflector.
@@ -22,4 +22,4 @@ export const ROLES_KEY = 'roles';
  * @param {...Role[]} roles - Một danh sách các vai trò (dưới dạng enum) được phép.
  * @returns Một decorator function của NestJS.
  */
-export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
+export const Roles = (...roles: RoleEnum[]) => SetMetadata(ROLES_KEY, roles);

@@ -4,7 +4,7 @@
  * - `User`: Vai trò người dùng thông thường.
  * - `Admin`: Vai trò quản trị viên, có quyền hạn cao hơn.
  */
-export enum Role {
+export enum RoleEnum {
   User = 'user',
   Admin = 'super_admin',
   Staff = 'staff',

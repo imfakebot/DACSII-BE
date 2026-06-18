@@ -2,22 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { Role } from '../enums/role.enum';
+import { JwtPayload } from '../interface/jwtpayload.interface';
 
 /**
  * @interface JwtPayload
  * @description Định nghĩa cấu trúc dữ liệu (payload) được mã hóa bên trong một JWT Access Token.
  * @property {string} email - Email của người dùng.
  * @property {string} sub - Subject của token, thường là ID của người dùng (Account ID).
- * @property {Role} role - Vai trò của người dùng trong hệ thống.
+ * @property {RoleEnum} role - Vai trò của người dùng trong hệ thống.
  */
-interface JwtPayload {
-  email: string;
-  sub: string;
-  role: Role;
-  branch_id?: string;
-  userProfileId?: string;
-}
 
 /**
  * @class JwtStrategy

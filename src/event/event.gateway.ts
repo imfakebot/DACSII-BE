@@ -73,7 +73,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // payload thường chứa: { sub: userId, role: 'admin', branchId: ... }
 
       this.logger.log(
-        `Client connected: ${client.id} | User: ${payload.email} | Role: ${payload.role}`,
+        `Client connected: ${client.id} | User: ${payload.email} | Role: ${payload.role.name}`,
       );
 
       // --- LOGIC JOIN PHÒNG CÁ NHÂN ---
@@ -95,7 +95,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // --- LOGIC PHÂN QUYỀN TỰ ĐỘNG ---
       // Nếu là Admin/Manager/Staff -> Tự động cho vào phòng nhận thông báo hệ thống
-      if (['super_admin', 'branch_manager', 'staff'].includes(payload.role)) {
+      if (['super_admin', 'branch_manager', 'staff'].includes(payload.role.name)) {
         await client.join('admin_notifications');
         this.logger.log(
           `User ${payload.email} joined admin_notifications room`,

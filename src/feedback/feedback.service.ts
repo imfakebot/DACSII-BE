@@ -7,13 +7,13 @@ import { CreateFeedbackDto } from './dto/create-feedback.dto';
 import { ReplyFeedbackDto } from './dto/reply-feedback.dto';
 import { Account } from '../user/entities/account.entity';
 import { EventGateway } from '@/event/event.gateway';
-import { Role } from '@/auth/enums/role.enum';
 import { FeedbackStatus } from './enums/feedback-status.enum';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { UserProfileResponseDto } from '@/user/dto/user-profile-response.dto';
 
 import { FeedbackDto } from './dto/feedback.dto';
 import { FeedbackResponseDto } from './dto/feedback-response.dto';
+import { RoleEnum } from '@/auth/enums/role.enum';
 
 /**
  * @class FeedbackService
@@ -258,7 +258,7 @@ export class FeedbackService {
 
     // Nếu admin/manager trả lời, cập nhật trạng thái ticket.
     if (
-      account.role.name !== String(Role.User) &&
+      account.role.name !== String(RoleEnum.User) &&
       feedback.status === FeedbackStatus.OPEN
     ) {
       this.logger.log(`Updating feedback ${feedbackId} status to in_progress`);

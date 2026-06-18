@@ -29,7 +29,7 @@ import { User } from '@/auth/decorator/users.decorator';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { RolesGuard } from '@/auth/guards/role.guard';
-import { Role } from '../auth/enums/role.enum';
+import { RoleEnum } from '../auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
@@ -170,7 +170,7 @@ export class UsersController {
    */
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
   @ApiResponse({ status: 200, type: AccountPaginatedResponseDto, description: 'Trả về danh sách người dùng.' })
@@ -188,7 +188,7 @@ export class UsersController {
    */
   @Patch('admin/:id/ban')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Khóa tài khoản người dùng' })
   @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Khóa tài khoản thành công.' })
@@ -206,7 +206,7 @@ export class UsersController {
    */
   @Patch('admin/:id/unban')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Mở khóa tài khoản người dùng' })
   @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Mở khóa tài khoản thành công.' })
@@ -226,7 +226,7 @@ export class UsersController {
    */
   @Post('create-employee')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Chỉ Admin và Manager được phép
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Chỉ Admin và Manager được phép
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Tạo tài khoản nhân viên (Admin có thể chọn Manager/Staff, Manager chỉ tạo Staff)',

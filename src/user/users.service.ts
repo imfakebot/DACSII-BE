@@ -12,8 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Account } from './entities/account.entity';
-import { Role } from '../auth/enums/role.enum';
-import { Role as RoleEntity } from './entities/role.entity';
+import { Role } from './entities/role.entity';
 import { UserProfile } from './entities/users-profile.entity';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AccountStatus } from './enum/account-status.enum';
@@ -25,7 +24,6 @@ import { ConfigService } from '@nestjs/config';
 import { Address } from '@/location/entities/address.entity';
 import { City } from '@/location/entities/city.entity';
 import { Ward } from '@/location/entities/ward.entity';
-import { AddressResponseDto } from '@/location/dto/address-response.dto';
 
 /**
  * Kiểu dữ liệu cho việc tạo người dùng chưa xác thực.
@@ -67,6 +65,7 @@ type UpdateUnverifiedAccountPayload = Partial<Account> & {
 import { AccountResponseDto } from './dto/account-response.dto';
 import { AccountPaginatedResponseDto } from './dto/account-paginated-response.dto';
 import { UserProfileResponseDto } from './dto/user-profile-response.dto';
+import { RoleEnum } from '@/auth/enums/role.enum';
 
 /**
  * UsersService chịu trách nhiệm xử lý logic nghiệp vụ liên quan đến người dùng,
@@ -173,8 +172,8 @@ export class UsersService {
     this.logger.log(`Creating unverified user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
-        const userRole = await transactionalEntityManager.findOne(RoleEntity, {
-          where: { name: Role.User },
+        const userRole = await transactionalEntityManager.findOne(Role, {
+          where: { name: RoleEnum.User },
         });
         if (!userRole) {
           throw new InternalServerErrorException(
@@ -215,8 +214,8 @@ export class UsersService {
     this.logger.log(`Creating OAuth user for email: ${data.email}`);
     return this.accountRepository.manager.transaction(
       async (transactionalEntityManager) => {
-        const userRole = await transactionalEntityManager.findOne(RoleEntity, {
-          where: { name: Role.User },
+        const userRole = await transactionalEntityManager.findOne(Role, {
+          where: { name: RoleEnum.User },
         });
         if (!userRole) {
           throw new InternalServerErrorException(
@@ -672,19 +671,19 @@ export class UsersService {
     }
 
     const requesterRoleName = requester.role.name;
-    const targetRoleName: Role = data.role; // Lấy role từ DTO
+    const targetRoleName: RoleEnum = data.role; // Lấy role từ DTO
 
     // 2. Phân quyền: kiểm tra người tạo có quyền tạo vai trò này không
-    if (requesterRoleName === String(Role.Admin)) {
+    if (requesterRoleName === String(RoleEnum.Admin)) {
       // Admin có thể tạo cả Manager và Staff
-      if (targetRoleName !== Role.Manager && targetRoleName !== Role.Staff) {
+      if (targetRoleName !== RoleEnum.Manager && targetRoleName !== RoleEnum.Staff) {
         throw new ForbiddenException(
           'Admin chỉ có thể tạo tài khoản Manager hoặc Staff.',
         );
       }
-    } else if (requesterRoleName === String(Role.Manager)) {
+    } else if (requesterRoleName === String(RoleEnum.Manager)) {
       // Manager chỉ có thể tạo Staff
-      if (targetRoleName !== Role.Staff) {
+      if (targetRoleName !== RoleEnum.Staff) {
         throw new ForbiddenException(
           'Manager chỉ có thể tạo tài khoản Staff.',
         );
@@ -724,7 +723,7 @@ export class UsersService {
     // 6. Thực hiện Transaction lưu DB
     const savedAccount = await this.accountRepository.manager.transaction(async (manager) => {
       // 6.1 Lấy Role từ DB (để đảm bảo vai trò tồn tại)
-      const targetRoleEntity = await manager.findOne(RoleEntity, {
+      const targetRoleEntity = await manager.findOne(Role, {
         where: { name: targetRoleName },
       });
       if (!targetRoleEntity)
@@ -734,7 +733,7 @@ export class UsersService {
 
       // Logic lấy Branch ID
       const targetBranchId =
-        requesterRoleName === String(Role.Admin)
+        requesterRoleName === String(RoleEnum.Admin)
           ? data.branchId
           : requester.userProfile?.branch?.id;
 
@@ -774,7 +773,7 @@ export class UsersService {
       const savedAccountEntity = await manager.save(newAccount);
 
       // (Tùy chọn) Nếu tạo Manager, cập nhật lại bảng Branch để set người này làm manager_id
-      if (targetRoleName === Role.Manager) {
+      if (targetRoleName === RoleEnum.Manager) {
         // Lưu ý: Logic này sẽ ghi đè manager cũ nếu có
         await manager.update(Branch, targetBranchId, {
           manager_id: newProfile.id,

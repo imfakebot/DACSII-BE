@@ -168,7 +168,11 @@ export class AuthService {
     code: string,
   ): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Completing registration for ${email}`);
-    const account = await this.userService.findAccountByEmail(email);
+    const account = await this.userService.findAccountByEmail(email, [
+      'role',
+      'userProfile',
+      'userProfile.branch',
+    ]);
     if (!account || account.is_verified) {
       this.logger.warn(`Invalid registration completion attempt for ${email}`);
       throw new ConflictException('Yêu cầu xác thực không hợp lệ.');
@@ -261,7 +265,7 @@ export class AuthService {
     const branchId = userProfile?.branch?.id ?? authenticatedUser.branch_id ?? undefined;
     const userProfileId = userProfile?.id ?? authenticatedUser.userProfileId;
 
-    const roleName = (user.role as unknown as { name: string }).name;
+    const roleName = user.role.name;
 
     const payload: JwtPayload = {
       email: user.email,

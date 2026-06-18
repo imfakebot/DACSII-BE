@@ -14,7 +14,7 @@ import { GeocodingService } from '@/location/geocoding.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
-import { Role as RoleEnum } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { Account } from '@/user/entities/account.entity';
 import { IsNull } from 'typeorm';
 import { BranchResponseDto, AddressResponseDto } from './dto/branch-response.dto';

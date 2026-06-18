@@ -13,7 +13,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UserProfile } from '@/user/entities/users-profile.entity';
 import { BookingStatus } from '@/booking/enums/booking-status.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { ReviewDto } from './dto/review.dto';
 import { ReviewPaginatedResponseDto } from './dto/review-paginated-response.dto';
 import { ReviewPaginationMetaDto } from './dto/review-pagination-meta.dto';
@@ -36,7 +36,7 @@ export class ReviewService {
     private readonly reviewRepository: Repository<Review>,
 
     private readonly bookingService: BookingService,
-  ) {}
+  ) { }
 
   /**
    * @method mapToDto
@@ -48,7 +48,7 @@ export class ReviewService {
     dto.rating = review.rating;
     dto.comment = review.comment;
     dto.createdAt = review.createdAt;
-    
+
     if (review.userProfile) {
       dto.userProfile = {
         id: review.userProfile.id,
@@ -64,7 +64,7 @@ export class ReviewService {
         address: null,
       };
     }
-    
+
     return dto;
   }
 
@@ -101,26 +101,26 @@ export class ReviewService {
     // 3. Kiểm tra trạng thái đơn (Phải đã check-in hoặc hoàn thành mới được review)
     // Xử lý trường hợp status rỗng do bug database
     let actualStatus = booking.status;
-    
+
     // Nếu status rỗng nhưng có check_in_at, suy luận status là CHECKED_IN
     if ((!actualStatus || (actualStatus as any) === '') && booking.check_in_at) {
       actualStatus = BookingStatus.CHECKED_IN;
       this.logger.log(`[DEBUG] Status empty but has check_in_at, inferring status as CHECKED_IN`);
     }
-    
+
     const allowedStatuses = [
       BookingStatus.CHECKED_IN,
       BookingStatus.FINISHED
     ];
-    
+
     // Log để debug
     this.logger.log(`[DEBUG] Booking ${bookingId} actual status: "${actualStatus}" (type: ${typeof actualStatus})`);
     this.logger.log(`[DEBUG] Allowed statuses: ${JSON.stringify(allowedStatuses)}`);
     this.logger.log(`[DEBUG] Status comparison: CHECKED_IN=${actualStatus === BookingStatus.CHECKED_IN}, FINISHED=${actualStatus === BookingStatus.FINISHED}`);
-    
+
     // So sánh với actualStatus thay vì booking.status
     const isAllowed = allowedStatuses.includes(actualStatus);
-    
+
     if (!isAllowed) {
       this.logger.warn(`Booking ${bookingId} status ${actualStatus} not allowed for review.`);
       throw new BadRequestException(
@@ -179,17 +179,17 @@ export class ReviewService {
     const averageRating =
       total > 0 ? review.reduce((sum, r) => sum + r.rating, 0) / total : 0;
     this.logger.log(`Found ${total} reviews for field ${fieldId}, average rating: ${averageRating}.`);
-    
+
     const response = new ReviewPaginatedResponseDto();
     response.data = review.map(r => this.mapToDto(r));
-    
+
     const meta = new ReviewPaginationMetaDto();
     meta.total = total;
     meta.page = page;
     meta.limit = limit;
     meta.lastPage = Math.ceil(total / limit);
     meta.averageRating = parseFloat(averageRating.toFixed(1));
-    
+
     response.meta = meta;
 
     return response;
@@ -202,7 +202,7 @@ export class ReviewService {
    * - Manager: Chỉ lấy review thuộc chi nhánh mình quản lý.
    */
   async findAllReviews(page: number, limit: number, user: AuthenticatedUser): Promise<ReviewPaginatedResponseDto> {
-    this.logger.log(`User ${user.id} fetching all reviews (management), page ${page}, limit ${limit}. Role: ${user.role}.`);
+    this.logger.log(`User ${user.id} fetching all reviews (management), page ${page}, limit ${limit}. Role: ${user.role.name}.`);
     const skip = (page - 1) * limit;
 
     const query = this.reviewRepository
@@ -216,24 +216,24 @@ export class ReviewService {
 
     // LOGIC PHÂN QUYỀN:
     // Nếu là Manager, thêm điều kiện lọc theo branch_id
-    if (user.role === Role.Manager && user.branch_id) {
+    if (user.role.name === (RoleEnum.Manager as string) && user.branch_id) {
       this.logger.debug(`Filtering reviews for manager ${user.id} by branch ${user.branch_id}.`);
       query.andWhere('branch.id = :branchId', { branchId: user.branch_id });
     }
 
     const [data, total] = await query.getManyAndCount();
     this.logger.log(`Found ${total} reviews for management view.`);
-    
+
     const response = new ReviewPaginatedResponseDto();
     response.data = data.map(r => this.mapToDto(r));
-    
+
     const meta = new ReviewPaginationMetaDto();
     meta.total = total;
     meta.page = page;
     meta.limit = limit;
     meta.lastPage = Math.ceil(total / limit);
     meta.averageRating = 0;
-    
+
     response.meta = meta;
 
     return response;
@@ -262,10 +262,10 @@ export class ReviewService {
     }
 
     // 2. Logic kiểm tra quyền
-    if (user.role === Role.Admin) {
+    if (user.role.name === (RoleEnum.Admin as string)) {
       this.logger.debug(`Admin ${user.id} deleting review ${id}.`);
       // Admin được quyền xóa tất cả -> Pass
-    } else if (user.role === Role.Manager) {
+    } else if (user.role.name === (RoleEnum.Manager as string)) {
       // Manager chỉ được xóa review của chi nhánh mình
       if (review.field.branch.id !== user.branch_id) {
         this.logger.warn(`Manager ${user.id} unauthorized to delete review ${id} (different branch).`);

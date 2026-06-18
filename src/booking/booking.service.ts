@@ -25,7 +25,6 @@ import { PaymentStatus } from '@/payment/enums/payment-status.enum';
 import { FilterBookingDto } from './dto/filter-booking.dto';
 import { AdminCreateBookingDto } from './dto/admin-create-booking';
 import { UsersService } from '@/user/users.service';
-import { Role } from '@/auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface';
 import moment from 'moment';
 import * as fs from 'fs/promises';
@@ -39,6 +38,7 @@ import { BookingDto } from './dto/booking.dto';
 import { BookingFieldDto } from './dto/booking-field.dto';
 import { BookingPaginatedResponseDto } from './dto/booking-paginated-response.dto';
 import { FieldScheduleResponseDto } from './dto/field-schedule-response.dto';
+import { RoleEnum } from '@/auth/enums/role.enum';
 
 /**
  * @class BookingService
@@ -412,7 +412,7 @@ export class BookingService {
   async cancelBooking(
     bookingId: string,
     accountId: string,
-    userRole: Role,
+    userRole: RoleEnum,
     ipAddr: string,
   ): Promise<{ message: string }> {
     this.logger.log(
@@ -443,7 +443,7 @@ export class BookingService {
     const bookingAccountId = booking.userProfile?.account?.id;
     const isOwner = bookingAccountId === accountId;
     const isAdminOrManager =
-      userRole === Role.Admin || userRole === Role.Manager;
+      userRole === RoleEnum.Admin || userRole === RoleEnum.Manager;
 
     if (!isOwner && !isAdminOrManager) {
       throw new ForbiddenException('Bạn không có quyền hủy đơn này.');

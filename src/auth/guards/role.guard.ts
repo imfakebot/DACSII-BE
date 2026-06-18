@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role } from '../enums/role.enum';
+import { RoleEnum } from '../enums/role.enum';
 import { AuthenticatedUser } from '../interface/authenicated-user.interface';
 import { ROLES_KEY } from '../decorator/roles.decorator';
 
@@ -16,7 +16,7 @@ export class RolesGuard implements CanActivate {
    * @param {Reflector} reflector - Một helper class của NestJS để truy xuất metadata
    * được đính kèm vào các class hoặc handler (ví dụ: các vai trò được định nghĩa bởi `@Roles`).
    */
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   /**
    * @method canActivate
@@ -26,7 +26,7 @@ export class RolesGuard implements CanActivate {
    */
   canActivate(context: ExecutionContext): boolean {
     // Lấy danh sách các vai trò yêu cầu từ metadata của route handler hoặc controller.
-    const requireRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+    const requireRoles = this.reflector.getAllAndOverride<RoleEnum[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);

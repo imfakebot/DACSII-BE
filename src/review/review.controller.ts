@@ -24,7 +24,7 @@ import { UsersService } from '@/user/users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { Roles } from '@/auth/decorator/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Throttle } from '@nestjs/throttler';
 import { User } from '@/auth/decorator/users.decorator'; // Import decorator User
@@ -46,7 +46,7 @@ export class ReviewController {
   constructor(
     private readonly reviewService: ReviewService,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   /**
    * @route POST /review
@@ -114,7 +114,7 @@ export class ReviewController {
   @Get('management/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cho phép cả Admin và Manager
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Cho phép cả Admin và Manager
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Manager) Quản lý danh sách đánh giá' })
   @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá.' })
@@ -139,7 +139,7 @@ export class ReviewController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager, Role.User) // Mở rộng quyền xóa
+  @Roles(RoleEnum.Admin, RoleEnum.Manager, RoleEnum.User) // Mở rộng quyền xóa
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Xóa một bài đánh giá' })
   @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Xóa đánh giá thành công.' })

@@ -16,7 +16,7 @@ import { FieldImage } from './entities/field-image.entity';
 import { ConfigService } from '@nestjs/config';
 import { Branch } from '@/branch/entities/branch.entity';
 import { UserProfile } from '../user/entities/users-profile.entity';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { Utility } from '../utility/entities/utility.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { FieldRawResult } from '../auth/interface/FieldRawResult.interface';
@@ -130,7 +130,7 @@ export class FieldsService {
     );
 
     const { fieldTypeId, utilityIds, branchId, ...fieldData } = createFieldDto;
-    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    const isAdmin = userProfile.account.role.name === String(RoleEnum.Admin);
 
     let branch: Branch | null;
 
@@ -208,7 +208,7 @@ export class FieldsService {
       page = 1,
       limit = 10,
     } = filterDto;
-    
+
     let { latitude, longitude } = filterDto;
     let locationSource = 'none';
 
@@ -270,7 +270,7 @@ export class FieldsService {
     if (name) query.andWhere('field.name LIKE :name', { name: `%${name}%` });
     if (fieldTypeId)
       query.andWhere('fieldType.id = :fieldTypeId', { fieldTypeId });
-    
+
     if (cityId) {
       query.andWhere('city.id = :cityId', { cityId });
     }
@@ -279,11 +279,11 @@ export class FieldsService {
       query
         .addSelect(distanceSql, 'distance')
         .setParameters({ userLat: latitude, userLong: longitude, radius });
-      
+
       if (locationSource === 'none' || locationSource === 'gps') {
-         query.andWhere(`${distanceSql} <= :radius`).orderBy('distance', 'ASC');
+        query.andWhere(`${distanceSql} <= :radius`).orderBy('distance', 'ASC');
       } else {
-         query.orderBy('distance', 'ASC').addOrderBy('field_averageRating', 'DESC');
+        query.orderBy('distance', 'ASC').addOrderBy('field_averageRating', 'DESC');
       }
     } else {
       query.orderBy('field.createdAt', 'DESC');
@@ -309,11 +309,11 @@ export class FieldsService {
           .setParameters({ userLat: latitude, userLong: longitude })
           .orderBy('field_averageRating', 'DESC')
           .take(5);
-        
+
         const fallback = await suggestionQuery.getRawAndEntities<FieldRawResult>();
         entities = fallback.entities;
         raw = fallback.raw;
-        
+
         const cityName = entities[0]?.branch?.address?.city?.name;
         suggestMessage = cityName
           ? `Khu vực bạn chọn hiện chưa có sân. Dưới đây là các sân HOT tại ${cityName}!`
@@ -469,7 +469,7 @@ export class FieldsService {
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
 
-    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    const isAdmin = userProfile.account.role.name === String(RoleEnum.Admin);
     if (!isAdmin) {
       if (!field.branch || field.branch.manager_id !== userProfile.id) {
         throw new ForbiddenException(
@@ -536,7 +536,7 @@ export class FieldsService {
       throw new NotFoundException(`Sân bóng ID ${id} không tồn tại`);
     }
 
-    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    const isAdmin = userProfile.account.role.name === String(RoleEnum.Admin);
     if (!isAdmin) {
       if (!field.branch || field.branch.manager_id !== userProfile.id) {
         throw new ForbiddenException('Bạn không có quyền xóa sân bóng này.');
@@ -569,7 +569,7 @@ export class FieldsService {
       throw new NotFoundException(`Sân bóng không tồn tại`);
     }
 
-    const isAdmin = userProfile.account.role.name === String(Role.Admin);
+    const isAdmin = userProfile.account.role.name === String(RoleEnum.Admin);
     if (!isAdmin) {
       if (!field.branch || field.branch.manager_id !== userProfile.id) {
         throw new ForbiddenException(

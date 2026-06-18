@@ -26,7 +26,7 @@ import {
 } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { Roles } from '../auth/decorator/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { AuthenticatedUser } from '@/auth/interface/authenicated-user.interface'; // Keep this import
 import { Request } from 'express'; // Import Request from express
 
@@ -41,7 +41,7 @@ import { VoucherCheckResponseDto } from './dto/voucher-check-response.dto';
 @Controller('voucher')
 export class VoucherController {
   private readonly logger = new Logger(VoucherController.name);
-  constructor(private readonly voucherService: VoucherService) {}
+  constructor(private readonly voucherService: VoucherService) { }
 
   /**
    * (Admin) Endpoint để tạo một voucher mới.
@@ -51,7 +51,7 @@ export class VoucherController {
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Tạo mã giảm giá mới' })
   @ApiResponse({
@@ -234,7 +234,7 @@ export class VoucherController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: '(Admin) Xóa mã giảm giá' })
   @ApiResponse({ status: 200, description: 'Xóa thành công.' })

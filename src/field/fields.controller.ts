@@ -31,7 +31,7 @@ import { CreateFieldDto } from '../field/dto/create-fields.dto';
 import { UpdateFieldDto } from '../field/dto/update-fields.dto';
 import { AuthenticatedRequest } from '../auth/interface/authenticated-request.interface';
 import { Roles } from '../auth/decorator/roles.decorator';
-import { Role } from '../auth/enums/role.enum';
+import { RoleEnum } from '../auth/enums/role.enum';
 import { RolesGuard } from '../auth/guards/role.guard';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { FilterFieldDto } from './dto/filter-field.dto';
@@ -64,7 +64,7 @@ export class FieldsController {
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cập nhật: Cho phép cả Manager
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Cập nhật: Cho phép cả Manager
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Tạo một sân bóng mới (Admin/Manager)' })
   @ApiResponse({
@@ -146,7 +146,7 @@ export class FieldsController {
    */
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật thông tin sân bóng (Admin/Manager)' })
   @ApiResponse({
@@ -180,7 +180,7 @@ export class FieldsController {
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager) // Cho phép Manager xóa
+  @Roles(RoleEnum.Admin, RoleEnum.Manager) // Cho phép Manager xóa
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xóa một sân bóng (Xóa mềm)' })
@@ -208,7 +208,7 @@ export class FieldsController {
    */
   @Post(':id/images')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Tải lên hình ảnh cho một sân bóng' })
   @UseInterceptors(

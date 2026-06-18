@@ -9,7 +9,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Gender } from '../enum/gender.enum';
-import { Role } from '../../auth/enums/role.enum';
+import { RoleEnum } from '../../auth/enums/role.enum';
 
 export class CreateEmployeeDto {
   @ApiProperty({
@@ -63,12 +63,12 @@ export class CreateEmployeeDto {
 
   @ApiProperty({
     description: 'Vai trò của nhân viên',
-    enum: [Role.Manager, Role.Staff],
-    example: Role.Staff,
+    enum: [RoleEnum.Manager, RoleEnum.Staff],
+    example: RoleEnum.Staff,
   })
-  @IsEnum([Role.Manager, Role.Staff], {
+  @IsEnum([RoleEnum.Manager, RoleEnum.Staff], {
     message: 'Vai trò phải là "branch_manager" hoặc "staff"',
   })
   @IsNotEmpty()
-  role!: Role.Manager | Role.Staff;
+  role!: RoleEnum.Manager | RoleEnum.Staff;
 }

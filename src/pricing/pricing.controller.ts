@@ -17,7 +17,7 @@ import { CheckPriceResponseDto } from './dto/check-price-response.dto';
 import { CheckPriceDto } from './dto/check-price.dto';
 import { UpdateTimeSlotDto } from './dto/update-time-slot.dto';
 import { Roles } from '../auth/decorator/roles.decorator';
-import { Role } from '../auth/enums/role.enum';
+import { RoleEnum } from '../auth/enums/role.enum';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/role.guard';
 
@@ -35,7 +35,7 @@ export class PricingController {
    * @constructor
    * @param {PricingService} pricingService - Service xử lý logic tính giá.
    */
-  constructor(private readonly pricingService: PricingService) {}
+  constructor(private readonly pricingService: PricingService) { }
 
   @Post('check-availability')
   @HttpCode(HttpStatus.OK)
@@ -69,7 +69,7 @@ export class PricingController {
 
   @Patch('time-slot/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiOperation({ summary: 'Cập nhật khung giờ (Admin)' })
   @ApiResponse({
     status: 200,

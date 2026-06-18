@@ -26,7 +26,7 @@ import { CreateBookingDto } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedRequest } from '../auth/interface/authenticated-request.interface';
 import { UsersService } from '../user/users.service';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { BookingResponse } from './dto/booking-response.dto';
 import { FilterBookingDto } from './dto/filter-booking.dto';
 import { RolesGuard } from '@/auth/guards/role.guard';
@@ -189,7 +189,7 @@ export class BookingController {
     @Req() req: AuthenticatedRequest,
   ): Promise<MessageResponseDto> {
     const accountId = req.user.sub;
-    const userRole = req.user.role as unknown as Role;
+    const userRole = req.user.role as unknown as RoleEnum;
     this.logger.log(
       `User ${accountId} (Role: ${userRole}) attempting to cancel booking ${bookingId}`,
     );
@@ -238,7 +238,7 @@ export class BookingController {
    */
   @Get('management/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager, Role.Staff)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager, RoleEnum.Staff)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Manager/Staff) Lấy danh sách booking' })
   @ApiResponse({ status: 200, type: BookingPaginatedResponseDto })
@@ -264,7 +264,7 @@ export class BookingController {
    */
   @Post('management/create')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.Manager, Role.Staff)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager, RoleEnum.Staff)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin/Staff/Manager) Tạo đơn đặt sân tại quầy' })
   @ApiResponse({ status: 201, type: BookingDto })
@@ -288,7 +288,7 @@ export class BookingController {
   @Post('check-in')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Manager, Role.Admin)
+  @Roles(RoleEnum.Manager, RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Manager/Admin) Check-in cho khách hàng tại sân' })
   @ApiResponse({

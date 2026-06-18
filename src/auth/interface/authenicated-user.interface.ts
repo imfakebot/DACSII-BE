@@ -1,5 +1,5 @@
+import { Role } from '@/user/entities/role.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
-import { Role } from '../enums/role.enum';
 
 /**
  * @interface AuthenticatedUser

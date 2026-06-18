@@ -24,7 +24,7 @@ import {
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
 import { Roles } from '@/auth/decorator/roles.decorator';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { User } from '@/auth/decorator/users.decorator';
 import { Account } from '@/user/entities/account.entity';
 import { BranchResponseDto } from './dto/branch-response.dto';
@@ -35,11 +35,11 @@ import { MessageResponseDto } from '@/common/dto/message-response.dto';
 @Controller('branches')
 export class BranchController {
   private readonly logger = new Logger(BranchController.name);
-  constructor(private readonly branchService: BranchService) {}
+  constructor(private readonly branchService: BranchService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Tạo chi nhánh mới' })
   @ApiResponse({
@@ -70,7 +70,7 @@ export class BranchController {
 
   @Get('available-managers')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({
     summary: '(Admin) Lấy danh sách các quản lý chưa được gán chi nhánh',
@@ -99,7 +99,7 @@ export class BranchController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Cập nhật thông tin chi nhánh' })
   @ApiResponse({
@@ -119,7 +119,7 @@ export class BranchController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '(Admin) Xóa một chi nhánh' })

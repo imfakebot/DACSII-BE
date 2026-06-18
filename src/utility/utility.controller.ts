@@ -23,7 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '@/auth/guards/role.guard';
-import { Role } from '@/auth/enums/role.enum';
+import { RoleEnum } from '@/auth/enums/role.enum';
 import { Roles } from '@/auth/decorator/roles.decorator';
 import { UtilityDto } from '@/utility/dto/utility.dto';
 
@@ -37,7 +37,7 @@ import { UtilityDto } from '@/utility/dto/utility.dto';
 @Controller('utilities')
 export class UtilityController {
   private readonly logger = new Logger(UtilityController.name);
-  constructor(private readonly utilityService: UtilityService) {}
+  constructor(private readonly utilityService: UtilityService) { }
 
   /**
    * @route POST /utilities
@@ -47,7 +47,7 @@ export class UtilityController {
    */
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Tạo một tiện ích/sản phẩm mới' })
   @ApiResponse({
@@ -105,7 +105,7 @@ export class UtilityController {
    */
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Cập nhật một tiện ích' })
   @ApiResponse({
@@ -129,7 +129,7 @@ export class UtilityController {
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.Admin)
+  @Roles(RoleEnum.Admin)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '(Admin) Xoá một tiện ích' })
