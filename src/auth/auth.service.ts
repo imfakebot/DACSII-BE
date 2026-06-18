@@ -160,13 +160,13 @@ export class AuthService {
    * Cập nhật trạng thái tài khoản thành đã xác thực nếu mã hợp lệ.
    * @param {string} email - Email của tài khoản cần xác thực.
    * @param {string} code - Mã xác thực được gửi từ người dùng.
-   * @returns {Promise<AuthMessageResponseDto>} - Một thông báo xác thực thành công.
+   * @returns {Promise<LoginResponseDto & { refreshToken: string }>} - Đưa người dùng đăng nhập thành công.
    * @throws {ConflictException} Nếu mã không hợp lệ, hết hạn, hoặc tài khoản không tồn tại.
    */
   async completeRegistration(
     email: string,
     code: string,
-  ): Promise<AuthMessageResponseDto> {
+  ): Promise<LoginResponseDto & { refreshToken: string }> {
     this.logger.log(`Completing registration for ${email}`);
     const account = await this.userService.findAccountByEmail(email);
     if (!account || account.is_verified) {
@@ -186,6 +186,11 @@ export class AuthService {
     await this.userService.verifyAccount(account.id);
     this.logger.log(`Account ${email} verified successfully`);
 
+    await this.userService.updateAccount(account.id, {
+      verification_code: null,
+      verification_code_expires_at: null,
+    })
+
     // Sau khi đăng ký thành công, tạo voucher chào mừng
     const userProfile = await this.userService.findProfileByAccountId(
       account.id,
@@ -194,7 +199,7 @@ export class AuthService {
       await this.voucherService.createWelcomeVoucher(userProfile);
     }
 
-    return { message: 'Tài khoản của bạn đã được xác thực thành công.' };
+    return this.login(account);
   }
 
   /**

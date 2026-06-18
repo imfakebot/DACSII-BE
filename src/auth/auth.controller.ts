@@ -83,25 +83,42 @@ export class AuthController {
 
   /**
    * @route POST /auth/register/complete
-   * @description Hoàn tất quá trình đăng ký bằng cách xác thực mã được gửi qua email.
+   * @description Hoàn tất quá trình đăng ký bằng cách xác thực mã được gửi qua email. Sau khi xác thực thành công, hệ thống sẽ tự động đăng nhập người dùng.
    * @param {VerifyEmailDto} verifyEmailDto - DTO chứa email và mã xác thực.
-   * @returns {Promise<AuthMessageResponseDto>} - Thông báo xác thực thành công.
+   * @param {Response} res - Đối tượng response để set cookie.
+   * @returns {Promise<LoginResponseDto>} - Thông tin đăng nhập bao gồm access token và user info.
    */
   @Post('register/complete')
-  @ApiOperation({ summary: 'Hoàn thành đăng ký bằng mã xác thực' })
-  @ApiResponse({ status: 200, type: AuthMessageResponseDto, description: 'Xác thực thành công.' })
+  @ApiOperation({ summary: 'Hoàn thành đăng ký và tự động đăng nhập' })
+  @ApiResponse({ status: 200, type: LoginResponseDto, description: 'Xác thực và đăng nhập thành công.' })
   @ApiResponse({
     status: 400,
     description: 'Dữ liệu không hợp lệ (Validation Error).',
   })
   @ApiResponse({ status: 409, description: 'Mã không hợp lệ hoặc đã hết hạn.' })
   @HttpCode(HttpStatus.OK)
-  completeRegistration(@Body() verifyEmailDto: VerifyEmailDto): Promise<AuthMessageResponseDto> {
+  async completeRegistration(
+    @Body() verifyEmailDto: VerifyEmailDto,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<LoginResponseDto> {
     this.logger.log(`Completing registration for ${verifyEmailDto.email}`);
-    return this.authService.completeRegistration(
+    const loginData = await this.authService.completeRegistration(
       verifyEmailDto.email,
       verifyEmailDto.verificationCode,
     );
+
+    res.cookie('refresh_token', loginData.refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      path: '/',
+    })
+
+    return {
+      accessToken: loginData.accessToken,
+      user: loginData.user
+    }
   }
 
   /**
