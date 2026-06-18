@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MaxLength, IsUUID } from 'class-validator';
+import { IsString, MaxLength, IsInt } from 'class-validator';
 
 /**
  * @class UpdateAddressDto
@@ -11,11 +11,11 @@ export class UpdateAddressDto {
   @MaxLength(255)
   street!: string;
 
-  @ApiProperty({ description: 'ID của Thành phố', format: 'uuid' })
-  @IsUUID()
-  cityId!: string;
+  @ApiProperty({ description: 'ID của Thành phố' })
+  @IsInt()
+  cityId!: number;
 
-  @ApiProperty({ description: 'ID của Phường/Xã', format: 'uuid' })
-  @IsUUID()
-  wardId!: string;
+  @ApiProperty({ description: 'ID của Phường/Xã' })
+  @IsInt()
+  wardId!: number;
 }

@@ -72,6 +72,9 @@ export class UsersController {
     return this.usersService.findAccountById(accountID, [
       'userProfile',
       'role',
+      'userProfile.address',
+      'userProfile.address.city',
+      'userProfile.address.ward',
     ]);
   }
 

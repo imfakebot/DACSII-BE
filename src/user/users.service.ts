@@ -418,13 +418,13 @@ export class UsersService {
       if (!userProfile.address) {
         userProfile.address = this.addressRepository.create({
           street: data.address.street,
-          city: { id: data.address.cityId } as any,
-          ward: { id: data.address.wardId } as any,
+          city: { id: data.address.cityId } as City,
+          ward: { id: data.address.wardId } as Ward,
         });
       } else {
         userProfile.address.street = data.address.street;
-        userProfile.address.city = { id: data.address.cityId } as any;
-        userProfile.address.ward = { id: data.address.wardId } as any;
+        userProfile.address.city = { id: data.address.cityId } as City;
+        userProfile.address.ward = { id: data.address.wardId } as Ward;
       }
     }
 
@@ -493,7 +493,14 @@ export class UsersService {
   async findAllUser(page: number, limit: number): Promise<AccountPaginatedResponseDto> {
     this.logger.log(`Finding all users for page: ${page}, limit: ${limit}`);
     const [user, total] = await this.accountRepository.findAndCount({
-      relations: ['userProfile', 'role', 'userProfile.branch'],
+      relations: [
+        'userProfile',
+        'role',
+        'userProfile.branch',
+        'userProfile.address',
+        'userProfile.address.city',
+        'userProfile.address.ward',
+      ],
       skip: (page - 1) * limit,
       take: limit,
       order: { created_at: 'DESC' },
@@ -564,7 +571,12 @@ export class UsersService {
     }
     const account = await this.accountRepository.findOne({
       where: { id: accountId },
-      relations: ['userProfile'],
+      relations: [
+        'userProfile',
+        'userProfile.address',
+        'userProfile.address.city',
+        'userProfile.address.ward',
+      ],
     });
 
     if (!account || !account.userProfile) {
@@ -775,7 +787,14 @@ export class UsersService {
     // Reload to get relations for mapping
     const reloadedAccount = await this.accountRepository.findOne({
       where: { id: savedAccount.id },
-      relations: ['userProfile', 'role', 'userProfile.branch']
+      relations: [
+        'userProfile',
+        'role',
+        'userProfile.branch',
+        'userProfile.address',
+        'userProfile.address.city',
+        'userProfile.address.ward',
+      ],
     });
 
     return this.mapAccountToDto(reloadedAccount!);
