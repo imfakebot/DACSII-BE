@@ -332,6 +332,7 @@ export class AuthService {
             ? ((user.userProfile as { is_profile_complete?: boolean })
               .is_profile_complete ?? false)
             : false,
+        is_active: user.userProfile?.account.status === AccountStatus.ACTIVE,
         branch: { branchId: branchId },
       },
     };

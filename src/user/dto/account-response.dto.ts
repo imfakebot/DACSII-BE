@@ -28,6 +28,9 @@ export class AccountResponseDto {
   @ApiProperty({ type: () => Role })
   role!: Role;
 
+  @ApiProperty()
+  status!: boolean;
+
   @ApiProperty({ type: () => UserProfileResponseDto })
   userProfile!: UserProfileResponseDto;
 }

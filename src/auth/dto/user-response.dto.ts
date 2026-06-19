@@ -23,6 +23,9 @@ export class UserResponseDto {
   @ApiProperty({ example: true })
   is_profile_complete!: boolean;
 
+  @ApiProperty({ example: true })
+  is_active!: boolean;
+
   @ApiProperty({
     description: 'Thông tin chi nhánh (nếu có)',
     required: false,

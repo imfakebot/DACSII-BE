@@ -105,6 +105,7 @@ export class UsersService {
     dto.created_at = account.created_at;
     dto.updated_at = account.updated_at;
     dto.role = account.role;
+    dto.status = account.status === AccountStatus.ACTIVE;
 
     if (account.userProfile) {
       dto.userProfile = this.mapProfileToDto(account.userProfile);
