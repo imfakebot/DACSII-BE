@@ -280,7 +280,7 @@ export class BookingController {
 
   /**
    * @route POST /bookings/check-in
-   * @description (Manager/Admin) Check-in cho khách hàng khi đến sân.
+   * @description (Manager/Admin/Staff) Check-in cho khách hàng khi đến sân.
    * Cập nhật trạng thái của đơn đặt sân từ `COMPLETED` thành `CHECKED_IN`.
    * @param {CheckInDto} checkInDto - DTO chứa ID của đơn đặt sân cần check-in.
    * @returns {Promise<BookingDto>} - Đơn đặt sân sau khi đã cập nhật.
@@ -288,9 +288,9 @@ export class BookingController {
   @Post('check-in')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleEnum.Manager, RoleEnum.Admin)
+  @Roles(RoleEnum.Manager, RoleEnum.Admin, RoleEnum.Staff)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '(Manager/Admin) Check-in cho khách hàng tại sân' })
+  @ApiOperation({ summary: '(Manager/Admin/Staff) Check-in cho khách hàng tại sân' })
   @ApiResponse({
     status: 200,
     description:
