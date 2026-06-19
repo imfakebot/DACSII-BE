@@ -95,12 +95,16 @@ export class ReviewService {
     // 2. Kiểm tra quyền sở hữu (User này có phải người đặt không?)
     if (booking.userProfile.id !== userProfile.id) {
       this.logger.warn(`User ${userProfile.id} unauthorized to review booking ${bookingId}.`);
-      throw new BadRequestException('Bạn không có quyền đánh giá đơn này.');
+      throw new ForbiddenException('Bạn không có quyền đánh giá đơn này.');
     }
+    this.logger.debug(`User ${userProfile.id} is the owner of booking ${bookingId}.`);
 
     // 3. Kiểm tra trạng thái đơn (Phải đã check-in hoặc hoàn thành mới được review)
     // Xử lý trường hợp status rỗng do bug database
     let actualStatus = booking.status;
+    if (actualStatus === BookingStatus.COMPLETED) {
+      this.logger.warn(`Booking ${bookingId} has status COMPLETED. It should ideally be CHECKED_IN or FINISHED to be reviewed.`);
+    }
 
     // Nếu status rỗng nhưng có check_in_at, suy luận status là CHECKED_IN
     if ((!actualStatus || (actualStatus as any) === '') && booking.check_in_at) {
@@ -127,29 +131,39 @@ export class ReviewService {
         'Chỉ có thể đánh giá các đơn đặt sân đã check-in hoặc hoàn thành.',
       );
     }
+    this.logger.debug(`Booking ${bookingId} status '${actualStatus}' is valid for review.`);
 
     // 4. Kiểm tra đã review chưa (Tránh spam)
     const existingReview = await this.reviewRepository.findOne({
       where: { booking: { id: bookingId } },
     });
     if (existingReview) {
-      this.logger.warn(`Booking ${bookingId} already has a review.`);
+      this.logger.warn(`Booking ${bookingId} already has a review (ID: ${existingReview.id}).`);
       throw new BadRequestException('Bạn đã đánh giá đơn này trước đó.');
     }
+    this.logger.debug(`Booking ${bookingId} has no existing review. Proceeding.`);
 
-    //5. Lưu review
-    const newReview = this.reviewRepository.create({
-      id: booking.id, // Dùng luôn ID của booking cho review để đảm bảo 1-1
-      rating,
-      comment,
-      booking: booking,
-      field: booking.field, // Lấy field từ booking
-      userProfile: userProfile, // Lấy userProfile từ người đang review
-    });
+    try {
+      //5. Lưu review
+      const newReview = this.reviewRepository.create({
+        id: booking.id, // Dùng luôn ID của booking cho review để đảm bảo 1-1
+        rating,
+        comment,
+        booking: booking,
+        field: booking.field, // Lấy field từ booking
+        userProfile: userProfile, // Lấy userProfile từ người đang review
+      });
 
-    const savedReview = await this.reviewRepository.save(newReview);
-    this.logger.log(`Review ${newReview.id} created successfully for booking ${bookingId}.`);
-    return this.mapToDto(savedReview);
+      const savedReview = await this.reviewRepository.save(newReview);
+      this.logger.log(`Review ${newReview.id} created successfully for booking ${bookingId}.`);
+      return this.mapToDto(savedReview);
+    } catch (error) {
+      this.logger.error(
+        `Failed to save review for booking ${bookingId}. Error: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new BadRequestException('Không thể lưu đánh giá vào lúc này.');
+    }
   }
 
   /**
@@ -244,7 +258,7 @@ export class ReviewService {
    * @description Xóa review. Kiểm tra quyền hạn kỹ càng.
    */
   async delete(id: string, user: AuthenticatedUser) {
-    this.logger.log(`User ${user.id} attempting to delete review ${id}. Role: ${user.role}.`);
+    this.logger.log(`User ${user.id} attempting to delete review ${id}. Role: ${user.role.name}.`);
     // 1. Tìm review kèm thông tin chi nhánh
     const review = await this.reviewRepository.findOne({
       where: { id },
@@ -285,8 +299,13 @@ export class ReviewService {
     }
 
     // 3. Xóa
-    await this.reviewRepository.delete(id);
-    this.logger.log(`Review ${id} deleted successfully.`);
-    return { message: 'Xóa đánh giá thành công.' };
+    try {
+      await this.reviewRepository.delete(id);
+      this.logger.log(`Review ${id} deleted successfully.`);
+      return { message: 'Xóa đánh giá thành công.' };
+    } catch (error) {
+      this.logger.error(`Failed to delete review ${id}. Error: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      throw new BadRequestException('Không thể xóa đánh giá vào lúc này.');
+    }
   }
 }

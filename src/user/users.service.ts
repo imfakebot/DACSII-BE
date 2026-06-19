@@ -301,6 +301,7 @@ export class UsersService {
    * @returns Promise giải quyết thành chuỗi mật khẩu đã được băm.
    */
   async hashPassword(password: string): Promise<string> {
+    this.logger.debug(`Hashing a password.`);
     const salt = await bcrypt.genSalt();
     return bcrypt.hash(password, salt);
   }
@@ -312,6 +313,7 @@ export class UsersService {
    * @returns Promise giải quyết thành `true` nếu mật khẩu khớp, ngược lại là `false`.
    */
   comparePassword(password: string, hash: string): Promise<boolean> {
+    this.logger.debug(`Comparing a password with a hash.`);
     return bcrypt.compare(password, hash);
   }
 
@@ -405,6 +407,9 @@ export class UsersService {
       dob.setHours(0, 0, 0, 0);
       today.setHours(0, 0, 0, 0);
       if (dob > today) {
+        this.logger.warn(
+          `Invalid date of birth provided for account ${accountId}: ${data.date_of_birth.toISOString()} is in the future.`,
+        );
         throw new BadRequestException('Ngày sinh không được lớn hơn ngày hiện tại.');
       }
       userProfile.date_of_birth = data.date_of_birth;
@@ -443,6 +448,9 @@ export class UsersService {
    * @returns Promise giải quyết thành chuỗi token đã được băm.
    */
   async findAccountByHashedResetToken(token: string): Promise<string> {
+    this.logger.debug(
+      `Hashing a password reset token. Note: This function only hashes, it does not find.`,
+    );
     const hashedToken = await bcrypt.hash(token, 10);
     return hashedToken;
   }
@@ -672,12 +680,15 @@ export class UsersService {
     }
 
     const requesterRoleName = requester.role.name;
-    const targetRoleName: RoleEnum = data.role; // Lấy role từ DTO
+    const targetRoleName = data.role; // Lấy role từ DTO
 
     // 2. Phân quyền: kiểm tra người tạo có quyền tạo vai trò này không
     if (requesterRoleName === String(RoleEnum.Admin)) {
       // Admin có thể tạo cả Manager và Staff
       if (targetRoleName !== RoleEnum.Manager && targetRoleName !== RoleEnum.Staff) {
+        this.logger.warn(
+          `Admin ${requesterId} tried to create an employee with invalid role ${targetRoleName as string}.`,
+        );
         throw new ForbiddenException(
           'Admin chỉ có thể tạo tài khoản Manager hoặc Staff.',
         );
@@ -685,16 +696,25 @@ export class UsersService {
     } else if (requesterRoleName === String(RoleEnum.Manager)) {
       // Manager chỉ có thể tạo Staff
       if (targetRoleName !== RoleEnum.Staff) {
+        this.logger.warn(
+          `Manager ${requesterId} tried to create an employee with role ${targetRoleName as string}, but only 'staff' is allowed.`,
+        );
         throw new ForbiddenException(
           'Manager chỉ có thể tạo tài khoản Staff.',
         );
       }
       if (!requester.userProfile?.branch?.id) {
+        this.logger.error(
+          `Manager ${requesterId} has no branch assigned and cannot create staff.`,
+        );
         throw new ForbiddenException(
           'Tài khoản của bạn phải được gán vào một chi nhánh để thực hiện hành động này.',
         );
       }
     } else {
+      this.logger.warn(
+        `User ${requesterId} with role ${requesterRoleName} attempted to create an employee.`,
+      );
       throw new ForbiddenException(
         'Bạn không có quyền tạo tài khoản nhân viên.',
       );
@@ -729,7 +749,7 @@ export class UsersService {
       });
       if (!targetRoleEntity)
         throw new NotFoundException(
-          `Vai trò '${targetRoleName}' không tồn tại.`,
+          `Vai trò '${String(targetRoleName)}' không tồn tại.`,
         );
 
       // Logic lấy Branch ID
