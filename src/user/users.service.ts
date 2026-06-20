@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { MoreThan, Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Account } from './entities/account.entity';
 import { Role } from './entities/role.entity';
@@ -496,11 +496,18 @@ export class UsersService {
    * Lấy danh sách tất cả người dùng với phân trang.
    * @param page Số trang hiện tại.
    * @param limit Số lượng kết quả trên mỗi trang.
+   * @param search Từ khóa tìm kiếm theo tên.
    * @returns Promise giải quyết thành một AccountPaginatedResponseDto.
    */
-  async findAllUser(page: number, limit: number): Promise<AccountPaginatedResponseDto> {
-    this.logger.log(`Finding all users for page: ${page}, limit: ${limit}`);
+  async findAllUser(page: number, limit: number, search?: string): Promise<AccountPaginatedResponseDto> {
+    this.logger.log(`Finding all users for page: ${page}, limit: ${limit}, search: ${search}`);
+    
+    const whereCondition = search 
+      ? { userProfile: { full_name: Like(`%${search}%`) } } 
+      : {};
+
     const [user, total] = await this.accountRepository.findAndCount({
+      where: whereCondition,
       relations: [
         'userProfile',
         'role',

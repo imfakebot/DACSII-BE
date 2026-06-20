@@ -174,10 +174,13 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: '(Admin) Lấy danh sách tất cả người dùng' })
   @ApiResponse({ status: 200, type: AccountPaginatedResponseDto, description: 'Trả về danh sách người dùng.' })
-  async GetUsers(@Query() query: PaginationQueryDto): Promise<AccountPaginatedResponseDto> {
+  async GetUsers(
+    @Query() query: PaginationQueryDto,
+    @Query('search') search?: string
+  ): Promise<AccountPaginatedResponseDto> {
     const { page = 1, limit = 10 } = query;
-    this.logger.log(`Fetching all users for page ${page}, limit ${limit}`);
-    return await this.usersService.findAllUser(page, limit);
+    this.logger.log(`Fetching all users for page ${page}, limit ${limit}, search ${search}`);
+    return await this.usersService.findAllUser(page, limit, search);
   }
 
   /**
