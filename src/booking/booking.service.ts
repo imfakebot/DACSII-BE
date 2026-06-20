@@ -238,7 +238,11 @@ export class BookingService {
     await queryRunner.startTransaction();
 
     try {
-      const start = new Date(createBookingDto.startTime);
+      const startMoment = moment(createBookingDto.startTime);
+      if (!startMoment.isValid()) {
+        throw new BadRequestException('Thời gian bắt đầu không hợp lệ.');
+      }
+      const start = startMoment.toDate();
       const end = new Date(
         start.getTime() + createBookingDto.durationMinutes * 60000,
       );
@@ -792,7 +796,11 @@ export class BookingService {
         );
       }
 
-      const start = new Date(dto.startTime);
+      const startMoment = moment(dto.startTime);
+      if (!startMoment.isValid()) {
+        throw new BadRequestException('Thời gian bắt đầu không hợp lệ.');
+      }
+      const start = startMoment.toDate();
       const end = new Date(start.getTime() + dto.durationMinutes * 60000);
 
       const newBooking = queryRunner.manager.create(Booking, {
