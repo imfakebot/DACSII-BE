@@ -112,7 +112,6 @@ export class PricingService {
 
     // 4. TÍNH TOÁN GIÁ TIỀN (Pricing Lookup)
     // Lấy giờ:phút:giây từ startTime để so sánh với bảng time_slots
-    // Ví dụ: startTime là '2023-11-20T17:15:00' -> lấy '17:15:00'
     const timeString = start.toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
 
     this.logger.debug(`Looking up pricing for field type ${field.fieldType.id} at time ${timeString}.`);
