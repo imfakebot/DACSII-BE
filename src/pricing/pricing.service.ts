@@ -40,7 +40,7 @@ export class PricingService {
     private readonly bookingRepository: Repository<Booking>,
     @InjectRepository(Field)
     private readonly fieldRepository: Repository<Field>,
-  ) {}
+  ) { }
 
   /**
    * Kiểm tra tính khả dụng của sân và tính toán giá tiền cho một yêu cầu đặt sân cụ thể.
@@ -113,7 +113,9 @@ export class PricingService {
     // 4. TÍNH TOÁN GIÁ TIỀN (Pricing Lookup)
     // Lấy giờ:phút:giây từ startTime để so sánh với bảng time_slots
     // Ví dụ: startTime là '2023-11-20T17:15:00' -> lấy '17:15:00'
-    const timeString = start.toTimeString().split(' ')[0];
+    const timeString = start.toLocaleTimeString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+
+    this.logger.debug(`Looking up pricing for field type ${field.fieldType.id} at time ${timeString}.`);
 
     // Tìm TimeSlot phù hợp với loại sân và khung giờ bắt đầu
     // Logic: Tìm slot mà start_time <= giờ khách chọn <= end_time
@@ -126,6 +128,8 @@ export class PricingService {
       .andWhere('slot.end_time > :time', { time: timeString }) // Dùng > thay vì >= để tránh edge case đúng giờ giao
       .getOne();
 
+    this.logger.debug(`Pricing rule found: ${pricingRule ? JSON.stringify(pricingRule) : 'None'}.`);
+
     // Nếu không tìm thấy khung giá (ví dụ 2h sáng), dùng giá mặc định hoặc báo lỗi
     // Ở đây giả sử giá mặc định là 100.000 VNĐ/giờ nếu không cấu hình
     const pricePerHour = pricingRule ? Number(pricingRule.price) : 100000;
@@ -135,8 +139,8 @@ export class PricingService {
 
     // Làm tròn tiền (ví dụ làm tròn đến hàng nghìn)
     const roundedPrice = Math.ceil(finalPrice / 1000) * 1000;
-    this.logger.log(`Price calculated for field ${fieldId}: ${roundedPrice} VND.`);
-    
+    this.logger.debug(`Price calculated for field ${fieldId}: ${roundedPrice} VND.`);
+
     const response = new CheckPriceResponseDto();
     response.available = true;
     response.field_name = field.name;
@@ -158,7 +162,7 @@ export class PricingService {
       currency: 'VND',
     };
     response.message = 'Sân còn trống, có thể đặt ngay.';
-    
+
     return response;
   }
 
@@ -205,7 +209,7 @@ export class PricingService {
     dto.end_time = slot.end_time;
     dto.price = Number(slot.price);
     dto.is_peak_hour = slot.is_peak_hour;
-    
+
     if (slot.fieldType) {
       dto.fieldType = {
         id: slot.fieldType.id,
@@ -213,7 +217,7 @@ export class PricingService {
         description: slot.fieldType.description,
       };
     }
-    
+
     return dto;
   }
 
