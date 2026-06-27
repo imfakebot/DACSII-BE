@@ -11,6 +11,7 @@ import { Field } from './entities/field.entity';
 import { CreateFieldDto } from './dto/create-fields.dto';
 import { UpdateFieldDto } from './dto/update-fields.dto';
 import { FieldType } from './entities/field-types.entity';
+import { TimeSlot } from '../pricing/entities/time-slot.entity';
 import { FilterFieldDto } from './dto/filter-field.dto';
 import { FieldImage } from './entities/field-image.entity';
 import { ConfigService } from '@nestjs/config';
@@ -47,6 +48,8 @@ export class FieldsService {
     private readonly utilityRepository: Repository<Utility>,
     @InjectRepository(City)
     private readonly cityRepository: Repository<City>,
+    @InjectRepository(TimeSlot)
+    private readonly timeSlotRepository: Repository<TimeSlot>,
     private readonly configService: ConfigService,
   ) { }
 
@@ -190,6 +193,7 @@ export class FieldsService {
     this.logger.log(
       `Field ${savedField.id} created successfully in branch ${branch.id}`,
     );
+
     return this.findOne(savedField.id);
   }
 

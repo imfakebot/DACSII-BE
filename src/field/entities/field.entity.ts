@@ -19,6 +19,7 @@ import { Utility } from '../../utility/entities/utility.entity';
 import { Booking } from '@/booking/entities/booking.entity';
 import { Review } from '@/review/entities/review.entity';
 import { Branch } from '@/branch/entities/branch.entity';
+import { TimeSlot } from '@/pricing/entities/time-slot.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -96,6 +97,9 @@ export class Field {
   @ApiProperty({ type: () => [Review] })
   @OneToMany(() => Review, (review) => review.field)
   reviews!: Review[];
+
+  @OneToMany(() => TimeSlot, (timeSlot) => timeSlot.field)
+  timeSlots!: TimeSlot[];
 
   @ApiProperty({
     description: 'Điểm đánh giá trung bình',

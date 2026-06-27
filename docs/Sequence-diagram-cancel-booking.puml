@@ -35,32 +35,49 @@ deactivate DB
 ' alt/else là cấu trúc để thể hiện các luồng rẽ nhánh (thành công hoặc thất bại)
 alt Luồng thành công (Kiểm tra hợp lệ)
 
-    ' Logic kiểm tra được thực thi bên trong Service
-    BService -> BService: validateCancellation(booking, userId)
-    note right of BService: **Kiểm tra nghiệp vụ:**\n1. Lịch đặt này có thuộc về user không?\n2. Trạng thái lịch có phải là 'CONFIRMED' không?\n3. Còn trong thời gian cho phép hủy không?
+    ' Logic kiểm tra
+    BService -> BService: validateCancellation(booking, userId, role)
+    note right of BService: **Kiểm tra nghiệp vụ:**\n1. Lịch đặt có thuộc về user/admin không?\n2. Trạng thái có hợp lệ để hủy không?\n3. Còn trong thời gian cho phép hủy không?
 
-    ' Gọi phương thức của đối tượng nghiệp vụ "thông minh"
-    BService -> BService: bookingEntity.cancel()
-    note right of BService: Gọi phương thức của Rich Domain Object\nđể thay đổi trạng thái thành 'CANCELLED'
+    opt Đơn đã thanh toán qua VNPAY
+        BService -> PService: refundVnpayTransaction(payment, bookingId, accountId, ipAddr)
+        activate PService
+        PService -> PaymentGateway: Yêu cầu hoàn tiền
+        activate PaymentGateway
+        PaymentGateway --> PService: Kết quả hoàn tiền
+        deactivate PaymentGateway
+        PService --> BService: (refundResult)
+        deactivate PService
+    end
 
+    note right of BService: Bắt đầu DB Transaction
+    
     BService -> DB: Cập nhật Booking (status="CANCELLED")
-    activate DB
-    DB --> BService
-    deactivate DB
-    note right of BService: (Optional) Có thể gọi FieldService\nđể cập nhật lại trạng thái sân là 'Còn trống'
+    BService -> DB: Cập nhật Payment (status="FAILED")
 
-    BService -> NotiService: sendCancellationConfirmation(bookingEntity)
-    activate NotiService
-    note right of NotiService: Gửi email/SMS thông báo hủy thành công
-    NotiService --> BService
-    deactivate NotiService
+    opt Có áp dụng Voucher
+        BService -> VoucherService: cancelUsage(userProfile.id, voucherId)
+        activate VoucherService
+        VoucherService -> DB: Trả lại số lượng & Xóa VoucherUsage
+        VoucherService --> BService: Hoàn voucher thành công
+        deactivate VoucherService
+    end
 
-    BService --> BController: { success: true, message: "Hủy lịch thành công" }
+    note right of BService: Commit Transaction
 
-else Luồng thất bại (Không hợp lệ)
+    opt Admin/Manager hủy hộ
+        BService -> VoucherService: createApologyVoucher(userProfile)
+        activate VoucherService
+        VoucherService --> BService
+        deactivate VoucherService
+    end
 
-    BService --> BController: Lỗi (Ví dụ: "Không thể hủy lịch đã quá hạn")
-    note right of BService: Ném ra một Exception (ví dụ: ForbiddenException,\nBadRequestException)
+    BService --> BController: { message: "Hủy đơn đặt sân thành công..." }
+
+else Luồng thất bại (Không hợp lệ / Lỗi hoàn tiền)
+
+    BService --> BController: Ném Exception (Forbidden, BadRequest, v.v.)
+    note right of BService: Trả về lỗi tương ứng với vi phạm
 
 end
 

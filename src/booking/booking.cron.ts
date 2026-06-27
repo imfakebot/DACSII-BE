@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, Raw, Repository } from 'typeorm';
 import { Payment } from '@/payment/entities/payment.entity';
 import { Voucher } from '@/voucher/entities/voucher.entity';
+import { VoucherUsage } from '@/voucher/entities/voucher-usage.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { BookingStatus } from './enums/booking-status.enum';
 import { VoucherService } from '@/voucher/voucher.service';
@@ -35,7 +36,7 @@ export class BookingCronService {
         status: BookingStatus.PENDING,
         createdAt: Raw((alias) => `${alias} < NOW() - INTERVAL 30 MINUTE`),
       },
-      relations: ['userProfile', 'payment', 'payment.voucher'],
+      relations: ['userProfile', 'payment'],
     });
 
     if (expiredBookings.length === 0) {
@@ -55,11 +56,16 @@ export class BookingCronService {
         booking.status = BookingStatus.CANCELLED;
         await queryRunner.manager.save(Booking, booking);
 
-        if (booking.payment?.voucher) {
+        const voucherUsage = await queryRunner.manager.findOne(VoucherUsage, {
+          where: { bookingId: booking.id },
+          relations: ['voucher']
+        });
+
+        if (voucherUsage && voucherUsage.voucher) {
           await queryRunner.manager.increment(
             Voucher,
             {
-              id: booking.payment.voucher.id,
+              id: voucherUsage.voucher.id,
             },
             'quantity',
             1,
@@ -69,7 +75,7 @@ export class BookingCronService {
           if (booking.userProfile) {
             await this.voucherService.cancelUsage(
               booking.userProfile.id,
-              booking.payment.voucher.id,
+              voucherUsage.voucher.id,
               queryRunner.manager
             );
           }

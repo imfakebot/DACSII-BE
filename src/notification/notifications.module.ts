@@ -2,7 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Notification } from './entities/notification.entities';
+import { Notification } from './entities/notification.entity';
 import { UsersModule } from '@/user/users.module';
 
 /**

@@ -49,9 +49,9 @@ export class Account {
    */
   @ApiProperty({ enum: AuthProvider, example: AuthProvider.CREDENTIALS })
   @Column({
-    type: 'varchar',
-    length: 50,
-    default: 'local',
+    type: 'enum',
+    enum: AuthProvider,
+    default: AuthProvider.CREDENTIALS,
   })
   provider!: AuthProvider;
 
@@ -154,7 +154,6 @@ export class Account {
   @ApiProperty()
   @CreateDateColumn({
     name: 'created_at',
-    default: () => 'CURRENT_TIMESTAMP',
   })
   created_at!: Date;
 

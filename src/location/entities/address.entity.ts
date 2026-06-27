@@ -38,7 +38,7 @@ export class Address {
    */
   @ApiProperty({ type: () => City })
   @ManyToOne(() => City, (city) => city.addresses)
-  @JoinColumn({ name: 'cityId' }) // TypeORM thường dùng snake_case cho cột trong DB
+  @JoinColumn({ name: 'city_id' }) // Sửa lại thành snake_case chuẩn
   city!: City;
 
   /**

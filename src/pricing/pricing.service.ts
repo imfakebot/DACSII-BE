@@ -120,8 +120,8 @@ export class PricingService {
     // Logic: Tìm slot mà start_time <= giờ khách chọn <= end_time
     const pricingRule = await this.timeSlotRepository
       .createQueryBuilder('slot')
-      .where('slot.field_type_id = :fieldTypeId', {
-        fieldTypeId: field.fieldType.id,
+      .where('slot.field_id = :fieldId', {
+        fieldId: field.id,
       })
       .andWhere('slot.start_time <= :time', { time: timeString })
       .andWhere('slot.end_time > :time', { time: timeString }) // Dùng > thay vì >= để tránh edge case đúng giờ giao
@@ -209,11 +209,11 @@ export class PricingService {
     dto.price = Number(slot.price);
     dto.is_peak_hour = slot.is_peak_hour;
 
-    if (slot.fieldType) {
+    if (slot.field?.fieldType) {
       dto.fieldType = {
-        id: slot.fieldType.id,
-        name: slot.fieldType.name,
-        description: slot.fieldType.description,
+        id: slot.field.fieldType.id,
+        name: slot.field.fieldType.name,
+        description: slot.field.fieldType.description,
       };
     }
 
@@ -227,7 +227,7 @@ export class PricingService {
    */
   async getAllTimeSlots(): Promise<TimeSlotDto[]> {
     this.logger.log('Fetching all time slots.');
-    const slots = await this.timeSlotRepository.find({ relations: ['fieldType'] });
+    const slots = await this.timeSlotRepository.find({ relations: ['field', 'field.fieldType'] });
     return slots.map(s => this.mapToDto(s));
   }
 
@@ -241,7 +241,7 @@ export class PricingService {
    */
   async updateTimeSlot(id: number, dto: UpdateTimeSlotDto): Promise<TimeSlotDto> {
     this.logger.log(`Updating time slot with ID ${id} with data: ${JSON.stringify(dto)}`);
-    const timeSlot = await this.timeSlotRepository.findOne({ where: { id }, relations: ['fieldType'] });
+    const timeSlot = await this.timeSlotRepository.findOne({ where: { id }, relations: ['field', 'field.fieldType'] });
 
     if (!timeSlot) {
       this.logger.warn(`Time slot with ID ${id} not found.`);
@@ -263,6 +263,33 @@ export class PricingService {
     }
 
     const savedSlot = await this.timeSlotRepository.save(timeSlot);
+    return this.mapToDto(savedSlot);
+  }
+
+  /**
+   * Tạo một khung giờ mới.
+   *
+   * @param {CreateTimeSlotDto} dto - DTO chứa thông tin tạo khung giờ.
+   * @returns {Promise<TimeSlotDto>} Khung giờ đã được tạo.
+   * @throws {NotFoundException} Nếu không tìm thấy sân bóng.
+   */
+  async createTimeSlot(dto: import('./dto/create-time-slot.dto').CreateTimeSlotDto): Promise<TimeSlotDto> {
+    this.logger.log(`Creating new time slot for field ${dto.field_id}`);
+    
+    const field = await this.fieldRepository.findOne({ where: { id: dto.field_id }, relations: ['fieldType'] });
+    if (!field) {
+      throw new NotFoundException(`Sân bóng với ID ${dto.field_id} không tồn tại.`);
+    }
+
+    const newSlot = this.timeSlotRepository.create({
+      start_time: dto.start_time,
+      end_time: dto.end_time,
+      price: dto.price,
+      is_peak_hour: dto.is_peak_hour,
+      field: field,
+    });
+
+    const savedSlot = await this.timeSlotRepository.save(newSlot);
     return this.mapToDto(savedSlot);
   }
 }

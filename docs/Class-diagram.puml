@@ -1,108 +1,163 @@
 @startuml Soccer Field Booking System - Class Diagram
-' Class Diagram (Gold Standard) - Rich Model with Composition/Aggregation
+' Sơ đồ Lớp Hệ thống Đặt sân bóng đá (Phản ánh đúng kiến trúc Backend hiện tại)
 
-title Hệ thống Đặt sân bóng đá - Sơ đồ Lớp 
+title Hệ thống Đặt sân bóng đá - Sơ đồ Lớp (Backend Model)
 
 skinparam classAttributeIconSize 0
+skinparam linetype ortho
 
-' --- Định nghĩa các Lớp với đầy đủ chi tiết ---
+' --- TÀI KHOẢN VÀ NGƯỜI DÙNG ---
 
-class User {
-  ' Thuộc tính
-  + id: string
-  + fullName: string
-  + email: string
-  + role: RoleEnum
-  + status: UserStatusEnum
-  + isEmailVerified: boolean
-  + isPhoneVerified: boolean
-  + createdAt: Date
-  --
-  ' Phương thức
-  + changePassword(newPass: string): void
-  + updateProfile(profileDto): void
-  + suspend(): void
-  + activate(): void
+class Role {
+  + id: number
+  + name: RoleEnum
 }
 
-class Field {
-  ' Thuộc tính
+class Account {
+  + id: string
+  + email: string
+  + password: string
+  + is_active: boolean
+  + provider: string
+  + createdAt: Date
+}
+
+class UserProfile {
+  + id: string
+  + full_name: string
+  + date_of_birth: Date
+  + gender: GenderEnum
+  + phone_number: string
+  + avatar_url: string
+  + bio: string
+  + is_profile_complete: boolean
+}
+
+' --- CHI NHÁNH VÀ SÂN BÓNG ---
+
+class Branch {
   + id: string
   + name: string
-  + address: string
-  + status: FieldStatusEnum
-  --
-  ' Phương thức
-  + open(): void
-  + closeForMaintenance(): void
+  + code: string
+  + phone_number: string
+  + status: BranchStatus
+  + operating_start_time: Time
+  + operating_end_time: Time
 }
 
 class FieldType {
-  ' Thuộc tính
-  + id: string
+  + id: number
   + name: string
-  + pricePerHour: number
-  --
-  ' Phương thức
-  + updatePrice(newPrice: number): void
 }
 
+class Field {
+  + id: string
+  + name: string
+  + status: FieldStatus
+}
+
+class TimeSlot {
+  + id: string
+  + startTime: Time
+  + endTime: Time
+}
+
+class Price {
+  + id: string
+  + dayOfWeek: DayOfWeek
+  + price: number
+}
+
+' --- ĐẶT SÂN VÀ THANH TOÁN ---
+
 class Booking {
-  ' Thuộc tính
   + id: string
   + startTime: Date
   + endTime: Date
   + totalPrice: number
-  + status: BookingStatusEnum
+  + status: BookingStatus
   + createdAt: Date
-  --
-  ' Phương thức
-  + confirm(): void
-  + cancel(): void
-}
-
-class Review {
-  ' Thuộc tính
-  + id: string
-  + rating: int
-  + comment: string
-  + createdAt: Date
-  --
-  ' Phương thức
-  + editComment(newComment: string): void
 }
 
 class Payment {
-  ' Thuộc tính
   + id: string
   + amount: number
-  + status: PaymentStatusEnum
+  + status: PaymentStatus
   + paymentMethod: string
   + transactionCode: string
   + createdAt: Date
   + completedAt: Date
-  --
-  ' Phương thức
-  + markAsSuccess(transCode: string): void
-  + markAsFailed(): void
-  + initiateRefund(): void
 }
 
+class Voucher {
+  + id: string
+  + code: string
+  + discountAmount: number
+  + discountType: DiscountType
+  + quantity: number
+  + expiresAt: Date
+  + isActive: boolean
+}
 
-' --- Định nghĩa các Mối quan hệ Chi tiết ---
+class VoucherUsage {
+  + id: string
+  + usedAt: Date
+}
 
-' Composition (*--): User "sở hữu" Booking và Review. Nếu User bị xóa, chúng cũng bị xóa.
-User "1" *-- "0..*" Booking : books
-User "1" *-- "0..*" Review : writes
+' --- ĐÁNH GIÁ VÀ HỖ TRỢ ---
 
-' Composition (*--): Field "sở hữu" Booking và Review của nó.
-Field "1" *-- "0..*" Booking : is booked for
-Field "1" *-- "0..*" Review : is reviewed for
+class Review {
+  + id: string
+  + rating: number
+  + comment: string
+  + createdAt: Date
+}
 
-' Aggregation (o--): FieldType là một "tập hợp" các Field.
-FieldType "1" o-- "0..*" Field : has
+class Feedback {
+  + id: string
+  + title: string
+  + category: string
+  + status: FeedbackStatus
+  + created_at: Date
+}
 
-' Composition (*--): Booking "sở hữu" Payment của nó.
-Booking "1" *-- "1" Payment : has
+class FeedbackResponse {
+  + id: string
+  + content: string
+  + created_at: Date
+}
+
+' --- QUAN HỆ ---
+
+' Users
+Role "1" <-- "0..*" Account : has
+Account "1" -- "1" UserProfile : belongs to
+
+' Fields
+Branch "1" *-- "0..*" Field : manages
+UserProfile "1" <-- "0..*" Branch : managed by (BranchManager)
+FieldType "1" <-- "0..*" Field : belongs to
+Field "1" *-- "0..*" Price : has pricing
+TimeSlot "1" <-- "0..*" Price : applies for
+
+' Bookings & Payments
+UserProfile "1" <-- "0..*" Booking : books
+Field "1" <-- "0..*" Booking : booked for
+Booking "1" *-- "1" Payment : requires
+Booking "1" -- "0..1" VoucherUsage : uses
+
+' Vouchers
+Voucher "1" *-- "0..*" VoucherUsage : tracked by
+UserProfile "1" <-- "0..*" VoucherUsage : used by
+
+' Reviews
+UserProfile "1" <-- "0..*" Review : writes
+Field "1" <-- "0..*" Review : receives
+
+' Feedbacks
+UserProfile "1" <-- "0..*" Feedback : submits
+UserProfile "0..1" <-- "0..*" Feedback : assigned to
+Feedback "1" *-- "0..*" FeedbackResponse : contains
+UserProfile "1" <-- "0..*" FeedbackResponse : responded by
 
 @enduml

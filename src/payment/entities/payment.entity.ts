@@ -2,8 +2,8 @@ import {
   Column,
   Entity,
   JoinColumn,
-  ManyToOne,
   OneToOne,
+  ManyToOne,
   PrimaryColumn,
   CreateDateColumn,
   BeforeInsert,
@@ -120,14 +120,6 @@ export class Payment {
   @OneToOne(() => Booking, (booking) => booking.payment)
   @JoinColumn({ name: 'booking_id' })
   booking!: Booking;
-
-  /**
-   * Mối quan hệ Nhiều-Một với Voucher. Một thanh toán có thể áp dụng một voucher.
-   */
-  @ApiProperty({ type: () => Voucher, required: false })
-  @ManyToOne(() => Voucher, { nullable: true }) // Cho phép không có voucher
-  @JoinColumn({ name: 'voucher_id' })
-  voucher!: Voucher;
 
   @BeforeInsert()
   generateId() {

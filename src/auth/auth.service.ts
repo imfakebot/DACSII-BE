@@ -1,3 +1,7 @@
+// ============================================================================
+// Author: Tanh - Created on 2026-06-21
+// Note: Authentication Core Logic - Protected Source
+// ============================================================================
 import { UsersService } from '@/user/users.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import {

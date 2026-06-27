@@ -1,5 +1,5 @@
-import { Payment } from '@/payment/entities/payment.entity';
 import { UserProfile } from '@/user/entities/users-profile.entity';
+import { VoucherUsage } from './voucher-usage.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -111,6 +111,7 @@ export class Voucher {
   @DeleteDateColumn({ name: 'deleted_at' })
   deleteAt!: Date;
 
-  @OneToMany(() => Payment, (payment) => payment.voucher)
-  payments!: Payment[];
+  @ApiProperty({ type: () => [VoucherUsage] })
+  @OneToMany(() => VoucherUsage, (usage) => usage.voucher)
+  usages!: VoucherUsage[];
 }

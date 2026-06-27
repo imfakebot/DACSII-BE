@@ -27,24 +27,49 @@ group Luồng Khách hàng Khởi tạo Đặt sân
     Member -> BController: Yêu cầu đặt sân (POST /bookings)
     activate BController
 
-    BController -> BService: createBooking(bookingDto)
+    BController -> BService: createBooking(bookingDto, userProfile)
     activate BService
-    note right of BService: Bắt đầu xử lý logic nghiệp vụ
+    note right of BService: Bắt đầu Transaction (Khóa DB chống trùng lặp)
 
-    BService -> FService: checkAvailability(fieldId, time)
-    activate FService
-    FService --> BService: (true) Sân còn trống
-    deactivate FService
+    BService -> DB: Truy vấn Booking (lock: pessimistic_write)
+    activate DB
+    DB --> BService: Không có booking trùng lặp
+    deactivate DB
 
-    BService -> DB: Tạo Booking (status="PENDING")
+    BService -> PricingService: checkPriceAndAvailability(dto)
+    activate PricingService
+    PricingService --> BService: (priceResult) Thông tin giá và khung giờ
+    deactivate PricingService
+
+    opt Khách hàng có áp dụng Voucher
+        BService -> DB: Truy vấn Voucher (lock: pessimistic_write)
+        activate DB
+        DB --> BService: Thông tin Voucher hợp lệ
+        deactivate DB
+    end
+
+    BService -> DB: Tạo & Lưu Booking (status="PENDING")
     activate DB
     DB --> BService: bookingEntity (đã lưu)
     deactivate DB
 
-    BService -> PService: initiatePayment(bookingEntity)
+    opt Khách hàng có áp dụng Voucher
+        BService -> VoucherService: recordUsage(userProfileId, voucherId, bookingId)
+        activate VoucherService
+        VoucherService -> DB: Tạo VoucherUsage
+        VoucherService --> BService: Ghi nhận thành công
+        deactivate VoucherService
+    end
+
+    BService -> DB: Tạo & Lưu Payment (status="PENDING")
+    activate DB
+    DB --> BService: paymentEntity (đã lưu)
+    deactivate DB
+
+    BService -> PService: createPaymentUrl(paymentEntity, ip)
     activate PService
 
-    PService -> PaymentGateway: Yêu cầu tạo giao dịch thanh toán
+    PService -> PaymentGateway: Tạo URL thanh toán (Mã hóa Hash)
     activate PaymentGateway
     PaymentGateway --> PService: paymentUrl
     deactivate PaymentGateway
@@ -52,7 +77,8 @@ group Luồng Khách hàng Khởi tạo Đặt sân
     PService --> BService: paymentUrl
     deactivate PService
 
-    BService --> BController: { bookingId, paymentUrl }
+    BService --> BController: BookingResponse { booking, paymentUrl, ... }
+    note right of BService: Commit Transaction
     deactivate BService
 
     BController --> Member: 201 Created (Chuyển hướng đến trang thanh toán)

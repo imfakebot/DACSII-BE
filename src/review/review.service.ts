@@ -209,6 +209,37 @@ export class ReviewService {
     return response;
   }
 
+  async findMyReviews(user: AuthenticatedUser, page: number = 1, limit: number = 10): Promise<ReviewPaginatedResponseDto> {
+    this.logger.log(`Fetching my reviews for user ${user.id}, page ${page}, limit ${limit}.`);
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await this.reviewRepository.findAndCount({
+      where: {
+        userProfile: { account: { id: user.id } }
+      },
+      relations: ['field', 'booking', 'userProfile'],
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    this.logger.log(`Found ${total} reviews for user ${user.id}.`);
+
+    const response = new ReviewPaginatedResponseDto();
+    response.data = data.map(r => this.mapToDto(r));
+
+    const meta = new ReviewPaginationMetaDto();
+    meta.total = total;
+    meta.page = page;
+    meta.limit = limit;
+    meta.lastPage = Math.ceil(total / limit);
+    meta.averageRating = 0;
+
+    response.meta = meta;
+
+    return response;
+  }
+
   /**
    * @method findAllReviews
    * @description Lấy danh sách review dùng cho trang quản lý.

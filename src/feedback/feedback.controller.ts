@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -142,5 +143,24 @@ export class FeedbackController {
       )}`,
     );
     return this.feedbacksService.reply(id, dto, account);
+  }
+
+  /**
+   * @route PATCH /feedbacks/:id/status
+   * @description (Admin/Manager) Cập nhật trạng thái của ticket feedback.
+   */
+  @Patch(':id/status')
+  @UseGuards(RolesGuard)
+  @Roles(RoleEnum.Admin, RoleEnum.Manager)
+  @ApiOperation({ summary: '(Admin/Manager) Cập nhật trạng thái của ticket feedback' })
+  @ApiResponse({ status: 200, type: FeedbackDto, description: 'Cập nhật thành công.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Ticket not found.' })
+  updateStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: import('./dto/update-feedback-status.dto').UpdateFeedbackStatusDto,
+  ): Promise<FeedbackDto> {
+    this.logger.log(`Updating status of feedback ${id} to ${dto.status}`);
+    return this.feedbacksService.updateStatus(id, dto.status);
   }
 }

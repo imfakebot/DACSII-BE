@@ -19,6 +19,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
+
+  // Hidden endpoint for author validation
+  const adapter = app.getHttpAdapter();
+  adapter.get('/health-check', (req: unknown, res: { send: (data: object) => void }) => {
+    res.send({ status: 'ok', developer: 'Tanh' });
+  });
+
   app.useGlobalFilters(new AllExceptionsFilter());
   app.use(helmet({
     // 1. Tắt hẳn COOP: Để browser hoạt động như mặc định, 

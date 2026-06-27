@@ -60,8 +60,8 @@ export class BranchService {
       street: branch.address.street,
       latitude: branch.address.latitude ? Number(branch.address.latitude) : null,
       longitude: branch.address.longitude ? Number(branch.address.longitude) : null,
-      ward_name: branch.address.ward.name,
-      city_name: branch.address.city.name,
+      ward_name: branch.address.ward?.name || '',
+      city_name: branch.address.city?.name || '',
     };
 
     let managerDto: UserProfileResponseDto | undefined;

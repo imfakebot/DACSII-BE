@@ -15,6 +15,7 @@ import { Field } from '../../field/entities/field.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { Review } from '../../review/entities/review.entity';
 import { BookingStatus } from '../enums/booking-status.enum';
+import { BookingPaymentStatus } from '../enums/payment-status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity({ name: 'bookings' })
@@ -73,6 +74,15 @@ export class Booking {
     default: BookingStatus.PENDING,
   })
   status!: BookingStatus;
+
+  @ApiProperty({ enum: BookingPaymentStatus, example: BookingPaymentStatus.UNPAID })
+  @Column({
+    name: 'payment_status',
+    type: 'enum',
+    enum: BookingPaymentStatus,
+    default: BookingPaymentStatus.UNPAID,
+  })
+  paymentStatus!: BookingPaymentStatus;
 
   @ApiProperty({
     description: 'Tên khách hàng (cho khách vãng lai)',

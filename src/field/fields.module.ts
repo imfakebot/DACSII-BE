@@ -15,6 +15,7 @@ import { Utility } from '../utility/entities/utility.entity';
 import { Branch } from '@/branch/entities/branch.entity';
 import { FieldTypeService } from './field-type.service'
 import { FieldTypeController } from './field-type.controller';
+import { TimeSlot } from '../pricing/entities/time-slot.entity';
 
 /**
  * @module FieldsModule
@@ -34,6 +35,7 @@ import { FieldTypeController } from './field-type.controller';
       Ward,
       City,
       Branch,
+      TimeSlot,
     ]),
     // Import HttpModule để có thể inject HttpService
     HttpModule,

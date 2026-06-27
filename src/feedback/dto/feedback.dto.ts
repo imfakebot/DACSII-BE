@@ -13,6 +13,9 @@ export class FeedbackDto {
   @ApiProperty({ example: 'suggestion' })
   category!: string;
 
+  @ApiProperty({ description: 'Nội dung ban đầu của phản hồi', required: false })
+  content?: string;
+
   @ApiProperty({ enum: FeedbackStatus })
   status!: FeedbackStatus;
 

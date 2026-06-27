@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsArray,
   IsNumber,
+  IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import sanitizeHtml from 'sanitize-html';
@@ -38,6 +39,17 @@ export class CreateFieldDto {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   @Transform(({ value }) => sanitizeHtml(value)) // Tiện tay chống XSS luôn
   description?: string;
+
+  /**
+   * @property {boolean} status
+   */
+  @ApiPropertyOptional({
+    description: 'Trạng thái hoạt động của sân',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  status?: boolean;
 
   /**
    * @property {string} fieldTypeId

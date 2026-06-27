@@ -58,9 +58,19 @@ export class FeedbackService {
       dto.assignee = this.mapProfileToDto(feedback.assignee);
     }
 
-    if (feedback.responses) {
-      dto.responses = feedback.responses.map(res => this.mapResponseToDto(res));
+    if (feedback.responses && feedback.responses.length > 0) {
+      // Sắp xếp responses theo thời gian tạo (cũ nhất lên đầu)
+      const sortedResponses = [...feedback.responses].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      
+      // Lấy tin nhắn đầu tiên (thường là nội dung gốc do người dùng nhập lúc tạo)
+      dto.content = sortedResponses[0].content;
+      
+      // Vẫn map toàn bộ responses như bình thường
+      dto.responses = sortedResponses.map(res => this.mapResponseToDto(res));
     } else {
+      dto.content = '';
       dto.responses = [];
     }
 
@@ -289,5 +299,26 @@ export class FeedbackService {
     });
 
     return this.mapResponseToDto(savedResponse);
+  }
+
+  /**
+   * @method updateStatus
+   * @description (Admin/Manager) Cập nhật trạng thái của ticket feedback
+   */
+  async updateStatus(
+    id: string,
+    status: FeedbackStatus,
+  ): Promise<FeedbackDto> {
+    this.logger.log(`Updating status of feedback ${id} to ${status}`);
+    const feedback = await this.feedbackRepo.findOne({ where: { id } });
+    if (!feedback) {
+      throw new NotFoundException('Không tìm thấy ticket feedback.');
+    }
+
+    feedback.status = status;
+    const updatedFeedback = await this.feedbackRepo.save(feedback);
+    
+    // Reload full info to return
+    return this.findOne(updatedFeedback.id);
   }
 }

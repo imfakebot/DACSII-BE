@@ -1,6 +1,5 @@
 import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
 import { Field } from './field.entity';
-import { TimeSlot } from '@/pricing/entities/time-slot.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -48,10 +47,4 @@ export class FieldType {
   @OneToMany(() => Field, (field) => field.fieldType)
   fields!: Field[];
 
-  /**
-   * @description Mối quan hệ Một-Nhiều với thực thể TimeSlot.
-   * Một loại sân có thể có nhiều khung giờ với các mức giá khác nhau.
-   */
-  @OneToMany(() => TimeSlot, (timeSlot) => timeSlot.fieldType)
-  timeSlots!: TimeSlot[];
 }

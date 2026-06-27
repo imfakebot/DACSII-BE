@@ -373,7 +373,6 @@ export class BookingService {
         paymentMethod: PaymentMethod.VNPAY,
         status: PaymentStatus.PENDING,
         booking: savedBooking,
-        voucher: appliedVoucher || undefined,
         createdAt: new Date(),
       });
 
@@ -430,7 +429,6 @@ export class BookingService {
         'userProfile',
         'userProfile.account',
         'payment',
-        'payment.voucher',
       ],
     });
 
@@ -520,10 +518,15 @@ export class BookingService {
       booking.payment.status = PaymentStatus.FAILED; // Or REFUNDED
       await queryRunner.manager.save(Payment, booking.payment);
 
-      if (booking.payment.voucher) {
+      const voucherUsage = await queryRunner.manager.findOne(VoucherUsage, {
+        where: { bookingId: booking.id },
+        relations: ['voucher']
+      });
+
+      if (voucherUsage && voucherUsage.voucher) {
         await queryRunner.manager.increment(
           Voucher,
-          { id: booking.payment.voucher.id },
+          { id: voucherUsage.voucher.id },
           'quantity',
           1,
         );
@@ -532,7 +535,7 @@ export class BookingService {
         if (booking.userProfile) {
           await this.voucherService.cancelUsage(
             booking.userProfile.id,
-            booking.payment.voucher.id,
+            voucherUsage.voucher.id,
             queryRunner.manager
           );
         }

@@ -106,6 +106,26 @@ export class ReviewController {
   // ==================== PHẦN BỔ SUNG MỚI ====================
 
   /**
+   * @route GET /review/my-reviews
+   * @description Lấy danh sách đánh giá của chính user (My Reviews).
+   */
+  @Get('my-reviews')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '(User) Lấy danh sách đánh giá của chính mình' })
+  @ApiResponse({ status: 200, type: ReviewPaginatedResponseDto, description: 'Trả về danh sách đánh giá của user.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  async getMyReviews(
+    @Query() query: PaginationQueryDto,
+    @User() user: AuthenticatedUser,
+  ): Promise<ReviewPaginatedResponseDto> {
+    const { page = 1, limit = 10 } = query;
+    this.logger.log(`User ${user.id} fetching my-reviews, page ${page}, limit ${limit}.`);
+    return this.reviewService.findMyReviews(user, page, limit);
+  }
+
+  /**
    * @route GET /review/management/all
    * @description Lấy danh sách đánh giá (Dành cho quản lý).
    * - Admin: Xem tất cả.

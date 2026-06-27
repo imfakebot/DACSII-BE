@@ -366,6 +366,16 @@ export class VoucherService {
   }
 
   /**
+   * (Internal) Lấy thông tin sử dụng voucher theo bookingId.
+   */
+  async getUsageByBookingId(bookingId: string): Promise<VoucherUsage | null> {
+    return this.voucherUsageRepository.findOne({
+      where: { bookingId },
+      relations: ['voucher'],
+    });
+  }
+
+  /**
    * (User) Kiểm tra tính hợp lệ của một mã giảm giá và tính toán số tiền được giảm.
    * Thực hiện các kiểm tra sau:
    * - Tồn tại

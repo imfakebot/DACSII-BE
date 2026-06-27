@@ -280,7 +280,6 @@ export class PaymentService {
       const payment = await this.paymentRepository.findOne({
         where: { booking: { id: bookingId }, status: PaymentStatus.PENDING },
         relations: [
-          'voucher',
           'booking',
           'booking.userProfile',
           'booking.userProfile.account',
@@ -427,9 +426,11 @@ export class PaymentService {
           recipientId: payment.booking.userProfile.id,
         });
 
-        if (payment.voucher) {
+        const voucherUsage = await this.voucherService.getUsageByBookingId(bookingId);
+
+        if (voucherUsage && voucherUsage.voucher) {
           await this.voucherRepository.increment(
-            { id: payment.voucher.id },
+            { id: voucherUsage.voucher.id },
             'quantity',
             1,
           );
@@ -437,11 +438,11 @@ export class PaymentService {
           // Hoàn lại lượt sử dụng voucher cho người dùng
           await this.voucherService.cancelUsage(
             payment.booking.userProfile.id,
-            payment.voucher.id,
+            voucherUsage.voucher.id,
           );
 
           this.logger.log(
-            `[IPN_INFO] Voucher ${payment.voucher.code} for booking ${bookingId} has been refunded.`,
+            `[IPN_INFO] Voucher ${voucherUsage.voucher.code} for booking ${bookingId} has been refunded.`,
           );
         }
 
@@ -482,8 +483,7 @@ export class PaymentService {
    */
   async findByBookingId(bookingId: string): Promise<Payment | null> {
     return this.paymentRepository.findOne({
-      where: { booking: { id: bookingId } },
-      relations: { voucher: true },
+      where: { booking: { id: bookingId } }
     });
   }
 

@@ -16,6 +16,7 @@ import { PricingService } from './pricing.service';
 import { CheckPriceResponseDto } from './dto/check-price-response.dto';
 import { CheckPriceDto } from './dto/check-price.dto';
 import { UpdateTimeSlotDto } from './dto/update-time-slot.dto';
+import { CreateTimeSlotDto } from './dto/create-time-slot.dto';
 import { Roles } from '../auth/decorator/roles.decorator';
 import { RoleEnum } from '../auth/enums/role.enum';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -84,5 +85,21 @@ export class PricingController {
   ): Promise<TimeSlotDto> {
     this.logger.log(`Received request to update time slot with ID: ${id}`);
     return this.pricingService.updateTimeSlot(id, updateTimeSlotDto);
+  }
+
+  @Post('time-slots')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleEnum.Admin)
+  @ApiOperation({ summary: 'Tạo khung giờ mới (Admin)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo khung giờ thành công.',
+    type: TimeSlotDto,
+  })
+  createTimeSlot(
+    @Body() createTimeSlotDto: CreateTimeSlotDto,
+  ): Promise<TimeSlotDto> {
+    this.logger.log('Received request to create a new time slot.');
+    return this.pricingService.createTimeSlot(createTimeSlotDto);
   }
 }

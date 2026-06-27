@@ -1,4 +1,4 @@
-import { FieldType } from '@/field/entities/field-types.entity';
+import { Field } from '@/field/entities/field.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -30,9 +30,9 @@ export class TimeSlot {
   @Column({ name: 'is_peak_hour', type: 'boolean', default: false })
   is_peak_hour!: boolean;
 
-  @ManyToOne(() => FieldType, (fieldType) => fieldType.timeSlots, {
+  @ManyToOne(() => Field, (field) => field.timeSlots, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'field_type_id' })
-  fieldType!: FieldType;
+  @JoinColumn({ name: 'field_id' })
+  field!: Field;
 }
