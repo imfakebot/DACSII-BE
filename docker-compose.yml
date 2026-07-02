@@ -2,7 +2,7 @@ services:
   db:
     image: mysql:8.0
     container_name: mysql_container
-    restart: always
+    restart: no
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_DATABASE}
